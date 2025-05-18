@@ -133,16 +133,8 @@ export default function PhotoGallery({
                         },
                       ]}
                     >
-                      {deletingPhotoId === photo.id ? (
-                        <Text style={[styles.actionText, { color: 'white' }]}>
-                          Apagando...
-                        </Text>
-                      ) : (
-                        <>
-                          <Trash2 size={16} color="white" />
-                          <Text style={styles.actionText}>Excluir</Text>
-                        </>
-                      )}
+                      <Trash2 size={16} color="white" />
+                      <Text style={styles.actionText}>Excluir</Text>
                     </TouchableOpacity>
                   )}
               </View>
@@ -226,28 +218,31 @@ const styles = StyleSheet.create({
   },
   descriptionContainer: {
     width: ITEM_WIDTH,
-    marginTop: 5,
-    backgroundColor: '#ccc',
-    padding: 10,
-    alignItems: 'center',
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#f9f9f9',
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
     shadowColor: '#000',
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2, // para Android
   },
 
   descriptionText: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#333',
-    lineHeight: 18,
+    lineHeight: 20,
     flex: 1,
     textAlign: 'left',
   },
 
   icon: {
-    marginRight: 8,
+    marginTop: 2,
   },
 });

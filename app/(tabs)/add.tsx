@@ -16,6 +16,7 @@ import Button from '@/components/ui/Button';
 import { Calendar, MapPin, CalendarRange, Info } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { FormValues } from '@/types';
+import LoadingOverlay from '@/components/LoadingOverlay';
 
 export default function AddEventScreen() {
   const { addEvent } = useEvents();
@@ -79,21 +80,24 @@ export default function AddEventScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
-    if (!validateForm()) {
-      return;
-    }
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
 
     setIsSubmitting(true);
 
     try {
-      addEvent(formValues);
+      const newEventId = await addEvent(formValues); // agora retorna o ID
 
-      Alert.alert('Evento criado', 'Seu evento foi criado com sucesso!.', [
-        { text: 'OK', onPress: () => router.push('/') },
-      ]);
+      setTimeout(() => {
+        Alert.alert('Evento criado', 'Seu evento foi criado com sucesso!', [
+          {
+            text: 'OK',
+            onPress: () => router.push(`/events/${newEventId}`),
+          },
+        ]);
+      }, 500);
     } catch (error) {
-      Alert.alert('Error', 'Falha ao criar o evento, tente novamente');
+      Alert.alert('Erro', 'Não foi possível criar o evento.');
     } finally {
       setIsSubmitting(false);
     }
@@ -129,131 +133,140 @@ export default function AddEventScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.contentContainer}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Text style={[styles.heading, { color: colors.text }]}>
-        Criar novo evento
-      </Text>
-
-      <TextInput
-        label="Título do evento"
-        placeholder="Insira o título do evento"
-        value={formValues.title}
-        onChangeText={(text) => updateFormValue('title', text)}
-        error={errors.title}
-      />
-
-      <TextInput
-        label="Localização"
-        placeholder="Insira a localização do evento"
-        value={formValues.location}
-        onChangeText={(text) => updateFormValue('location', text)}
-        error={errors.location}
-        icon={<MapPin size={20} color={colors.textSecondary} />}
-      />
-
-      <View style={styles.dateSection}>
-        <Text style={[styles.dateLabel, { color: colors.text }]}>
-          Período do evento
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={[styles.heading, { color: colors.text }]}>
+          Criar novo evento
         </Text>
 
-        <View style={styles.datePickersContainer}>
-          <View style={styles.datePickerWrapper}>
-            <Text
-              style={[styles.datePickerLabel, { color: colors.textSecondary }]}
-            >
-              Data de início
-            </Text>
-            <View style={[styles.dateButton, { borderColor: colors.border }]}>
-              <Calendar size={18} color={colors.primary} />
-              <Text
-                style={[styles.dateText, { color: colors.text }]}
-                onPress={() => setShowStartDatePicker(true)}
-              >
-                {formatDate(formValues.startDate)}
-              </Text>
-            </View>
-          </View>
+        <TextInput
+          label="Título do evento"
+          placeholder="Insira o título do evento"
+          value={formValues.title}
+          onChangeText={(text) => updateFormValue('title', text)}
+          error={errors.title}
+        />
 
-          <View style={styles.datePickerWrapper}>
-            <Text
-              style={[styles.datePickerLabel, { color: colors.textSecondary }]}
-            >
-              Data de encerramento
-            </Text>
-            <View style={[styles.dateButton, { borderColor: colors.border }]}>
-              <CalendarRange size={18} color={colors.primary} />
+        <TextInput
+          label="Localização"
+          placeholder="Insira a localização do evento"
+          value={formValues.location}
+          onChangeText={(text) => updateFormValue('location', text)}
+          error={errors.location}
+          icon={<MapPin size={20} color={colors.textSecondary} />}
+        />
+
+        <View style={styles.dateSection}>
+          <Text style={[styles.dateLabel, { color: colors.text }]}>
+            Período do evento
+          </Text>
+
+          <View style={styles.datePickersContainer}>
+            <View style={styles.datePickerWrapper}>
               <Text
-                style={[styles.dateText, { color: colors.text }]}
-                onPress={() => setShowEndDatePicker(true)}
+                style={[
+                  styles.datePickerLabel,
+                  { color: colors.textSecondary },
+                ]}
               >
-                {formatDate(formValues.endDate)}
+                Data de início
               </Text>
+              <View style={[styles.dateButton, { borderColor: colors.border }]}>
+                <Calendar size={18} color={colors.primary} />
+                <Text
+                  style={[styles.dateText, { color: colors.text }]}
+                  onPress={() => setShowStartDatePicker(true)}
+                >
+                  {formatDate(formValues.startDate)}
+                </Text>
+              </View>
             </View>
-            {errors.endDate && (
-              <Text style={[styles.errorText, { color: colors.error }]}>
-                {errors.endDate}
+
+            <View style={styles.datePickerWrapper}>
+              <Text
+                style={[
+                  styles.datePickerLabel,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                Data de encerramento
               </Text>
-            )}
+              <View style={[styles.dateButton, { borderColor: colors.border }]}>
+                <CalendarRange size={18} color={colors.primary} />
+                <Text
+                  style={[styles.dateText, { color: colors.text }]}
+                  onPress={() => setShowEndDatePicker(true)}
+                >
+                  {formatDate(formValues.endDate)}
+                </Text>
+              </View>
+              {errors.endDate && (
+                <Text style={[styles.errorText, { color: colors.error }]}>
+                  {errors.endDate}
+                </Text>
+              )}
+            </View>
           </View>
         </View>
-      </View>
 
-      {showStartDatePicker && (
-        <DateTimePicker
-          value={formValues.startDate}
-          mode="date"
-          display="default"
-          onChange={onStartDateChange}
-          minimumDate={new Date()}
-        />
-      )}
+        {showStartDatePicker && (
+          <DateTimePicker
+            value={formValues.startDate}
+            mode="date"
+            display="default"
+            onChange={onStartDateChange}
+            minimumDate={new Date()}
+          />
+        )}
 
-      {showEndDatePicker && (
-        <DateTimePicker
-          value={formValues.endDate}
-          mode="date"
-          display="default"
-          onChange={onEndDateChange}
-          minimumDate={formValues.startDate}
-        />
-      )}
+        {showEndDatePicker && (
+          <DateTimePicker
+            value={formValues.endDate}
+            mode="date"
+            display="default"
+            onChange={onEndDateChange}
+            minimumDate={formValues.startDate}
+          />
+        )}
 
-      <TextInput
-        label="Descrição (Opcional)"
-        placeholder="Insira uma descrição"
-        value={formValues.description}
-        onChangeText={(text) => updateFormValue('description', text)}
-        multiline
-        numberOfLines={4}
-        icon={<Info size={20} color={colors.textSecondary} />}
-      />
-      <TextInput
-        label="Código de Acesso para o evento (Token)"
-        placeholder="Ex: A1XD"
-        value={formValues.accessCode}
-        onChangeText={(text) => updateFormValue('accessCode', text)}
-        error={errors.accessCode}
-      />
+        <TextInput
+          label="Descrição (Opcional)"
+          placeholder="Insira uma descrição"
+          value={formValues.description}
+          onChangeText={(text) => updateFormValue('description', text)}
+          multiline
+          numberOfLines={4}
+          icon={<Info size={20} color={colors.textSecondary} />}
+        />
+        <TextInput
+          label="Código de Acesso para o evento (Token)"
+          placeholder="Ex: A1XD"
+          value={formValues.accessCode}
+          onChangeText={(text) => updateFormValue('accessCode', text)}
+          error={errors.accessCode}
+        />
 
-      <View style={styles.buttonsContainer}>
-        <Button
-          title="Cancelar"
-          onPress={() => router.back()}
-          variant="ghost"
-          style={styles.cancelButton}
-        />
-        <Button
-          title="Criar evento"
-          onPress={handleSubmit}
-          loading={isSubmitting}
-          style={styles.submitButton}
-        />
-      </View>
-    </ScrollView>
+        <View style={styles.buttonsContainer}>
+          <Button
+            title="Cancelar"
+            onPress={() => router.back()}
+            variant="ghost"
+            style={styles.cancelButton}
+          />
+          <Button
+            title="Criar evento"
+            onPress={handleSubmit}
+            loading={isSubmitting}
+            style={styles.submitButton}
+          />
+        </View>
+      </ScrollView>
+      {isSubmitting && <LoadingOverlay message="Criando evento..." />}
+    </View>
   );
 }
 

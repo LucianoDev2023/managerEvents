@@ -24,6 +24,7 @@ import {
 import ProgramItem from '@/components/ProgramItem';
 import Button from '@/components/ui/Button';
 import { Event } from '@/types';
+import LoadingOverlay from '@/components/LoadingOverlay';
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -106,16 +107,19 @@ export default function EventDetailScreen() {
     );
   };
 
-  const handleAddProgram = () => {
+  const handleAddProgram = async () => {
     setIsAddingProgram(true);
 
-    // Add a new program with today's date
-    // In a real app, you'd show a date picker
-    addProgram(event.id, new Date());
+    try {
+      await addProgram(event.id, new Date());
 
-    setTimeout(() => {
+      // Aguarda um tempo mínimo opcional (ex: 500ms)
+      await new Promise((res) => setTimeout(res, 500));
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível adicionar o dia.');
+    } finally {
       setIsAddingProgram(false);
-    }, 500);
+    }
   };
 
   return (
@@ -219,7 +223,6 @@ export default function EventDetailScreen() {
               size="small"
               icon={<Plus size={16} color="white" />}
               onPress={handleAddProgram}
-              loading={isAddingProgram}
             />
           </View>
 
@@ -254,6 +257,7 @@ export default function EventDetailScreen() {
           )}
         </View>
       </ScrollView>
+      {isAddingProgram && <LoadingOverlay message="Adicionando dia..." />}
     </View>
   );
 }

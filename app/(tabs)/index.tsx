@@ -19,6 +19,7 @@ import { useColorScheme } from 'react-native';
 import Button from '@/components/ui/Button';
 import { KeyRound, Plus, SearchCheck } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import LoadingOverlay from '@/components/LoadingOverlay';
 
 export default function EventsScreen() {
   const { state } = useEvents();
@@ -195,14 +196,7 @@ export default function EventsScreen() {
       </View>
 
       {isSearching ? (
-        <View
-          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-        >
-          <Text style={{ color: colors.text, marginBottom: 10 }}>
-            Buscando...
-          </Text>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <LoadingOverlay message="Buscando..." />
       ) : showResults ? (
         filteredEvents.length > 0 ? (
           <FlatList

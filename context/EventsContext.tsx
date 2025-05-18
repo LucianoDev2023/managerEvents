@@ -76,7 +76,7 @@ const eventsReducer = (
 type EventsContextType = {
   state: EventsState;
   fetchEvents: () => Promise<void>;
-  addEvent: (data: Omit<Event, 'id' | 'programs'>) => Promise<void>;
+  addEvent: (data: Omit<Event, 'id' | 'programs'>) => Promise<string>;
   updateEvent: (event: Event) => Promise<void>;
   deleteEvent: (eventId: string) => Promise<void>;
   addProgram: (eventId: string, date: Date) => Promise<void>;
@@ -230,6 +230,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       type: 'ADD_EVENT',
       payload: { id: docRef.id, ...data, programs: [] },
     });
+    return docRef.id;
   };
 
   const updateEvent = async (event: Event) => {

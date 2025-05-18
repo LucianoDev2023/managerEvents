@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
@@ -12,6 +13,7 @@ import PhotoGallery from '@/components/PhotoGallery';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
+import LoadingOverlay from '@/components/LoadingOverlay';
 
 export default function ActivityPhotosScreen() {
   const { id, programId, activityId } = useLocalSearchParams<{
@@ -23,6 +25,7 @@ export default function ActivityPhotosScreen() {
   const { state, deletePhoto } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
 
   const event = state.events.find((e) => e.id === id);
   const program = event?.programs.find((p) => p.id === programId);
@@ -36,6 +39,21 @@ export default function ActivityPhotosScreen() {
       </View>
     );
   }
+
+  const handleDeletePhoto = async ({
+    id,
+    publicId,
+  }: {
+    id: string;
+    publicId: string;
+  }) => {
+    setDeletingPhotoId(id);
+    try {
+      await deletePhoto(event.id, program.id, id);
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -56,16 +74,19 @@ export default function ActivityPhotosScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         {photos.length > 0 ? (
-          <PhotoGallery
-            photos={photos}
-            eventId={event.id}
-            programId={program.id}
-            activityId={activity.id}
-            editable
-            onDeletePhoto={({ id, publicId }) =>
-              deletePhoto(event.id, program.id, id)
-            }
-          />
+          <View style={{ position: 'relative', flex: 1 }}>
+            <PhotoGallery
+              photos={photos}
+              eventId={event.id}
+              programId={program.id}
+              activityId={activity.id}
+              editable
+              onDeletePhoto={handleDeletePhoto}
+              deletingPhotoId={deletingPhotoId}
+            />
+
+            {deletingPhotoId && <LoadingOverlay message="Excluindo..." />}
+          </View>
         ) : (
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>

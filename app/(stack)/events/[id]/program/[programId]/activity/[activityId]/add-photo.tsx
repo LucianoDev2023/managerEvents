@@ -22,6 +22,7 @@ import {
 import Button from '@/components/ui/Button';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinary } from '@/lib/uploadImageToCloudinary';
+import LoadingOverlay from '@/components/LoadingOverlay';
 
 export default function AddActivityPhotoScreen() {
   const { id, programId, activityId } = useLocalSearchParams<{
@@ -291,7 +292,6 @@ export default function AddActivityPhotoScreen() {
               <Button
                 title="Adicionar Foto"
                 onPress={handleSubmit}
-                loading={isSubmitting}
                 disabled={!selectedImage}
                 style={styles.submitButton}
               />
@@ -299,6 +299,7 @@ export default function AddActivityPhotoScreen() {
           </View>
         )}
       </ScrollView>
+      {isSubmitting && <LoadingOverlay />}
     </View>
   );
 }
