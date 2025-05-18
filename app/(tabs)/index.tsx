@@ -236,15 +236,15 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     paddingTop: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 5,
     paddingBottom: 12,
     backgroundColor: 'transparent',
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: 6,
-    paddingRight: 6,
+    paddingLeft: 4,
+    paddingRight: 4,
     marginBottom: 8,
   },
   searchInputContainer: {
@@ -252,12 +252,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
+    borderRadius: 10,
+    paddingHorizontal: 5,
     minHeight: 40,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 10,
+    marginLeft: 5,
   },
   searchInput: {
     flex: 1,
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
     minHeight: 40,
   },
   actionButton: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 10,
     height: 40,
     borderRadius: 10,
     justifyContent: 'center',
@@ -300,6 +301,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   createButton: {
-    width: 180,
+    width: 200,
   },
 });

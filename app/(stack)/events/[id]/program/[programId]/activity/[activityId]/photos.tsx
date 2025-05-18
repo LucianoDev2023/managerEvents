@@ -42,7 +42,7 @@ export default function ActivityPhotosScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTitle: `Fotos - ${activity.title}`,
+          headerTitle: 'Fotos',
           headerLeft: () => (
             <TouchableOpacity
               onPress={() => router.back()}
@@ -67,16 +67,27 @@ export default function ActivityPhotosScreen() {
             }
           />
         ) : (
-          <Text
-            style={{
-              textAlign: 'center',
-              fontSize: 16,
-              fontFamily: 'Inter-Regular',
-              color: colors.textSecondary,
-            }}
-          >
-            Essa atividade ainda não possui fotos.
-          </Text>
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              Essa atividade ainda não possui fotos.
+            </Text>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={() =>
+                router.push({
+                  pathname:
+                    '/events/[id]/program/[programId]/activity/[activityId]/add-photo',
+                  params: {
+                    id: event.id,
+                    programId: program.id,
+                    activityId: activity.id,
+                  },
+                })
+              }
+            >
+              <Text style={styles.addButtonText}>Adicionar Foto</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
     </View>
@@ -86,5 +97,30 @@ export default function ActivityPhotosScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+
+  emptyText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+
+  addButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+
+  addButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
   },
 });

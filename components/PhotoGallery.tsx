@@ -226,6 +226,7 @@ const styles = StyleSheet.create({
   },
   descriptionContainer: {
     width: ITEM_WIDTH,
+    marginTop: 5,
     backgroundColor: '#ccc',
     padding: 10,
     alignItems: 'center',

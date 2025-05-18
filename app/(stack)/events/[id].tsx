@@ -123,7 +123,7 @@ export default function EventDetailScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTitle: event.title,
+          headerTitle: 'Detalhes do evento',
           headerTitleStyle: {
             fontFamily: 'Inter-Bold',
             fontSize: 18,
@@ -196,7 +196,7 @@ export default function EventDetailScreen() {
 
             {event.description && (
               <Text style={[styles.description, { color: colors.text }]}>
-                {event.description}
+                Descrição: {event.description}
               </Text>
             )}
           </View>
@@ -233,7 +233,8 @@ export default function EventDetailScreen() {
               <Text
                 style={[styles.emptySubtext, { color: colors.textSecondary }]}
               >
-                Adicione um dia e depois inicie o planejamento do seu evento
+                Adicione um dia e depois inicie o planejamento referente ao dia
+                do seu evento
               </Text>
               {/* <Button
                 title="Add programa"

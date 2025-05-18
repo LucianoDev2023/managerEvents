@@ -192,14 +192,6 @@ export default function AddActivityPhotoScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={[styles.heading, { color: colors.text }]}>
-          Adicionar foto na atividade
-        </Text>
-
-        <Text style={[styles.activityTitle, { color: colors.primary }]}>
-          {activity.title}
-        </Text>
-
         {selectedImage ? (
           <View style={styles.previewContainer}>
             <Image
@@ -243,7 +235,7 @@ export default function AddActivityPhotoScreen() {
         )}
 
         {selectedImage && (
-          <View style={{ marginTop: 16, width: '100%', height: '20%' }}>
+          <View style={{ marginTop: 16, width: '100%' }}>
             <Text
               style={{
                 fontFamily: 'Inter-Medium',
@@ -252,7 +244,7 @@ export default function AddActivityPhotoScreen() {
                 marginBottom: 6,
               }}
             >
-              Digite uma descrição para imagem(até 50 caracteres)
+              Digite uma descrição (até 70 caracteres)
             </Text>
             <TextInput
               style={{
@@ -264,6 +256,8 @@ export default function AddActivityPhotoScreen() {
                 fontSize: 14,
                 color: colors.text,
                 backgroundColor: colors.backgroundAlt,
+                textAlignVertical: 'top', // importante para alinhar o texto no topo
+                height: 60, // altura suficiente para duas linhas
               }}
               value={description}
               onChangeText={(text) => {
@@ -271,17 +265,21 @@ export default function AddActivityPhotoScreen() {
               }}
               placeholder="Digite uma descrição..."
               placeholderTextColor={colors.textSecondary}
-              maxLength={50}
+              maxLength={70}
+              multiline={true}
+              numberOfLines={2}
             />
+
             <Text
               style={{
                 alignSelf: 'flex-end',
                 color: colors.textSecondary,
                 fontSize: 12,
                 marginTop: 4,
+                lineHeight: 20,
               }}
             >
-              {description.length}/50
+              {description.length}/70
             </Text>
           </View>
         )}
@@ -341,7 +339,7 @@ const styles = StyleSheet.create({
     aspectRatio: 4 / 3,
     borderWidth: 2,
     borderStyle: 'dashed',
-    borderRadius: 12,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
