@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Image,
@@ -8,10 +8,13 @@ import {
   Text,
 } from 'react-native';
 import { Photo } from '@/types';
-import { Trash2 } from 'lucide-react-native';
+import { Trash2, Share2, MessageSquare } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import ImageViewing from 'react-native-image-viewing';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 interface PhotoGalleryProps {
   photos: Photo[];
@@ -20,6 +23,7 @@ interface PhotoGalleryProps {
   eventId?: string;
   programId?: string;
   activityId?: string;
+  deletingPhotoId?: string | null;
 }
 
 const { width } = Dimensions.get('window');
@@ -30,9 +34,28 @@ export default function PhotoGallery({
   photos,
   onDeletePhoto,
   editable = false,
+  deletingPhotoId,
 }: PhotoGalleryProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+
+  const [isViewerVisible, setIsViewerVisible] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const handleShareImage = async (imageUrl: string) => {
+    try {
+      const downloadPath = FileSystem.documentDirectory + 'shared-image.jpg';
+      const { uri } = await FileSystem.downloadAsync(imageUrl, downloadPath);
+      await Sharing.shareAsync(uri);
+    } catch (error) {
+      console.error('Erro ao compartilhar imagem:', error);
+    }
+  };
+
+  const openImage = (index: number) => {
+    setCurrentIndex(index);
+    setIsViewerVisible(true);
+  };
 
   if (photos.length === 0) {
     return (
@@ -46,31 +69,96 @@ export default function PhotoGallery({
 
   return (
     <View style={styles.container}>
-      {photos.map((photo) => (
-        <Animated.View
-          key={photo.id}
-          entering={FadeIn.duration(300)}
-          exiting={FadeOut.duration(300)}
-          style={styles.photoContainer}
-        >
-          <Image
-            source={{ uri: photo.uri }}
-            style={[styles.photo, { width: ITEM_WIDTH, height: ITEM_HEIGHT }]}
-            resizeMode="cover"
-          />
-
-          {editable && onDeletePhoto && (
-            <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: colors.error }]}
-              onPress={() =>
-                onDeletePhoto?.({ id: photo.id, publicId: photo.publicId })
-              }
+      {photos.map((photo, index) => {
+        console.log('Descrição:', photo.description);
+        return (
+          <View key={photo.id} style={{ width: '100%' }}>
+            <Animated.View
+              entering={FadeIn.duration(300)}
+              exiting={FadeOut.duration(300)}
+              style={styles.photoBlock}
             >
-              <Trash2 size={16} color="white" />
-            </TouchableOpacity>
-          )}
-        </Animated.View>
-      ))}
+              <TouchableOpacity onPress={() => openImage(index)}>
+                <View style={styles.photoWrapper}>
+                  <Image
+                    source={{ uri: photo.uri }}
+                    style={[
+                      styles.photo,
+                      { width: ITEM_WIDTH, height: ITEM_HEIGHT },
+                    ]}
+                    resizeMode="cover"
+                  />
+                  <View
+                    style={[
+                      styles.descriptionContainer,
+                      { flexDirection: 'row' },
+                    ]}
+                  >
+                    <MessageSquare size={16} color="#555" style={styles.icon} />
+                    <Text style={styles.descriptionText}>
+                      {photo.description}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.actionsContainer}>
+                <TouchableOpacity
+                  onPress={() => handleShareImage(photo.uri)}
+                  style={[
+                    styles.actionButton,
+                    { backgroundColor: colors.primary },
+                  ]}
+                >
+                  <Share2 size={16} color="white" />
+                  <Text style={styles.actionText}>Compartilhar</Text>
+                </TouchableOpacity>
+
+                {editable &&
+                  onDeletePhoto &&
+                  typeof photo.publicId === 'string' && (
+                    <TouchableOpacity
+                      disabled={deletingPhotoId === photo.id}
+                      onPress={() =>
+                        onDeletePhoto({
+                          id: photo.id,
+                          publicId: photo.publicId!,
+                        })
+                      }
+                      style={[
+                        styles.actionButton,
+                        {
+                          backgroundColor: colors.error,
+                          opacity: deletingPhotoId === photo.id ? 0.6 : 1,
+                        },
+                      ]}
+                    >
+                      {deletingPhotoId === photo.id ? (
+                        <Text style={[styles.actionText, { color: 'white' }]}>
+                          Apagando...
+                        </Text>
+                      ) : (
+                        <>
+                          <Trash2 size={16} color="white" />
+                          <Text style={styles.actionText}>Excluir</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
+              </View>
+            </Animated.View>
+
+            {index < photos.length - 1 && <View style={styles.divider} />}
+          </View>
+        );
+      })}
+
+      <ImageViewing
+        images={photos.map((p) => ({ uri: p.uri }))}
+        imageIndex={currentIndex}
+        visible={isViewerVisible}
+        onRequestClose={() => setIsViewerVisible(false)}
+      />
     </View>
   );
 }
@@ -78,25 +166,35 @@ export default function PhotoGallery({
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    padding: 16,
+    padding: 10,
   },
-  photoContainer: {
-    marginBottom: 16,
-    borderRadius: 12,
-    overflow: 'hidden',
+  photoBlock: {
+    marginBottom: 20,
+    alignItems: 'center',
   },
   photo: {
-    borderRadius: 12,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
-  deleteButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
+  actionsContainer: {
+    flexDirection: 'row',
+    marginTop: 10,
+    gap: 12,
+  },
+  actionButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+  },
+  actionText: {
+    color: 'white',
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    marginLeft: 6,
   },
   emptyContainer: {
     margin: 16,
@@ -110,5 +208,45 @@ const styles = StyleSheet.create({
   emptyText: {
     fontFamily: 'Inter-Medium',
     fontSize: 16,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#ccc',
+    marginVertical: 16,
+    width: '100%',
+    alignSelf: 'center',
+    opacity: 0.5,
+  },
+  photoWrapper: {
+    borderWidth: 2,
+    borderColor: '#999', // ou use colors.border para tema dinâmico
+    borderRadius: 14,
+    padding: 5,
+    backgroundColor: 'transparent', // opcional para borda mais visível
+  },
+  descriptionContainer: {
+    width: ITEM_WIDTH,
+    backgroundColor: '#ccc',
+    padding: 10,
+    alignItems: 'center',
+    flexDirection: 'row',
+    shadowColor: '#000',
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+  },
+
+  descriptionText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#333',
+    lineHeight: 18,
+    flex: 1,
+    textAlign: 'left',
+  },
+
+  icon: {
+    marginRight: 8,
   },
 });

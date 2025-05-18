@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  TextInput,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
@@ -32,6 +33,7 @@ export default function AddActivityPhotoScreen() {
   const { state, addPhoto } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = useMemo(() => Colors[colorScheme], [colorScheme]);
+  const [description, setDescription] = useState('');
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -119,7 +121,10 @@ export default function AddActivityPhotoScreen() {
         selectedImage.substring(0, 50) + '...'
       );
       const { uri, publicId } = await uploadImageToCloudinary(selectedImage);
-      await addPhoto(id, programId, activityId, publicId, uri);
+      await addPhoto(id, programId, activityId, publicId, uri, description);
+      console.log('Descrição recebida no EventsContext:', description);
+      console.log('Função dentro do add photo');
+      console.log(id, programId, activityId, publicId, uri, description);
 
       Alert.alert(
         'Sucesso',
@@ -131,7 +136,7 @@ export default function AddActivityPhotoScreen() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedImage, id, programId, activityId, addPhoto]);
+  }, [selectedImage, id, programId, activityId, addPhoto, description]);
 
   const handleClearImage = useCallback(() => {
     setSelectedImage(null);
@@ -234,6 +239,50 @@ export default function AddActivityPhotoScreen() {
                 style={styles.pickerButton}
               />
             </View>
+          </View>
+        )}
+
+        {selectedImage && (
+          <View style={{ marginTop: 16, width: '100%', height: '20%' }}>
+            <Text
+              style={{
+                fontFamily: 'Inter-Medium',
+                fontSize: 14,
+                color: colors.text,
+                marginBottom: 6,
+              }}
+            >
+              Digite uma descrição para imagem(até 50 caracteres)
+            </Text>
+            <TextInput
+              style={{
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 8,
+                padding: 10,
+                fontFamily: 'Inter-Regular',
+                fontSize: 14,
+                color: colors.text,
+                backgroundColor: colors.backgroundAlt,
+              }}
+              value={description}
+              onChangeText={(text) => {
+                if (text.length <= 70) setDescription(text);
+              }}
+              placeholder="Digite uma descrição..."
+              placeholderTextColor={colors.textSecondary}
+              maxLength={50}
+            />
+            <Text
+              style={{
+                alignSelf: 'flex-end',
+                color: colors.textSecondary,
+                fontSize: 12,
+                marginTop: 4,
+              }}
+            >
+              {description.length}/50
+            </Text>
           </View>
         )}
 

@@ -26,13 +26,21 @@ export type Activity = {
   photos?: Photo[];
 };
 
+interface ActivityItemProps {
+  activity: Activity;
+  eventId: string;
+  programId: string;
+  photos: Photo[]; // ✅ Adicione esta linha
+}
+
 export type Photo = {
   id: string;
   activityId: string;
   programId: string;
   uri: string;
   timestamp: Date;
-  publicId?: string; // opcional, se estiver usando Cloudinary
+  publicId?: string;
+  description?: string;
 };
 
 export type FormValues = {

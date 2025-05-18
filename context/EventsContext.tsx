@@ -101,7 +101,8 @@ type EventsContextType = {
     programId: string,
     activityId: string,
     publicId: string,
-    uri: string
+    uri: string,
+    description: string
   ) => Promise<void>;
 
   deletePhoto: (
@@ -174,7 +175,9 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
               id: photoDoc.id,
               programId: data.programId,
               uri: data.uri,
+              publicId: data.publicId,
               timestamp: data.timestamp?.toDate?.() ?? new Date(),
+              description: data.description ?? '',
             };
             if (!photosMap.has(activityId)) photosMap.set(activityId, []);
             photosMap.get(activityId)!.push(photo);
@@ -298,18 +301,21 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     programId: string,
     activityId: string,
     publicId: string,
-    uri: string
+    uri: string,
+    description: string
   ) => {
+    console.log('Salvando no Firestore com descrição:', description);
     await addDoc(collection(db, 'photos'), {
       eventId,
       programId,
       activityId,
-      publicId, // ID do Cloudinary
-      uri, // URL da imagem já hospedada no Cloudinary
+      publicId,
+      uri,
+      description: description.trim().slice(0, 70),
       timestamp: Timestamp.now(),
     });
 
-    await fetchEvents(); // Atualiza estado
+    await fetchEvents();
   };
 
   const deletePhoto = async (

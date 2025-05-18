@@ -217,7 +217,7 @@ export default function EventsScreen() {
             contentContainerStyle={{
               paddingHorizontal: 16,
               paddingBottom: 40,
-              paddingTop: 140,
+              paddingTop: 10,
             }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}

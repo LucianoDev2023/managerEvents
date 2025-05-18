@@ -24,7 +24,7 @@ export default function StackLayout() {
           headerTintColor: colors.text,
           headerTitleAlign: 'center',
           contentStyle: {
-            backgroundColor: colors.background, // ← ESSENCIAL para evitar piscada
+            backgroundColor: colors.background,
           },
         }}
       />

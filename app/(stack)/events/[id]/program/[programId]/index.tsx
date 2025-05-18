@@ -116,7 +116,7 @@ export default function ProgramDetailScreen() {
         style: 'destructive',
         onPress: () => {
           if (activityId) {
-            deletePhoto(event.id, program.id, activityId, photoId);
+            deletePhoto(event.id, program.id, activityId);
           } else {
             Alert.alert('Error', 'Activity ID not found.');
           }
@@ -199,12 +199,6 @@ export default function ProgramDetailScreen() {
               >
                 Adicione uma atividade e comece os registros diários
               </Text>
-              {/* <Button
-                title="Add Activity"
-                onPress={handleAddActivity}
-                icon={<Plus size={18} color="white" />}
-                style={styles.addButton}
-              /> */}
             </View>
           ) : (
             program.activities.map((activity) => (
@@ -213,21 +207,7 @@ export default function ProgramDetailScreen() {
                   activity={activity}
                   eventId={event.id}
                   programId={program.id}
-                  photos={program.photos.filter(
-                    (p) => p.activityId === activity.id
-                  )}
                 />
-
-                {/* <PhotoGallery
-                  photos={program.photos.filter(
-                    (p) => p.activityId === activity.id
-                  )}
-                  eventId={event.id}
-                  programId={program.id}
-                  activityId={activity.id}
-                  onDeletePhoto={deletePhoto}
-                  editable
-                /> */}
               </View>
             ))
           )}
