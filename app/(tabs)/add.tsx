@@ -104,7 +104,7 @@ export default function AddEventScreen() {
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('pt-BR', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -235,7 +235,7 @@ export default function AddEventScreen() {
 
         <TextInput
           label="Descrição (Opcional)"
-          placeholder="Insira uma descrição"
+          placeholder="Insira uma descrição..."
           value={formValues.description}
           onChangeText={(text) => updateFormValue('description', text)}
           multiline
@@ -243,7 +243,7 @@ export default function AddEventScreen() {
           icon={<Info size={20} color={colors.textSecondary} />}
         />
         <TextInput
-          label="Código de Acesso para o evento (Token)"
+          label="Código de Acesso (Salve este valor)"
           placeholder="Ex: A1XD"
           value={formValues.accessCode}
           onChangeText={(text) => updateFormValue('accessCode', text)}

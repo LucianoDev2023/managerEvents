@@ -203,20 +203,27 @@ export default function EventsScreen() {
             data={filteredEvents}
             keyExtractor={(item) => item.id}
             renderItem={({ item, index }) => (
-              <Pressable
-                onPress={() => router.push(`/events/${item.id}`)}
-                android_ripple={{ color: colors.primary }}
-                style={({ pressed }) => ({
-                  transform: [{ scale: pressed ? 0.97 : 1 }],
-                  marginBottom: 12,
-                })}
+              <Animated.View
+                entering={FadeInDown.delay(index * 100).springify()}
               >
-                <Animated.View
-                  entering={FadeInDown.delay(index * 100).springify()}
+                <View
+                  style={{
+                    borderRadius: 12,
+                    overflow: 'hidden',
+                    marginBottom: 12,
+                  }}
                 >
-                  <EventCard event={item} />
-                </Animated.View>
-              </Pressable>
+                  <Pressable
+                    onPress={() => router.push(`/events/${item.id}`)}
+                    android_ripple={{ color: colors.primary }}
+                    style={({ pressed }) => ({
+                      transform: [{ scale: pressed ? 0.97 : 1 }],
+                    })}
+                  >
+                    <EventCard event={item} />
+                  </Pressable>
+                </View>
+              </Animated.View>
             )}
             contentContainerStyle={{
               paddingHorizontal: 16,

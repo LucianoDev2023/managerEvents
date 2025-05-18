@@ -95,7 +95,7 @@ export default function CalendarScreen() {
   }, [selectedMonth, state.events]);
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('pt-BR', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -117,7 +117,7 @@ export default function CalendarScreen() {
         </TouchableOpacity>
 
         <Text style={[styles.monthTitle, { color: colors.text }]}>
-          {selectedMonth.toLocaleString('default', {
+          {selectedMonth.toLocaleString('pt-BR', {
             month: 'long',
             year: 'numeric',
           })}
@@ -129,7 +129,7 @@ export default function CalendarScreen() {
       </View>
 
       <View style={styles.weekdaysContainer}>
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+        {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
           <Text
             key={day}
             style={[styles.weekday, { color: colors.textSecondary }]}
@@ -167,7 +167,7 @@ export default function CalendarScreen() {
       </View>
 
       <Text style={[styles.eventsTitle, { color: colors.text }]}>
-        Events This Month
+        Eventos para este Mês
       </Text>
 
       <ScrollView style={styles.eventsContainer}>
@@ -177,7 +177,7 @@ export default function CalendarScreen() {
             <Text
               style={[styles.noEventsText, { color: colors.textSecondary }]}
             >
-              No events scheduled for this month
+              Nenhum evento disponível
             </Text>
           </View>
         ) : (

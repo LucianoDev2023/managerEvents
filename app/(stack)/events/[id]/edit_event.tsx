@@ -15,7 +15,7 @@ import TextInput from '@/components/ui/TextInput';
 import Button from '@/components/ui/Button';
 import { Calendar, MapPin, CalendarRange, Info } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { FormValues } from '@/types';
+import { Event, FormValues } from '@/types';
 
 export default function AddOrEditEventScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -25,56 +25,63 @@ export default function AddOrEditEventScreen() {
 
   const existingEvent = state.events.find((e) => e.id === id);
 
-  const [formValues, setFormValues] = useState<FormValues>(() =>
-    existingEvent
+  const getInitialFormValues = (event?: Event): FormValues => {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+
+    return event
       ? {
-          title: existingEvent.title,
-          location: existingEvent.location,
-          startDate: new Date(existingEvent.startDate),
-          endDate: new Date(existingEvent.endDate),
-          description: existingEvent.description,
+          title: event.title,
+          location: event.location,
+          startDate: new Date(event.startDate),
+          endDate: new Date(event.endDate),
+          description: event.description,
+          accessCode: event.accessCode ?? '',
         }
       : {
           title: '',
           location: '',
-          startDate: new Date(),
-          endDate: new Date(new Date().setDate(new Date().getDate() + 1)),
+          startDate: now,
+          endDate: tomorrow,
           description: '',
-        }
-  );
+          accessCode: '',
+        };
+  };
 
+  const [formValues, setFormValues] = useState<FormValues>(() =>
+    getInitialFormValues(existingEvent)
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateFormValue = (key: keyof FormValues, value: any) => {
-    setFormValues({
-      ...formValues,
+    setFormValues((prev) => ({
+      ...prev,
       [key]: value,
-    });
+    }));
     if (errors[key]) {
-      setErrors({
-        ...errors,
-        [key]: '',
-      });
+      setErrors((prev) => ({ ...prev, [key]: '' }));
     }
   };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
+
     if (!formValues.title.trim()) {
-      newErrors.title = 'Title is required';
+      newErrors.title = 'Título é obrigatório';
     } else if (formValues.title.length < 3) {
-      newErrors.title = 'Title must be at least 3 characters';
+      newErrors.title = 'O título deve ter pelo menos 3 caracteres';
     }
 
     if (!formValues.location.trim()) {
-      newErrors.location = 'Location is required';
+      newErrors.location = 'Local é obrigatório';
     }
 
     if (formValues.endDate < formValues.startDate) {
-      newErrors.endDate = 'End date must be after start date';
+      newErrors.endDate = 'Data final deve ser após a data inicial';
     }
 
     setErrors(newErrors);
@@ -94,11 +101,9 @@ export default function AddOrEditEventScreen() {
 
       updateEvent({ id, ...formValues, programs: existingEvent.programs });
 
-      Alert.alert(
-        'Evento Atualizado',
-        'Seu evento foi atualizado com sucesso!',
-        [{ text: 'OK', onPress: () => router.push('/') }]
-      );
+      Alert.alert('Evento Atualizado', 'Seu evento foi salvo com sucesso!', [
+        { text: 'OK', onPress: () => router.push('/') },
+      ]);
     } catch (error) {
       Alert.alert('Erro', 'Falha ao salvar o evento. Tente novamente.');
     } finally {
@@ -106,15 +111,14 @@ export default function AddOrEditEventScreen() {
     }
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', {
+  const formatDate = (date: Date) =>
+    date.toLocaleDateString('pt-BR', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-  };
 
-  const onStartDateChange = (event: any, selectedDate?: Date) => {
+  const onStartDateChange = (_: any, selectedDate?: Date) => {
     setShowStartDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
       updateFormValue('startDate', selectedDate);
@@ -127,7 +131,7 @@ export default function AddOrEditEventScreen() {
     }
   };
 
-  const onEndDateChange = (event: any, selectedDate?: Date) => {
+  const onEndDateChange = (_: any, selectedDate?: Date) => {
     setShowEndDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
       updateFormValue('endDate', selectedDate);
@@ -146,7 +150,7 @@ export default function AddOrEditEventScreen() {
 
       <TextInput
         label="Título do Evento"
-        placeholder="Digite o título do evento"
+        placeholder="Digite o título"
         value={formValues.title}
         onChangeText={(text) => updateFormValue('title', text)}
         error={errors.title}
@@ -154,7 +158,7 @@ export default function AddOrEditEventScreen() {
 
       <TextInput
         label="Local"
-        placeholder="Digite o local do evento"
+        placeholder="Digite o local"
         value={formValues.location}
         onChangeText={(text) => updateFormValue('location', text)}
         error={errors.location}
@@ -230,7 +234,7 @@ export default function AddOrEditEventScreen() {
 
       <TextInput
         label="Descrição (opcional)"
-        placeholder="Descreva o evento"
+        placeholder="Descreva o evento..."
         value={formValues.description}
         onChangeText={(text) => updateFormValue('description', text)}
         multiline
@@ -257,22 +261,15 @@ export default function AddOrEditEventScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: 40,
-  },
+  container: { flex: 1 },
+  contentContainer: { padding: 16, paddingBottom: 40 },
   heading: {
     fontSize: 24,
     fontFamily: 'Inter-Bold',
     marginBottom: 24,
     textAlign: 'center',
   },
-  dateSection: {
-    marginBottom: 16,
-  },
+  dateSection: { marginBottom: 16 },
   dateLabel: {
     fontFamily: 'Inter-Medium',
     fontSize: 16,
@@ -282,9 +279,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  datePickerWrapper: {
-    flex: 0.48,
-  },
+  datePickerWrapper: { flex: 0.48 },
   datePickerLabel: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
@@ -315,6 +310,7 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 0.48,
+    backgroundColor: '#333',
   },
   submitButton: {
     flex: 0.48,

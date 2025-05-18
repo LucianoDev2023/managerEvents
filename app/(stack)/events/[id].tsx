@@ -236,8 +236,7 @@ export default function EventDetailScreen() {
               <Text
                 style={[styles.emptySubtext, { color: colors.textSecondary }]}
               >
-                Adicione um dia e depois inicie o planejamento referente ao dia
-                do seu evento
+                Adicione um dia e depois inicie o planejamento
               </Text>
               {/* <Button
                 title="Add programa"
@@ -304,7 +303,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
   },
   description: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
     lineHeight: 24,
   },

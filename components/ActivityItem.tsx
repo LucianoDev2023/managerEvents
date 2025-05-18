@@ -1,7 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Pressable,
+  Platform,
+} from 'react-native';
 import Card from './ui/Card';
 import {
+  ChevronRight,
   Clock,
   Edit,
   CreditCard as Edit2,
@@ -48,7 +56,14 @@ export default function ActivityItem({
   };
 
   return (
-    <TouchableOpacity activeOpacity={0.85} onPress={handleViewPhotos}>
+    <Pressable
+      onPress={handleViewPhotos}
+      android_ripple={{ color: colors.primary, borderless: false }}
+      style={({ pressed }) => [
+        styles.cardWrapper,
+        pressed && Platform.OS === 'ios' && { opacity: 0.7 },
+      ]}
+    >
       <Card style={styles.card}>
         <View style={styles.header}>
           <View style={styles.timeContainer}>
@@ -83,8 +98,11 @@ export default function ActivityItem({
             {activity.description}
           </Text>
         )}
+        <View style={styles.chevronContainer}>
+          <ChevronRight size={24} color={colors.primary} />
+        </View>
       </Card>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -126,5 +144,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     lineHeight: 20,
+  },
+  chevronContainer: {
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingLeft: 12,
+  },
+  cardWrapper: {
+    borderRadius: 12,
+    overflow: 'hidden',
   },
 });

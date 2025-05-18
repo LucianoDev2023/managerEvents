@@ -130,12 +130,12 @@ export default function EditActivityScreen() {
       });
 
       Alert.alert(
-        'Activity Updated',
-        'The activity has been updated successfully.',
+        'Atualizar atividade',
+        'Essa atividade foi atualizada com sucesso.',
         [{ text: 'OK', onPress: () => router.back() }]
       );
     } catch (error) {
-      Alert.alert('Error', 'Failed to update activity. Please try again.');
+      Alert.alert('Error', 'Falha ao atualizar atividade.');
     } finally {
       setIsSubmitting(false);
     }
@@ -143,12 +143,12 @@ export default function EditActivityScreen() {
 
   const handleDelete = () => {
     Alert.alert(
-      'Delete Activity',
-      'Are you sure you want to delete this activity? This action cannot be undone.',
+      'Deletar atividade',
+      'Tem certeza que deseja deletar? Essa atividade não poderá ser desfeita.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancela', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Deletar',
           style: 'destructive',
           onPress: () => {
             deleteActivity(id, programId, activityId);
@@ -183,7 +183,7 @@ export default function EditActivityScreen() {
         <Stack.Screen
           options={{
             headerShown: true,
-            headerTitle: 'Activity not found',
+            headerTitle: 'Atividade não encontrada',
             headerLeft: () => (
               <TouchableOpacity onPress={() => router.back()}>
                 <ArrowLeft size={24} color={colors.text} />
@@ -193,7 +193,7 @@ export default function EditActivityScreen() {
         />
         <View style={styles.notFoundContainer}>
           <Text style={[styles.notFoundText, { color: colors.text }]}>
-            The activity you're looking for doesn't exist or has been deleted.
+            Essa atividade não pode ser localizada ou não existe.
           </Text>
           <Button
             title="Go Back"
@@ -210,7 +210,7 @@ export default function EditActivityScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTitle: 'Edit Activity',
+          headerTitle: 'Editar atividade',
           headerTitleStyle: {
             fontFamily: 'Inter-Bold',
             fontSize: 18,
@@ -240,12 +240,12 @@ export default function EditActivityScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={[styles.heading, { color: colors.text }]}>
-          Edit Activity
+          Editar atividade
         </Text>
 
         <View style={styles.timePickerContainer}>
           <Text style={[styles.label, { color: colors.text }]}>
-            Activity Time
+            Horário da atividade
           </Text>
 
           <TouchableOpacity
@@ -275,16 +275,16 @@ export default function EditActivityScreen() {
         )}
 
         <TextInput
-          label="Activity Title"
-          placeholder="Enter activity title"
+          label="Título da atividade"
+          placeholder="Insira o título da atividade"
           value={formValues.title}
           onChangeText={(text) => updateFormValue('title', text)}
           error={errors.title}
         />
 
         <TextInput
-          label="Description (Optional)"
-          placeholder="Enter activity description"
+          label="Descrição (Opcional)"
+          placeholder="Insira uma descrição..."
           value={formValues.description}
           onChangeText={(text) => updateFormValue('description', text)}
           multiline
@@ -293,13 +293,13 @@ export default function EditActivityScreen() {
 
         <View style={styles.buttonsContainer}>
           <Button
-            title="Cancel"
+            title="Cancelar"
             onPress={() => router.back()}
             variant="ghost"
             style={styles.cancelButton}
           />
           <Button
-            title="Update Activity"
+            title="Atualizar"
             onPress={handleUpdate}
             loading={isSubmitting}
             style={styles.submitButton}
@@ -362,6 +362,7 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 0.48,
+    backgroundColor: '#333',
   },
   submitButton: {
     flex: 0.48,

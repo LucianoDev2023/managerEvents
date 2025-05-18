@@ -26,13 +26,6 @@ export type Activity = {
   photos?: Photo[];
 };
 
-interface ActivityItemProps {
-  activity: Activity;
-  eventId: string;
-  programId: string;
-  photos: Photo[]; // ✅ Adicione esta linha
-}
-
 export type Photo = {
   id: string;
   activityId: string;
