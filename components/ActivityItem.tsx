@@ -1,7 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Card from './ui/Card';
-import { Clock, CreditCard as Edit2, Plus } from 'lucide-react-native';
+import {
+  Clock,
+  Edit,
+  CreditCard as Edit2,
+  LucideCamera,
+  Plus,
+} from 'lucide-react-native';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import { Activity } from '@/types';
@@ -46,7 +52,7 @@ export default function ActivityItem({
       <Card style={styles.card}>
         <View style={styles.header}>
           <View style={styles.timeContainer}>
-            <Clock size={16} color={colors.primary} />
+            <Clock size={18} color={colors.primary} />
             <Text style={[styles.time, { color: colors.primary }]}>
               {activity.time}
             </Text>
@@ -57,13 +63,13 @@ export default function ActivityItem({
               onPress={handleAddPhoto}
               style={styles.iconButton}
             >
-              <Plus size={18} color={colors.textSecondary} />
+              <LucideCamera size={20} color={colors.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleEditActivity}
               style={styles.iconButton}
             >
-              <Edit2 size={18} color={colors.textSecondary} />
+              <Edit size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>

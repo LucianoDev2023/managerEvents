@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Text,
+  Alert,
 } from 'react-native';
 import { Photo } from '@/types';
 import { Trash2, Share2, MessageSquare } from 'lucide-react-native';
@@ -119,12 +120,24 @@ export default function PhotoGallery({
                   typeof photo.publicId === 'string' && (
                     <TouchableOpacity
                       disabled={deletingPhotoId === photo.id}
-                      onPress={() =>
-                        onDeletePhoto({
-                          id: photo.id,
-                          publicId: photo.publicId!,
-                        })
-                      }
+                      onPress={() => {
+                        Alert.alert(
+                          'Confirmar exclusão',
+                          'Deseja realmente excluir esta foto?',
+                          [
+                            { text: 'Cancelar', style: 'cancel' },
+                            {
+                              text: 'Excluir',
+                              style: 'destructive',
+                              onPress: () =>
+                                onDeletePhoto({
+                                  id: photo.id,
+                                  publicId: photo.publicId!,
+                                }),
+                            },
+                          ]
+                        );
+                      }}
                       style={[
                         styles.actionButton,
                         {
