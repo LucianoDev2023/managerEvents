@@ -311,7 +311,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       activityId,
       publicId,
       uri,
-      description: description.trim().slice(0, 70),
+      description: description.trim().slice(0, 100),
       timestamp: Timestamp.now(),
     });
 

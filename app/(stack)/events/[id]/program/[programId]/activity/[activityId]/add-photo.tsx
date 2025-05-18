@@ -214,17 +214,18 @@ export default function AddActivityPhotoScreen() {
             ]}
           >
             <Text style={[styles.pickerText, { color: colors.textSecondary }]}>
-              Nenhuma imagem selecionada
+              Selecione a foto desejada na galeria
             </Text>
+
             <View style={styles.pickerButtonsContainer}>
-              <Button
+              {/* <Button
                 title="Abrir câmera"
                 onPress={handleTakePhoto}
                 icon={<Camera size={18} color="white" />}
                 style={styles.pickerButton}
-              />
+              /> */}
               <Button
-                title="Escolher na galeria"
+                title="Escolher foto"
                 onPress={handlePickImage}
                 variant="secondary"
                 icon={<ImageIcon size={18} color="white" />}
@@ -243,11 +244,20 @@ export default function AddActivityPhotoScreen() {
                 color: colors.text,
                 marginBottom: 6,
               }}
-            >
-              Digite uma descrição (até 70 caracteres)
-            </Text>
+            ></Text>
             <TextInput
+              multiline
+              numberOfLines={4}
+              scrollEnabled
+              maxLength={150}
+              value={description}
+              onChangeText={(text) => {
+                if (text.length <= 100) setDescription(text);
+              }}
+              placeholder="Digite uma descrição ..."
+              placeholderTextColor={colors.textSecondary}
               style={{
+                height: 100, // altura fixa
                 borderWidth: 1,
                 borderColor: colors.border,
                 borderRadius: 8,
@@ -256,18 +266,8 @@ export default function AddActivityPhotoScreen() {
                 fontSize: 14,
                 color: colors.text,
                 backgroundColor: colors.backgroundAlt,
-                textAlignVertical: 'top', // importante para alinhar o texto no topo
-                height: 60, // altura suficiente para duas linhas
+                textAlignVertical: 'top',
               }}
-              value={description}
-              onChangeText={(text) => {
-                if (text.length <= 70) setDescription(text);
-              }}
-              placeholder="Digite uma descrição..."
-              placeholderTextColor={colors.textSecondary}
-              maxLength={70}
-              multiline={true}
-              numberOfLines={2}
             />
 
             <Text
@@ -279,26 +279,25 @@ export default function AddActivityPhotoScreen() {
                 lineHeight: 20,
               }}
             >
-              {description.length}/70
+              {description.length}/100
             </Text>
+            <View style={styles.buttonsContainer}>
+              <Button
+                title="Cancelar"
+                onPress={() => router.back()}
+                variant="ghost"
+                style={styles.cancelButton}
+              />
+              <Button
+                title="Adicionar Foto"
+                onPress={handleSubmit}
+                loading={isSubmitting}
+                disabled={!selectedImage}
+                style={styles.submitButton}
+              />
+            </View>
           </View>
         )}
-
-        <View style={styles.buttonsContainer}>
-          <Button
-            title="Cancelar"
-            onPress={() => router.back()}
-            variant="ghost"
-            style={styles.cancelButton}
-          />
-          <Button
-            title="Adicionar Foto"
-            onPress={handleSubmit}
-            loading={isSubmitting}
-            disabled={!selectedImage}
-            style={styles.submitButton}
-          />
-        </View>
       </ScrollView>
     </View>
   );
@@ -380,7 +379,7 @@ const styles = StyleSheet.create({
   },
   buttonsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     width: '100%',
     marginTop: 16,
   },

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import {
   View,
   Text,
@@ -59,6 +60,15 @@ export default function EventsScreen() {
       setShowResults(true);
     }, 500);
   };
+
+  const { qrTitle, qrCode } = useLocalSearchParams();
+  useEffect(() => {
+    if (qrTitle && qrCode) {
+      setSearchQuery(String(qrTitle));
+      setConfirmedAccessCode(String(qrCode));
+      setShowResults(true);
+    }
+  }, [qrTitle, qrCode]);
 
   const filteredEvents =
     searchQuery === '' || confirmedAccessCode === ''
