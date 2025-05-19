@@ -91,7 +91,7 @@ export default function EventCard({ event }: EventCardProps) {
         </View>
 
         <View style={styles.chevronContainer}>
-          <ChevronRight size={24} color="#222" />
+          <ChevronRight size={24} color={colors.primary} />
         </View>
       </View>
     </Pressable>
@@ -157,10 +157,7 @@ const styles = StyleSheet.create({
   },
   chevronContainer: {
     position: 'absolute',
-    top: 12,
+    bottom: 20,
     right: 12,
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    padding: 4,
-    borderRadius: 999,
   },
 });
