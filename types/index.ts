@@ -7,6 +7,7 @@ export type Event = {
   description: string;
   programs: Program[];
   accessCode?: string;
+  coverImage?: string;
 };
 
 export type Program = {
@@ -43,4 +44,5 @@ export type FormValues = {
   endDate: Date;
   description: string;
   accessCode: string;
+  coverImage?: string;
 };

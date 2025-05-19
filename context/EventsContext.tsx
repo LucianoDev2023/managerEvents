@@ -206,6 +206,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
           endDate: eventData.endDate.toDate(),
           programs,
           accessCode: eventData.accessCode ?? '',
+          coverImage: eventData.coverImage || '',
         });
       }
 
@@ -225,11 +226,19 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       startDate: Timestamp.fromDate(data.startDate),
       endDate: Timestamp.fromDate(data.endDate),
       createdAt: Timestamp.now(),
+      coverImage: data.coverImage || '', // ✅ salva a imagem se existir
     });
+
     dispatch({
       type: 'ADD_EVENT',
-      payload: { id: docRef.id, ...data, programs: [] },
+      payload: {
+        id: docRef.id,
+        ...data,
+        coverImage: data.coverImage ?? '',
+        programs: [],
+      },
     });
+
     return docRef.id;
   };
 
@@ -240,7 +249,9 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       description: event.description,
       startDate: Timestamp.fromDate(event.startDate),
       endDate: Timestamp.fromDate(event.endDate),
+      coverImage: event.coverImage || '', // ✅ atualiza se tiver imagem
     });
+
     dispatch({ type: 'UPDATE_EVENT', payload: event });
   };
 

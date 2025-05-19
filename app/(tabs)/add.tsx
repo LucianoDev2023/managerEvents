@@ -17,6 +17,9 @@ import { Calendar, MapPin, CalendarRange, Info } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { FormValues } from '@/types';
 import LoadingOverlay from '@/components/LoadingOverlay';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'react-native';
+import { uploadImageToCloudinary } from '@/lib/uploadImageToCloudinary';
 
 export default function AddEventScreen() {
   const { addEvent } = useEvents();
@@ -36,6 +39,7 @@ export default function AddEventScreen() {
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
 
   const updateFormValue = (key: keyof FormValues, value: any) => {
     setFormValues({
@@ -249,6 +253,50 @@ export default function AddEventScreen() {
           onChangeText={(text) => updateFormValue('accessCode', text)}
           error={errors.accessCode}
         />
+        <Button
+          title={
+            formValues.coverImage
+              ? 'Alterar Capa do Evento'
+              : 'Selecionar Capa do Evento'
+          }
+          onPress={async () => {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              allowsEditing: true,
+              quality: 0.8,
+              aspect: [100, 45], // proporcional ao seu card de altura 220
+            });
+
+            if (!result.canceled) {
+              try {
+                setIsUploadingCover(true);
+                const uri = result.assets[0].uri;
+                const { uri: uploadedUrl } = await uploadImageToCloudinary(uri);
+                updateFormValue('coverImage', uploadedUrl);
+
+                Alert.alert('Sucesso', 'Imagem de capa enviada com sucesso!');
+              } catch (error) {
+                Alert.alert('Erro', 'Não foi possível enviar a imagem.');
+              } finally {
+                setIsUploadingCover(false);
+              }
+            }
+          }}
+          loading={isUploadingCover}
+          style={{ marginTop: 16 }}
+        />
+
+        {formValues.coverImage && (
+          <Image
+            source={{ uri: formValues.coverImage }}
+            style={{
+              width: '100%',
+              height: 180,
+              borderRadius: 12,
+              marginTop: 12,
+              marginBottom: 8,
+            }}
+          />
+        )}
 
         <View style={styles.buttonsContainer}>
           <Button
