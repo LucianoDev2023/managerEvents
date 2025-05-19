@@ -39,7 +39,7 @@ export default function AddActivityPhotoScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { event, program, activity } = useMemo(() => {
+  const { activity } = useMemo(() => {
     const event = state.events.find((e) => e.id === id);
     const program = event?.programs.find((p) => p.id === programId);
     const activity = program?.activities.find((a) => a.id === activityId);

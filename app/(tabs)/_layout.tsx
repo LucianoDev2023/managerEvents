@@ -4,6 +4,7 @@ import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import {
   Calendar,
+  Camera,
   Chrome as Home,
   SquarePlus as PlusSquare,
   User,
@@ -62,6 +63,14 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Calendar size={size} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="qr-scanner"
+        options={{
+          title: 'QR Code',
+          tabBarIcon: ({ color, size }) => <Camera size={size} color={color} />,
+          headerShown: false,
         }}
       />
       <Tabs.Screen

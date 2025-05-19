@@ -33,16 +33,28 @@ export default function EventsScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
 
-  useEffect(() => {
-    setSearchQuery('');
-    setInputValue('');
-    setAccessCodeInput('');
-    setConfirmedAccessCode('');
-    setShowResults(false);
-  }, []);
+  const { accessCode, title } = useLocalSearchParams<{
+    accessCode?: string;
+    title?: string;
+  }>();
 
-  const handleSearch = () => {
-    console.log(state);
+  // Efeito para busca via QR Code
+  useEffect(() => {
+    if (accessCode && title) {
+      // Busca diretamente sem preencher os inputs
+      setSearchQuery(title);
+      setConfirmedAccessCode(accessCode);
+      setShowResults(true);
+      setIsSearching(true);
+
+      setTimeout(() => {
+        setIsSearching(false);
+      }, 500);
+    }
+  }, [accessCode, title]);
+
+  // Busca manual pelos inputs
+  const handleManualSearch = () => {
     Keyboard.dismiss();
 
     if (!inputValue.trim() || !accessCodeInput.trim()) {
@@ -51,25 +63,17 @@ export default function EventsScreen() {
     }
 
     setIsSearching(true);
+    setSearchQuery(inputValue.trim());
+    setConfirmedAccessCode(accessCodeInput.trim());
+
+    setInputValue('');
+    setAccessCodeInput('');
 
     setTimeout(() => {
-      setSearchQuery(inputValue.trim());
-      setConfirmedAccessCode(accessCodeInput.trim());
-      setInputValue('');
-      setAccessCodeInput('');
       setIsSearching(false);
       setShowResults(true);
     }, 500);
   };
-
-  const { qrTitle, qrCode } = useLocalSearchParams();
-  useEffect(() => {
-    if (qrTitle && qrCode) {
-      setSearchQuery(String(qrTitle));
-      setConfirmedAccessCode(String(qrCode));
-      setShowResults(true);
-    }
-  }, [qrTitle, qrCode]);
 
   const filteredEvents =
     searchQuery === '' || confirmedAccessCode === ''
@@ -93,6 +97,10 @@ export default function EventsScreen() {
         {searchQuery
           ? 'Nenhum evento encontrado'
           : 'Pesquisar evento existente'}
+      </Text>
+      <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+        Insira nome e código de acesso ou pesquise utilizando um QRcode criado
+        para o evento
       </Text>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>
         Crie seu próprio evento
@@ -187,7 +195,7 @@ export default function EventsScreen() {
             <Button
               title="Buscar"
               icon={<SearchCheck size={16} color="white" />}
-              onPress={handleSearch}
+              onPress={handleManualSearch}
               size="small"
               style={[styles.actionButton, { backgroundColor: colors.primary }]}
             />
@@ -243,6 +251,7 @@ export default function EventsScreen() {
   );
 }
 
+// Mantenha os mesmos estilos
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {

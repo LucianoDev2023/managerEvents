@@ -111,7 +111,7 @@ export default function PhotoGallery({
                     { backgroundColor: colors.primary },
                   ]}
                 >
-                  <Share2 size={16} color="white" />
+                  <Share2 size={14} color="white" />
                   <Text style={styles.actionText}>Compartilhar</Text>
                 </TouchableOpacity>
 
@@ -146,7 +146,7 @@ export default function PhotoGallery({
                         },
                       ]}
                     >
-                      <Trash2 size={16} color="white" />
+                      <Trash2 size={14} color="white" />
                       <Text style={styles.actionText}>Excluir</Text>
                     </TouchableOpacity>
                   )}
@@ -191,14 +191,14 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 4,
     paddingHorizontal: 14,
     borderRadius: 10,
   },
   actionText: {
     color: 'white',
     fontFamily: 'Inter-Medium',
-    fontSize: 14,
+    fontSize: 10,
     marginLeft: 6,
   },
   emptyContainer: {
