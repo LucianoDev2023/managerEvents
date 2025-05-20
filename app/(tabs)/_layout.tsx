@@ -70,7 +70,7 @@ export default function TabLayout() {
         options={{
           title: 'QR Code',
           tabBarIcon: ({ color, size }) => <Camera size={size} color={color} />,
-          headerShown: false,
+          headerShown: true,
         }}
       />
       <Tabs.Screen

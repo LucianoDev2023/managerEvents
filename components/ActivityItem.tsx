@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
   },
   cardWrapper: {
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
   },
 });

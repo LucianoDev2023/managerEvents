@@ -99,20 +99,19 @@ export default function AddActivityScreen() {
     }
   };
 
-  const onTimeChange = (event: any, selectedTime?: Date) => {
+  const onTimeChange = (_: any, selectedTime?: Date) => {
     setShowTimePicker(Platform.OS === 'ios');
 
     if (selectedTime) {
       setPickerTime(selectedTime);
 
-      // Format time
+      // Formata para 24h
       const hours = selectedTime.getHours();
       const minutes = selectedTime.getMinutes();
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      const formattedHours = hours % 12 || 12;
-      const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+      const formattedHours = hours < 10 ? `0${hours}` : `${hours}`;
+      const formattedMinutes = minutes < 10 ? `0${minutes}` : `${minutes}`;
+      const timeString = `${formattedHours}:${formattedMinutes}`;
 
-      const timeString = `${formattedHours}:${formattedMinutes} ${ampm}`;
       updateFormValue('time', timeString);
     }
   };
@@ -175,6 +174,7 @@ export default function AddActivityScreen() {
             mode="time"
             display="default"
             onChange={onTimeChange}
+            is24Hour={true} // <-- adiciona isso
           />
         )}
 
@@ -199,7 +199,7 @@ export default function AddActivityScreen() {
           <Button
             title="Cancelar"
             onPress={() => router.back()}
-            variant="ghost"
+            variant="cancel"
             style={styles.cancelButton}
           />
           <Button
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 16,
   },

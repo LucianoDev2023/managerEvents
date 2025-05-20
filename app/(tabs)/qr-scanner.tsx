@@ -78,7 +78,9 @@ export default function QRScannerScreen() {
       >
         <View style={styles.overlay}>
           <View style={styles.finder} />
-          <Text style={styles.scanText}>Posicione o QR Code no quadro</Text>
+          <Text style={styles.scanText}>
+            Posicione o QR Code do evento no quadro
+          </Text>
         </View>
 
         <View style={styles.header}>
@@ -90,12 +92,12 @@ export default function QRScannerScreen() {
             size="small"
           />
 
-          <Button
+          {/* <Button
             title={facing === 'back' ? 'Frontal' : 'Traseira'}
             onPress={() => setFacing('back')}
             style={styles.switchButton}
             size="small"
-          />
+          /> */}
         </View>
       </CameraView>
     </View>
@@ -122,7 +124,7 @@ const styles = StyleSheet.create({
   scanText: {
     color: '#FFF',
     marginTop: 20,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   permissionText: {

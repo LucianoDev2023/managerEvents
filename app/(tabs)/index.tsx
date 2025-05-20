@@ -216,7 +216,7 @@ export default function EventsScreen() {
               >
                 <View
                   style={{
-                    borderRadius: 12,
+                    borderRadius: 10,
                     overflow: 'hidden',
                     marginBottom: 12,
                   }}

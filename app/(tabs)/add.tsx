@@ -254,16 +254,17 @@ export default function AddEventScreen() {
           error={errors.accessCode}
         />
         <Button
+          variant="outline"
           title={
             formValues.coverImage
-              ? 'Alterar Capa do Evento'
-              : 'Selecionar Capa do Evento'
+              ? 'Alterar imagem do Evento'
+              : 'Selecionar imagem do Evento'
           }
           onPress={async () => {
             const result = await ImagePicker.launchImageLibraryAsync({
               allowsEditing: true,
               quality: 0.8,
-              aspect: [100, 45], // proporcional ao seu card de altura 220
+              aspect: [4, 3], // proporcional ao seu card de altura 220
             });
 
             if (!result.canceled) {
@@ -290,8 +291,8 @@ export default function AddEventScreen() {
             source={{ uri: formValues.coverImage }}
             style={{
               width: '100%',
-              height: 180,
-              borderRadius: 12,
+              height: 220,
+              borderRadius: 10,
               marginTop: 12,
               marginBottom: 8,
             }}
@@ -302,7 +303,7 @@ export default function AddEventScreen() {
           <Button
             title="Cancelar"
             onPress={() => router.back()}
-            variant="ghost"
+            variant="cancel"
             style={styles.cancelButton}
           />
           <Button
@@ -356,7 +357,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 12,
   },

@@ -17,6 +17,7 @@ import TextInput from '@/components/ui/TextInput';
 import Button from '@/components/ui/Button';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Activity } from '@/types';
+import LoadingOverlay from '@/components/LoadingOverlay';
 
 interface ActivityFormValues {
   time: string;
@@ -55,33 +56,53 @@ export default function EditActivityScreen() {
   // Load activity data when component mounts
   useEffect(() => {
     if (activity) {
-      setFormValues({
-        time: activity.time,
-        title: activity.title,
-        description: activity.description ?? '',
-      });
+      // Parse time from activity (que pode estar em AM/PM ou 24h)
+      let initialTime = activity.time;
+      let initialDate = new Date();
 
-      // Parse time to set the time picker
       try {
-        const timeParts = activity.time.match(/(\d+):(\d+)\s*([AP]M)/);
-        if (timeParts) {
-          let hours = parseInt(timeParts[1]);
-          const minutes = parseInt(timeParts[2]);
-          const period = timeParts[3];
+        // Tenta parsear no formato 24h primeiro
+        const time24hFormat = activity.time.match(/^(\d{1,2}):(\d{2})$/);
 
-          if (period === 'PM' && hours < 12) {
-            hours += 12;
-          } else if (period === 'AM' && hours === 12) {
-            hours = 0;
+        if (time24hFormat) {
+          // Já está no formato 24h
+          const hours = parseInt(time24hFormat[1]);
+          const minutes = parseInt(time24hFormat[2]);
+          initialDate.setHours(hours, minutes);
+        } else {
+          // Tenta parsear no formato AM/PM
+          const timeParts = activity.time.match(/(\d+):(\d+)\s*([AP]M)?/i);
+          if (timeParts) {
+            let hours = parseInt(timeParts[1]);
+            const minutes = parseInt(timeParts[2]);
+            const period = timeParts[3]?.toUpperCase();
+
+            if (period === 'PM' && hours < 12) {
+              hours += 12;
+            } else if (period === 'AM' && hours === 12) {
+              hours = 0;
+            }
+
+            initialDate.setHours(hours, minutes);
+            // Converte para formato 24h para exibição
+            initialTime = `${hours < 10 ? '0' + hours : hours}:${
+              minutes < 10 ? '0' + minutes : minutes
+            }`;
           }
-
-          const date = new Date();
-          date.setHours(hours, minutes);
-          setPickerTime(date);
         }
       } catch (error) {
         console.log('Error parsing time:', error);
+        // Usa um horário padrão se houver erro
+        initialDate.setHours(9, 0);
+        initialTime = '09:00';
       }
+
+      setFormValues({
+        time: initialTime,
+        title: activity.title,
+        description: activity.description ?? '',
+      });
+      setPickerTime(initialDate);
     }
   }, [activity]);
 
@@ -114,7 +135,7 @@ export default function EditActivityScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!validateForm() || !activity) {
       return;
     }
@@ -122,20 +143,18 @@ export default function EditActivityScreen() {
     setIsSubmitting(true);
 
     try {
-      updateActivity(id, programId, {
+      await updateActivity(id, programId, {
         ...activity,
         time: formValues.time,
         title: formValues.title,
         description: formValues.description,
       });
 
-      Alert.alert(
-        'Atualizar atividade',
-        'Essa atividade foi atualizada com sucesso.',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
+      Alert.alert('Atualização', 'Essa atividade foi atualizada com sucesso.', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
     } catch (error) {
-      Alert.alert('Error', 'Falha ao atualizar atividade.');
+      Alert.alert('Erro', 'Falha ao atualizar atividade.');
     } finally {
       setIsSubmitting(false);
     }
@@ -165,14 +184,13 @@ export default function EditActivityScreen() {
     if (selectedTime) {
       setPickerTime(selectedTime);
 
-      // Format time
+      // Format time in 24h format
       const hours = selectedTime.getHours();
       const minutes = selectedTime.getMinutes();
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      const formattedHours = hours % 12 || 12;
+      const formattedHours = hours < 10 ? `0${hours}` : hours;
       const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
 
-      const timeString = `${formattedHours}:${formattedMinutes} ${ampm}`;
+      const timeString = `${formattedHours}:${formattedMinutes}`;
       updateFormValue('time', timeString);
     }
   };
@@ -271,6 +289,7 @@ export default function EditActivityScreen() {
             mode="time"
             display="default"
             onChange={onTimeChange}
+            is24Hour={true} // Adicione esta linha
           />
         )}
 
@@ -295,7 +314,7 @@ export default function EditActivityScreen() {
           <Button
             title="Cancelar"
             onPress={() => router.back()}
-            variant="ghost"
+            variant="cancel"
             style={styles.cancelButton}
           />
           <Button
@@ -306,6 +325,7 @@ export default function EditActivityScreen() {
           />
         </View>
       </ScrollView>
+      {isSubmitting && <LoadingOverlay message="Salvando alterações..." />}
     </View>
   );
 }
@@ -341,7 +361,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 16,
   },

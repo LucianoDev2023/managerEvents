@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderRadius: 12,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
   photoWrapper: {
     borderWidth: 2,
     borderColor: '#999', // ou use colors.border para tema dinâmico
-    borderRadius: 14,
+    borderRadius: 10,
     padding: 5,
     backgroundColor: 'transparent', // opcional para borda mais visível
   },

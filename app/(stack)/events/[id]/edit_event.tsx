@@ -6,6 +6,7 @@ import {
   ScrollView,
   Alert,
   Platform,
+  Image,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
@@ -16,20 +17,19 @@ import Button from '@/components/ui/Button';
 import { Calendar, MapPin, CalendarRange, Info } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Event, FormValues } from '@/types';
+import * as ImagePicker from 'expo-image-picker';
+import { uploadImageToCloudinary } from '@/lib/uploadImageToCloudinary';
+import LoadingOverlay from '@/components/LoadingOverlay';
 
-export default function AddOrEditEventScreen() {
+export default function EditEventScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { state, addEvent, updateEvent } = useEvents();
+  const { state, updateEvent } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
   const existingEvent = state.events.find((e) => e.id === id);
 
   const getInitialFormValues = (event?: Event): FormValues => {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-
     return event
       ? {
           title: event.title,
@@ -38,14 +38,16 @@ export default function AddOrEditEventScreen() {
           endDate: new Date(event.endDate),
           description: event.description,
           accessCode: event.accessCode ?? '',
+          coverImage: event.coverImage ?? '',
         }
       : {
           title: '',
           location: '',
-          startDate: now,
-          endDate: tomorrow,
+          startDate: new Date(),
+          endDate: new Date(),
           description: '',
           accessCode: '',
+          coverImage: '',
         };
   };
 
@@ -56,56 +58,41 @@ export default function AddOrEditEventScreen() {
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
 
   const updateFormValue = (key: keyof FormValues, value: any) => {
-    setFormValues((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-    if (errors[key]) {
-      setErrors((prev) => ({ ...prev, [key]: '' }));
-    }
+    setFormValues((prev) => ({ ...prev, [key]: value }));
+    if (errors[key]) setErrors((prev) => ({ ...prev, [key]: '' }));
   };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-
-    if (!formValues.title.trim()) {
-      newErrors.title = 'Título é obrigatório';
-    } else if (formValues.title.length < 3) {
-      newErrors.title = 'O título deve ter pelo menos 3 caracteres';
-    }
-
-    if (!formValues.location.trim()) {
-      newErrors.location = 'Local é obrigatório';
-    }
-
-    if (formValues.endDate < formValues.startDate) {
-      newErrors.endDate = 'Data final deve ser após a data inicial';
-    }
-
+    if (!formValues.title.trim()) newErrors.title = 'Título é obrigatório';
+    if (!formValues.location.trim()) newErrors.location = 'Local é obrigatório';
+    if (!formValues.accessCode.trim())
+      newErrors.accessCode = 'Código de acesso obrigatório';
+    if (formValues.endDate < formValues.startDate)
+      newErrors.endDate = 'Data final inválida';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
-
+    if (!existingEvent || !id)
+      return Alert.alert('Erro', 'Evento não encontrado.');
     setIsSubmitting(true);
-
     try {
-      if (!existingEvent || !id) {
-        Alert.alert('Erro', 'Evento não encontrado.');
-        return;
-      }
-
-      updateEvent({ id, ...formValues, programs: existingEvent.programs });
-
+      await updateEvent({
+        id,
+        ...formValues,
+        programs: existingEvent.programs,
+      });
       Alert.alert('Evento Atualizado', 'Seu evento foi salvo com sucesso!', [
-        { text: 'OK', onPress: () => router.push('/') },
+        { text: 'OK', onPress: () => router.push(`/events/${id}`) },
       ]);
-    } catch (error) {
-      Alert.alert('Erro', 'Falha ao salvar o evento. Tente novamente.');
+    } catch {
+      Alert.alert('Erro', 'Falha ao salvar o evento.');
     } finally {
       setIsSubmitting(false);
     }
@@ -122,141 +109,195 @@ export default function AddOrEditEventScreen() {
     setShowStartDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
       updateFormValue('startDate', selectedDate);
-
       if (formValues.endDate < selectedDate) {
-        const newEndDate = new Date(selectedDate);
-        newEndDate.setDate(selectedDate.getDate() + 1);
-        updateFormValue('endDate', newEndDate);
+        const newEnd = new Date(selectedDate);
+        newEnd.setDate(newEnd.getDate() + 1);
+        updateFormValue('endDate', newEnd);
       }
     }
   };
 
   const onEndDateChange = (_: any, selectedDate?: Date) => {
     setShowEndDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      updateFormValue('endDate', selectedDate);
-    }
+    if (selectedDate) updateFormValue('endDate', selectedDate);
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.contentContainer}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Text style={[styles.heading, { color: colors.text }]}>
-        {existingEvent ? 'Editar Evento' : 'Criar Novo Evento'}
-      </Text>
-
-      <TextInput
-        label="Título do Evento"
-        placeholder="Digite o título"
-        value={formValues.title}
-        onChangeText={(text) => updateFormValue('title', text)}
-        error={errors.title}
-      />
-
-      <TextInput
-        label="Local"
-        placeholder="Digite o local"
-        value={formValues.location}
-        onChangeText={(text) => updateFormValue('location', text)}
-        error={errors.location}
-        icon={<MapPin size={20} color={colors.textSecondary} />}
-      />
-
-      <View style={styles.dateSection}>
-        <Text style={[styles.dateLabel, { color: colors.text }]}>
-          Datas do Evento
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={[styles.heading, { color: colors.text }]}>
+          Editar Evento
         </Text>
 
-        <View style={styles.datePickersContainer}>
-          <View style={styles.datePickerWrapper}>
-            <Text
-              style={[styles.datePickerLabel, { color: colors.textSecondary }]}
-            >
-              Início
-            </Text>
-            <View style={[styles.dateButton, { borderColor: colors.border }]}>
-              <Calendar size={18} color={colors.primary} />
-              <Text
-                style={[styles.dateText, { color: colors.text }]}
-                onPress={() => setShowStartDatePicker(true)}
-              >
-                {formatDate(formValues.startDate)}
-              </Text>
-            </View>
-          </View>
+        <TextInput
+          label="Título"
+          placeholder="Digite o título"
+          value={formValues.title}
+          onChangeText={(text) => updateFormValue('title', text)}
+          error={errors.title}
+        />
 
-          <View style={styles.datePickerWrapper}>
-            <Text
-              style={[styles.datePickerLabel, { color: colors.textSecondary }]}
-            >
-              Fim
-            </Text>
-            <View style={[styles.dateButton, { borderColor: colors.border }]}>
-              <CalendarRange size={18} color={colors.primary} />
+        <TextInput
+          label="Local"
+          placeholder="Digite o local"
+          value={formValues.location}
+          onChangeText={(text) => updateFormValue('location', text)}
+          error={errors.location}
+          icon={<MapPin size={20} color={colors.textSecondary} />}
+        />
+
+        <View style={styles.dateSection}>
+          <Text style={[styles.dateLabel, { color: colors.text }]}>
+            Datas do Evento
+          </Text>
+          <View style={styles.datePickersContainer}>
+            <View style={styles.datePickerWrapper}>
               <Text
-                style={[styles.dateText, { color: colors.text }]}
-                onPress={() => setShowEndDatePicker(true)}
+                style={[
+                  styles.datePickerLabel,
+                  { color: colors.textSecondary },
+                ]}
               >
-                {formatDate(formValues.endDate)}
+                Início
               </Text>
+              <View style={[styles.dateButton, { borderColor: colors.border }]}>
+                <Calendar size={18} color={colors.primary} />
+                <Text
+                  style={[styles.dateText, { color: colors.text }]}
+                  onPress={() => setShowStartDatePicker(true)}
+                >
+                  {formatDate(formValues.startDate)}
+                </Text>
+              </View>
             </View>
-            {errors.endDate && (
-              <Text style={[styles.errorText, { color: colors.error }]}>
-                {errors.endDate}
+            <View style={styles.datePickerWrapper}>
+              <Text
+                style={[
+                  styles.datePickerLabel,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                Fim
               </Text>
-            )}
+              <View style={[styles.dateButton, { borderColor: colors.border }]}>
+                <CalendarRange size={18} color={colors.primary} />
+                <Text
+                  style={[styles.dateText, { color: colors.text }]}
+                  onPress={() => setShowEndDatePicker(true)}
+                >
+                  {formatDate(formValues.endDate)}
+                </Text>
+              </View>
+              {errors.endDate && (
+                <Text style={[styles.errorText, { color: colors.error }]}>
+                  {errors.endDate}
+                </Text>
+              )}
+            </View>
           </View>
         </View>
-      </View>
 
-      {showStartDatePicker && (
-        <DateTimePicker
-          value={formValues.startDate}
-          mode="date"
-          display="default"
-          onChange={onStartDateChange}
-          minimumDate={new Date()}
+        {showStartDatePicker && (
+          <DateTimePicker
+            value={formValues.startDate}
+            mode="date"
+            display="default"
+            onChange={onStartDateChange}
+            minimumDate={new Date()}
+          />
+        )}
+
+        {showEndDatePicker && (
+          <DateTimePicker
+            value={formValues.endDate}
+            mode="date"
+            display="default"
+            onChange={onEndDateChange}
+            minimumDate={formValues.startDate}
+          />
+        )}
+
+        <TextInput
+          label="Descrição"
+          placeholder="Descreva o evento..."
+          value={formValues.description}
+          onChangeText={(text) => updateFormValue('description', text)}
+          multiline
+          numberOfLines={4}
+          icon={<Info size={20} color={colors.textSecondary} />}
         />
-      )}
 
-      {showEndDatePicker && (
-        <DateTimePicker
-          value={formValues.endDate}
-          mode="date"
-          display="default"
-          onChange={onEndDateChange}
-          minimumDate={formValues.startDate}
+        <TextInput
+          label="Código de Acesso"
+          placeholder="Ex: A1B2"
+          value={formValues.accessCode}
+          onChangeText={(text) => updateFormValue('accessCode', text)}
+          error={errors.accessCode}
         />
-      )}
 
-      <TextInput
-        label="Descrição (opcional)"
-        placeholder="Descreva o evento..."
-        value={formValues.description}
-        onChangeText={(text) => updateFormValue('description', text)}
-        multiline
-        numberOfLines={4}
-        icon={<Info size={20} color={colors.textSecondary} />}
-      />
-
-      <View style={styles.buttonsContainer}>
         <Button
-          title="Cancelar"
-          onPress={() => router.back()}
-          variant="ghost"
-          style={styles.cancelButton}
+          variant="outline"
+          title={
+            formValues.coverImage
+              ? 'Alterar imagem do evento'
+              : 'Selecionar imagem do evento'
+          }
+          onPress={async () => {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              allowsEditing: true,
+              quality: 0.8,
+              aspect: [4, 3],
+            });
+            if (!result.canceled) {
+              try {
+                setIsUploadingCover(true);
+                const uri = result.assets[0].uri;
+                const { uri: uploadedUrl } = await uploadImageToCloudinary(uri);
+                updateFormValue('coverImage', uploadedUrl);
+                Alert.alert('Sucesso', 'Imagem de capa atualizada!');
+              } catch {
+                Alert.alert('Erro', 'Não foi possível enviar a imagem.');
+              } finally {
+                setIsUploadingCover(false);
+              }
+            }
+          }}
+          loading={isUploadingCover}
+          style={{ marginTop: 16 }}
         />
-        <Button
-          title={existingEvent ? 'Salvar Alterações' : 'Criar Evento'}
-          onPress={handleSubmit}
-          loading={isSubmitting}
-          style={styles.submitButton}
-        />
-      </View>
-    </ScrollView>
+
+        {formValues.coverImage && (
+          <Image
+            source={{ uri: formValues.coverImage }}
+            style={{
+              width: '100%',
+              height: 240,
+              borderRadius: 12,
+              marginTop: 12,
+            }}
+          />
+        )}
+
+        <View style={styles.buttonsContainer}>
+          <Button
+            title="Cancelar"
+            onPress={() => router.back()}
+            variant="ghost"
+            style={styles.cancelButton}
+          />
+          <Button
+            title="Salvar Alterações"
+            onPress={handleSubmit}
+            style={styles.submitButton}
+          />
+        </View>
+      </ScrollView>
+      {isSubmitting && <LoadingOverlay message="Salvando evento..." />}
+    </View>
   );
 }
 
@@ -270,11 +311,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   dateSection: { marginBottom: 16 },
-  dateLabel: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    marginBottom: 8,
-  },
+  dateLabel: { fontFamily: 'Inter-Medium', fontSize: 16, marginBottom: 8 },
   datePickersContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -290,29 +327,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    padding: 12,
   },
-  dateText: {
-    marginLeft: 8,
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-  },
-  errorText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 12,
-    marginTop: 4,
-  },
+  dateText: { marginLeft: 8, fontFamily: 'Inter-Regular', fontSize: 14 },
+  errorText: { fontFamily: 'Inter-Regular', fontSize: 12, marginTop: 4 },
   buttonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 24,
   },
-  cancelButton: {
-    flex: 0.48,
-    backgroundColor: '#333',
-  },
-  submitButton: {
-    flex: 0.48,
-  },
+  cancelButton: { flex: 0.48 },
+  submitButton: { flex: 0.48 },
 });

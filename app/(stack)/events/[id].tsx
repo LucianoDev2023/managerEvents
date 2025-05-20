@@ -8,9 +8,12 @@ import {
   Alert,
   Modal,
   Share,
+  ImageBackground,
+  Platform,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
@@ -24,6 +27,8 @@ import {
   Plus,
   Trash2,
   Edit,
+  Share2,
+  LucideQrCode,
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import ViewShot from 'react-native-view-shot';
@@ -39,6 +44,8 @@ export default function EventDetailScreen() {
   const colors = Colors[colorScheme];
   const [isAddingProgram, setIsAddingProgram] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const qrRef = useRef<ViewShot>(null);
 
   const event = state.events.find((e) => e.id === id) as Event | undefined;
@@ -131,10 +138,49 @@ export default function EventDetailScreen() {
     ]);
   };
 
-  const handleAddProgram = async () => {
+  const handleAddProgramPress = () => {
+    setSelectedDate(event.startDate);
+    setShowDatePicker(true);
+  };
+
+  const handleDateChange = (event: any, date?: Date) => {
+    // Fecha o datepicker no Android quando o usuário cancela ou seleciona
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+
+    // Se o usuário cancelou (event.type === 'dismissed')
+    if (event.type === 'dismissed') {
+      return;
+    }
+
+    // Se selecionou uma data válida
+    if (date) {
+      setSelectedDate(date);
+      if (Platform.OS === 'ios') {
+        return; // No iOS, vamos esperar o usuário confirmar
+      }
+      confirmAddProgram(date);
+    }
+  };
+
+  const confirmAddProgram = async (date: Date) => {
+    // Verifica se já existe um programa para esta data
+    const dateAlreadyHasProgram = event.programs.some((program) => {
+      return program.date.toDateString() === date.toDateString();
+    });
+
+    if (dateAlreadyHasProgram) {
+      Alert.alert(
+        'Erro',
+        'Já existe um programa para esta data, você poder adicionar em outro dia, ou atividades para o programa já criado.'
+      );
+      return;
+    }
+
     setIsAddingProgram(true);
     try {
-      await addProgram(event.id, new Date());
+      await addProgram(event.id, date);
       await new Promise((res) => setTimeout(res, 500));
     } catch {
       Alert.alert('Erro', 'Não foi possível adicionar o dia.');
@@ -192,27 +238,36 @@ export default function EventDetailScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.headerInfo}>
-          <Text style={[styles.title, { color: colors.text }]}>
-            {event.title}
-          </Text>
+          {event.coverImage && (
+            <ImageBackground
+              source={{ uri: event.coverImage }}
+              style={styles.coverImage}
+              imageStyle={{ borderRadius: 12 }}
+            >
+              <View style={styles.overlay}>
+                <Text style={styles.coverTitle}>{event.title}</Text>
+              </View>
+            </ImageBackground>
+          )}
+
+          {!event.coverImage && (
+            <Text style={[styles.title, { color: colors.text }]}>
+              {event.title}
+            </Text>
+          )}
+
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             {formatDateRange(event.startDate, event.endDate)}
           </Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             {event.location}
           </Text>
+
           {event.description && (
             <Text style={[styles.description, { color: colors.text }]}>
               {event.description}
             </Text>
           )}
-
-          {/* Botão para abrir QR Code */}
-          <Button
-            title="Gerar QR Code"
-            onPress={() => setShowQR(true)}
-            style={{ marginTop: 16, width: 200, alignSelf: 'center' }}
-          />
         </View>
 
         <View style={styles.programsSection}>
@@ -223,7 +278,7 @@ export default function EventDetailScreen() {
             <Button
               title="Add Dia"
               icon={<Plus size={16} color="white" />}
-              onPress={handleAddProgram}
+              onPress={handleAddProgramPress}
               size="small"
             />
           </View>
@@ -233,16 +288,29 @@ export default function EventDetailScreen() {
               Nenhum dia adicionado ainda.
             </Text>
           ) : (
-            event.programs.map((program) => (
-              <ProgramItem
-                key={program.id}
-                program={program}
-                eventId={event.id}
-              />
-            ))
+            [...event.programs]
+              .sort(
+                (a, b) =>
+                  new Date(a.date).getTime() - new Date(b.date).getTime()
+              )
+              .map((program) => (
+                <ProgramItem
+                  key={program.id}
+                  program={program}
+                  eventId={event.id}
+                />
+              ))
           )}
         </View>
       </ScrollView>
+
+      <TouchableOpacity
+        onPress={() => setShowQR(true)}
+        style={[styles.actionButton]}
+      >
+        <Text style={styles.actionText}>Compartilhar evento</Text>
+        <LucideQrCode size={14} color="white" />
+      </TouchableOpacity>
 
       {isAddingProgram && <LoadingOverlay message="Adicionando dia..." />}
 
@@ -255,7 +323,7 @@ export default function EventDetailScreen() {
               <QRCode value={qrPayload} size={200} />
             </ViewShot>
             <Button
-              title="Compartilhar QR Code"
+              title="Enviar QR Code"
               onPress={handleShareQR}
               style={styles.shareButton}
             />
@@ -267,18 +335,75 @@ export default function EventDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Date Picker */}
+      {showDatePicker && (
+        <Modal visible={showDatePicker} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.datepicker, { padding: 16 }]}>
+              <Text style={styles.titlepicker}>Selecione o dia do evento</Text>
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                minimumDate={event.startDate}
+                maximumDate={event.endDate}
+                onChange={handleDateChange}
+                locale="pt-BR"
+              />
+              {Platform.OS === 'ios' && (
+                <View style={styles.iosButtonsContainer}>
+                  <Button
+                    title="Cancelar"
+                    onPress={() => {
+                      setShowDatePicker(false);
+                      setSelectedDate(event.startDate); // Reseta para a data inicial
+                    }}
+                    style={styles.iosButton}
+                  />
+                  <Button
+                    title="Confirmar"
+                    onPress={() => {
+                      setShowDatePicker(false);
+                      confirmAddProgram(selectedDate);
+                    }}
+                    style={styles.iosButton}
+                  />
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+  },
   scrollContent: { padding: 16, paddingBottom: 40 },
+
   headerButton: { padding: 8 },
   headerActions: { flexDirection: 'row' },
-  headerInfo: { alignItems: 'center', marginBottom: 24 },
+  headerInfo: {
+    alignItems: 'flex-start',
+    marginBottom: 24,
+    width: '100%',
+    borderWidth: 2,
+    borderColor: '#222',
+    padding: 5,
+    borderRadius: 10,
+  },
+
   title: { fontSize: 22, fontFamily: 'Inter-Bold', marginBottom: 4 },
-  subtitle: { fontSize: 14, fontFamily: 'Inter-Regular', marginBottom: 2 },
+  subtitle: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 2,
+    textAlign: 'left',
+  },
   description: { fontSize: 14, fontFamily: 'Inter-Regular', marginTop: 12 },
   programsSection: {},
   sectionHeader: {
@@ -300,10 +425,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
+  datepicker: {
+    backgroundColor: 'transparent',
+  },
+  titlepicker: {
+    backgroundColor: 'transparent',
+  },
   qrContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: '#ddd',
     padding: 24,
-    borderRadius: 12,
+    borderRadius: 10,
     alignItems: 'center',
   },
   qrTitle: {
@@ -313,16 +444,67 @@ const styles = StyleSheet.create({
   },
   shareButton: {
     marginTop: 16,
+    fontSize: 10,
     width: 200,
     backgroundColor: '#25D366',
   },
   closeButton: {
     marginTop: 12,
     width: 120,
+    backgroundColor: '#333',
   },
   notFoundText: {
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
+  },
+
+  actionButton: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: '#25D366',
+    marginBottom: 10,
+    gap: 5,
+    marginTop: 10,
+  },
+  actionText: {
+    color: 'white',
+    fontFamily: 'Inter-Medium',
+    fontSize: 12,
+    backgroundColor: '#25D366',
+  },
+  coverImage: {
+    width: '100%',
+    height: 180,
+    marginBottom: 16,
+    justifyContent: 'flex-end',
+  },
+
+  overlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+
+  coverTitle: {
+    fontSize: 20,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  iosButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 16,
+  },
+  iosButton: {
+    width: '48%',
   },
 });

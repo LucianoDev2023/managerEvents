@@ -1,18 +1,24 @@
 import React from 'react';
-import { 
-  StyleSheet, 
-  TouchableOpacity, 
-  Text, 
+import {
+  StyleSheet,
+  TouchableOpacity,
+  Text,
   ActivityIndicator,
   View,
   StyleProp,
   ViewStyle,
-  TextStyle
+  TextStyle,
 } from 'react-native';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger';
+type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'ghost'
+  | 'outline'
+  | 'cancel'
+  | 'danger';
 type ButtonSize = 'small' | 'medium' | 'large';
 
 interface ButtonProps {
@@ -40,14 +46,14 @@ export default function Button({
   style,
   textStyle,
   icon,
-  iconPosition = 'left'
+  iconPosition = 'left',
 }: ButtonProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
   const getButtonStyle = () => {
     const baseStyle: ViewStyle = {
-      borderRadius: 8,
+      borderRadius: 10,
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
@@ -92,6 +98,11 @@ export default function Button({
         return {
           ...baseStyle,
           backgroundColor: colors.error,
+        };
+      case 'cancel':
+        return {
+          ...baseStyle,
+          backgroundColor: '#333',
         };
       default: // primary
         return {
@@ -141,11 +152,7 @@ export default function Button({
     style,
   ];
 
-  const textStyles = [
-    styles.text,
-    getTextStyle(),
-    textStyle,
-  ];
+  const textStyles = [styles.text, getTextStyle(), textStyle];
 
   return (
     <TouchableOpacity
@@ -155,7 +162,13 @@ export default function Button({
       activeOpacity={0.7}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'ghost' || variant === 'outline' ? colors.primary : 'white'} />
+        <ActivityIndicator
+          color={
+            variant === 'ghost' || variant === 'outline'
+              ? colors.primary
+              : 'white'
+          }
+        />
       ) : (
         <>
           {icon && iconPosition === 'left' && (
@@ -173,7 +186,7 @@ export default function Button({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',

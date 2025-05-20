@@ -201,15 +201,21 @@ export default function ProgramDetailScreen() {
               </Text>
             </View>
           ) : (
-            program.activities.map((activity) => (
-              <View key={activity.id}>
-                <ActivityItem
-                  activity={activity}
-                  eventId={event.id}
-                  programId={program.id}
-                />
-              </View>
-            ))
+            [...program.activities]
+              .sort((a, b) => {
+                const [aHours, aMinutes] = a.time.split(':').map(Number);
+                const [bHours, bMinutes] = b.time.split(':').map(Number);
+                return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
+              })
+              .map((activity) => (
+                <View key={activity.id}>
+                  <ActivityItem
+                    activity={activity}
+                    eventId={event.id}
+                    programId={program.id}
+                  />
+                </View>
+              ))
           )}
         </View>
       </ScrollView>
@@ -264,7 +270,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderRadius: 12,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },

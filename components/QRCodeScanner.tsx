@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: '#007AFF',
     padding: 15,
-    borderRadius: 5,
+    borderRadius: 10,
     alignSelf: 'center',
   },
   buttonText: {
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
   controlButton: {
     backgroundColor: 'rgba(0,0,0,0.5)',
     padding: 15,
-    borderRadius: 5,
+    borderRadius: 10,
   },
   controlText: {
     color: '#FFF',

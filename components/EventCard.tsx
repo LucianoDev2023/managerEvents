@@ -100,16 +100,16 @@ export default function EventCard({ event }: EventCardProps) {
 
 const styles = StyleSheet.create({
   cardWrapper: {
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
     marginHorizontal: 16,
     marginBottom: 16,
     borderWidth: 2,
-    borderColor: '#444',
+    borderColor: '#333',
     padding: 2,
   },
   card: {
-    height: 220,
+    height: 240,
     borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     height: '55%',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'flex-end',
   },
   content: {

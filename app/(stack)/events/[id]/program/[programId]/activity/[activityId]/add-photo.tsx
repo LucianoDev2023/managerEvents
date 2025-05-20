@@ -286,7 +286,7 @@ export default function AddActivityPhotoScreen() {
               <Button
                 title="Cancelar"
                 onPress={() => router.back()}
-                variant="ghost"
+                variant="cancel"
                 style={styles.cancelButton}
               />
               <Button
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     right: 12,
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },

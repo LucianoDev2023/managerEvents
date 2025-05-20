@@ -4,20 +4,28 @@ import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import { useEvents } from '@/context/EventsContext';
 import Button from '@/components/ui/Button';
-import { Settings, Moon, Sun, LogOut, Trash2, CircleHelp as HelpCircle, Bell } from 'lucide-react-native';
+import {
+  Settings,
+  Moon,
+  Sun,
+  LogOut,
+  Trash2,
+  CircleHelp as HelpCircle,
+  Bell,
+} from 'lucide-react-native';
 import Card from '@/components/ui/Card';
 
 export default function ProfileScreen() {
   const { state } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
-  
+
   const totalEvents = state.events.length;
   const totalPrograms = state.events.reduce(
-    (sum, event) => sum + event.programs.length, 
+    (sum, event) => sum + event.programs.length,
     0
   );
-  
+
   const handleThemeToggle = () => {
     Alert.alert(
       'Change Theme',
@@ -25,43 +33,44 @@ export default function ProfileScreen() {
       [{ text: 'OK' }]
     );
   };
-  
+
   const handleLogout = () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Log Out', style: 'destructive' }
-      ]
-    );
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log Out', style: 'destructive' },
+    ]);
   };
-  
+
   const handleClearData = () => {
     Alert.alert(
       'Clear All Data',
       'This will permanently delete all your events and programs. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete Everything', 
+        {
+          text: 'Delete Everything',
           style: 'destructive',
           onPress: () => {
-            Alert.alert('Data Cleared', 'All events and programs have been removed.');
-          }
-        }
+            Alert.alert(
+              'Data Cleared',
+              'All events and programs have been removed.'
+            );
+          },
+        },
       ]
     );
   };
 
   return (
-    <ScrollView 
+    <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.contentContainer}
     >
       <View style={styles.profileHeader}>
         <Image
-          source={{ uri: 'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2' }}
+          source={{
+            uri: 'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
+          }}
           style={styles.profileImage}
         />
         <Text style={[styles.profileName, { color: colors.text }]}>
@@ -71,28 +80,28 @@ export default function ProfileScreen() {
           jane.doe@example.com
         </Text>
       </View>
-      
+
       <View style={styles.statsContainer}>
         <View style={[styles.statCard, { backgroundColor: colors.primary }]}>
           <Text style={styles.statNumber}>{totalEvents}</Text>
           <Text style={styles.statLabel}>Events</Text>
         </View>
-        
+
         <View style={[styles.statCard, { backgroundColor: colors.secondary }]}>
           <Text style={styles.statNumber}>{totalPrograms}</Text>
           <Text style={styles.statLabel}>Programs</Text>
         </View>
-        
+
         <View style={[styles.statCard, { backgroundColor: colors.accent }]}>
           <Text style={styles.statNumber}>12</Text>
           <Text style={styles.statLabel}>Photos</Text>
         </View>
       </View>
-      
+
       <Text style={[styles.sectionTitle, { color: colors.text }]}>
         Preferences
       </Text>
-      
+
       <Card>
         <Button
           title="App Settings"
@@ -103,12 +112,15 @@ export default function ProfileScreen() {
           style={styles.menuButton}
           textStyle={{ color: colors.text }}
         />
-        
+
         <Button
           title={`Theme: ${colorScheme === 'dark' ? 'Dark' : 'Light'}`}
-          icon={colorScheme === 'dark' ? 
-            <Moon size={20} color={colors.text} /> : 
-            <Sun size={20} color={colors.text} />
+          icon={
+            colorScheme === 'dark' ? (
+              <Moon size={20} color={colors.text} />
+            ) : (
+              <Sun size={20} color={colors.text} />
+            )
           }
           onPress={handleThemeToggle}
           variant="ghost"
@@ -116,7 +128,7 @@ export default function ProfileScreen() {
           style={styles.menuButton}
           textStyle={{ color: colors.text }}
         />
-        
+
         <Button
           title="Notifications"
           icon={<Bell size={20} color={colors.text} />}
@@ -127,11 +139,9 @@ export default function ProfileScreen() {
           textStyle={{ color: colors.text }}
         />
       </Card>
-      
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        Support
-      </Text>
-      
+
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Support</Text>
+
       <Card>
         <Button
           title="Help & Support"
@@ -143,11 +153,9 @@ export default function ProfileScreen() {
           textStyle={{ color: colors.text }}
         />
       </Card>
-      
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        Account
-      </Text>
-      
+
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Account</Text>
+
       <Card>
         <Button
           title="Clear All Data"
@@ -158,7 +166,7 @@ export default function ProfileScreen() {
           style={styles.menuButton}
           textStyle={{ color: colors.error }}
         />
-        
+
         <Button
           title="Log Out"
           icon={<LogOut size={20} color={colors.error} />}
@@ -169,7 +177,7 @@ export default function ProfileScreen() {
           textStyle={{ color: colors.error }}
         />
       </Card>
-      
+
       <Text style={[styles.versionText, { color: colors.textSecondary }]}>
         Version 1.0.0
       </Text>
@@ -210,7 +218,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 16,
     alignItems: 'center',
     marginHorizontal: 4,

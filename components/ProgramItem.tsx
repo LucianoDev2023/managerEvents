@@ -43,7 +43,7 @@ export default function ProgramItem({ program, eventId }: ProgramItemProps) {
       month: 'long',
       day: 'numeric',
     };
-    return date.toLocaleDateString('en-US', options);
+    return date.toLocaleDateString('pt-BR', options);
   };
 
   // const handleAddActivity = () => {
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 10,
     flex: 0.48,
   },
   actionText: {
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   cardWrapper: {
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   chevronContainer: {

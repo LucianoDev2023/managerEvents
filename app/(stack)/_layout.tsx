@@ -27,7 +27,17 @@ export default function StackLayout() {
             backgroundColor: colors.background,
           },
         }}
-      />
+      >
+        {/* Todas as telas devem estar dentro do componente Stack */}
+        <Stack.Screen
+          name="events/[id]/edit_event"
+          options={{
+            title: '',
+            // Para título dinâmico:
+            // headerTitle: ({ route }) => route.params?.eventTitle || 'Editar Evento'
+          }}
+        />
+      </Stack>
     </View>
   );
 }
