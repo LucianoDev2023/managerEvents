@@ -286,7 +286,6 @@ export default function EditEventScreen() {
           <Button
             title="Cancelar"
             onPress={() => router.back()}
-            variant="ghost"
             style={styles.cancelButton}
           />
           <Button
@@ -336,6 +335,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 24,
   },
-  cancelButton: { flex: 0.48 },
+  cancelButton: { flex: 0.48, backgroundColor: '#333' },
   submitButton: { flex: 0.48 },
 });

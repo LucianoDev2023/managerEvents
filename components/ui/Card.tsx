@@ -50,7 +50,7 @@ export default function Card({ children, style, elevation = 1 }: CardProps) {
 const styles = StyleSheet.create({
   card: {
     borderRadius: 10,
-    padding: 16,
+    padding: 10,
     borderWidth: 1,
     marginVertical: 8,
   },

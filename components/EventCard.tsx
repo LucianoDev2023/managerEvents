@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   card: {
-    height: 240,
+    height: 245,
     borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
@@ -137,6 +137,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'Inter-Bold',
     marginBottom: 6,
+    padding: 5,
   },
   infoContainer: {
     marginBottom: 6,

@@ -7,27 +7,21 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
-  Share,
   ImageBackground,
   Platform,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import DateTimePicker from '@react-native-community/datetimepicker';
-
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
-
 import {
-  CalendarDays,
-  MapPin,
   ArrowLeft,
   Plus,
   Trash2,
   Edit,
-  Share2,
   LucideQrCode,
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -78,41 +72,16 @@ export default function EventDetailScreen() {
   });
 
   const handleShareQR = async () => {
-    if (!qrRef.current) {
-      Alert.alert('Erro', 'QR Code ainda não está pronto.');
-      return;
-    }
-
+    if (!qrRef.current) return;
     try {
       const uri = await qrRef.current.capture?.();
-
-      if (!uri) {
-        Alert.alert('Erro', 'Erro ao capturar QR Code.');
-        return;
-      }
-
+      if (!uri) return;
       const fileUri = FileSystem.cacheDirectory + `qrcode_${Date.now()}.png`;
-
-      // Copia o QR para local temporário
       await FileSystem.copyAsync({ from: uri, to: fileUri });
-
-      // Verifica se o dispositivo suporta compartilhamento de arquivos
       const isAvailable = await Sharing.isAvailableAsync();
-      if (!isAvailable) {
-        Alert.alert(
-          'Erro',
-          'Compartilhamento de arquivo não suportado neste dispositivo.'
-        );
-        return;
-      }
-
-      // Compartilha a imagem diretamente
-      await Sharing.shareAsync(fileUri, {
-        mimeType: 'image/png',
-        dialogTitle: `QR Code do evento ${event.title}`,
-      });
-    } catch (error) {
-      console.error(error);
+      if (!isAvailable) return;
+      await Sharing.shareAsync(fileUri);
+    } catch {
       Alert.alert('Erro', 'Não foi possível compartilhar o QR Code.');
     }
   };
@@ -143,45 +112,27 @@ export default function EventDetailScreen() {
     setShowDatePicker(true);
   };
 
-  const handleDateChange = (event: any, date?: Date) => {
-    // Fecha o datepicker no Android quando o usuário cancela ou seleciona
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-
-    // Se o usuário cancelou (event.type === 'dismissed')
-    if (event.type === 'dismissed') {
-      return;
-    }
-
-    // Se selecionou uma data válida
+  const handleDateChange = (e: any, date?: Date) => {
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (e.type === 'dismissed') return;
     if (date) {
       setSelectedDate(date);
-      if (Platform.OS === 'ios') {
-        return; // No iOS, vamos esperar o usuário confirmar
-      }
+      if (Platform.OS === 'ios') return;
       confirmAddProgram(date);
     }
   };
 
   const confirmAddProgram = async (date: Date) => {
-    // Verifica se já existe um programa para esta data
-    const dateAlreadyHasProgram = event.programs.some((program) => {
-      return program.date.toDateString() === date.toDateString();
-    });
-
-    if (dateAlreadyHasProgram) {
-      Alert.alert(
-        'Erro',
-        'Já existe um programa para esta data, você poder adicionar em outro dia, ou atividades para o programa já criado.'
-      );
+    const exists = event.programs.some(
+      (p) => p.date.toDateString() === date.toDateString()
+    );
+    if (exists) {
+      Alert.alert('Erro', 'Já existe um programa para esta data.');
       return;
     }
-
     setIsAddingProgram(true);
     try {
       await addProgram(event.id, date);
-      await new Promise((res) => setTimeout(res, 500));
     } catch {
       Alert.alert('Erro', 'Não foi possível adicionar o dia.');
     } finally {
@@ -195,11 +146,9 @@ export default function EventDetailScreen() {
       month: 'long',
       day: 'numeric',
     };
-    const startFormatted = start.toLocaleDateString('pt-BR', options);
-    const endFormatted = end.toLocaleDateString('pt-BR', options);
-    return startFormatted === endFormatted
-      ? startFormatted
-      : `${startFormatted} - ${endFormatted}`;
+    const s = start.toLocaleDateString('pt-BR', options);
+    const e = end.toLocaleDateString('pt-BR', options);
+    return s === e ? s : `${s} - ${e}`;
   };
 
   return (
@@ -236,40 +185,25 @@ export default function EventDetailScreen() {
         }}
       />
 
+      {event.coverImage && (
+        <ImageBackground
+          source={{ uri: event.coverImage }}
+          style={styles.coverImage}
+        >
+          <View style={styles.overlayBottom}>
+            <Text style={styles.coverTitle}>{event.title}</Text>
+            <Text style={styles.overlayText}>
+              {formatDateRange(event.startDate, event.endDate)}
+            </Text>
+            <Text style={styles.overlayText}>{event.location}</Text>
+            {event.description && (
+              <Text style={styles.overlayDescription}>{event.description}</Text>
+            )}
+          </View>
+        </ImageBackground>
+      )}
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.headerInfo}>
-          {event.coverImage && (
-            <ImageBackground
-              source={{ uri: event.coverImage }}
-              style={styles.coverImage}
-              imageStyle={{ borderRadius: 12 }}
-            >
-              <View style={styles.overlay}>
-                <Text style={styles.coverTitle}>{event.title}</Text>
-              </View>
-            </ImageBackground>
-          )}
-
-          {!event.coverImage && (
-            <Text style={[styles.title, { color: colors.text }]}>
-              {event.title}
-            </Text>
-          )}
-
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {formatDateRange(event.startDate, event.endDate)}
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {event.location}
-          </Text>
-
-          {event.description && (
-            <Text style={[styles.description, { color: colors.text }]}>
-              {event.description}
-            </Text>
-          )}
-        </View>
-
         <View style={styles.programsSection}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -288,7 +222,7 @@ export default function EventDetailScreen() {
               Nenhum dia adicionado ainda.
             </Text>
           ) : (
-            [...event.programs]
+            event.programs
               .sort(
                 (a, b) =>
                   new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -306,15 +240,14 @@ export default function EventDetailScreen() {
 
       <TouchableOpacity
         onPress={() => setShowQR(true)}
-        style={[styles.actionButton]}
+        style={styles.actionButton}
       >
         <Text style={styles.actionText}>Compartilhar evento</Text>
-        <LucideQrCode size={14} color="white" />
+        <LucideQrCode size={16} color="white" />
       </TouchableOpacity>
 
       {isAddingProgram && <LoadingOverlay message="Adicionando dia..." />}
 
-      {/* Modal QR Code */}
       <Modal visible={showQR} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.qrContainer}>
@@ -336,11 +269,10 @@ export default function EventDetailScreen() {
         </View>
       </Modal>
 
-      {/* Date Picker */}
       {showDatePicker && (
         <Modal visible={showDatePicker} transparent animationType="fade">
           <View style={styles.modalOverlay}>
-            <View style={[styles.datepicker, { padding: 16 }]}>
+            <View style={styles.datepicker}>
               <Text style={styles.titlepicker}>Selecione o dia do evento</Text>
               <DateTimePicker
                 value={selectedDate}
@@ -357,7 +289,7 @@ export default function EventDetailScreen() {
                     title="Cancelar"
                     onPress={() => {
                       setShowDatePicker(false);
-                      setSelectedDate(event.startDate); // Reseta para a data inicial
+                      setSelectedDate(event.startDate);
                     }}
                     style={styles.iosButton}
                   />
@@ -380,32 +312,11 @@ export default function EventDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40 },
-
   headerButton: { padding: 8 },
   headerActions: { flexDirection: 'row' },
-  headerInfo: {
-    alignItems: 'flex-start',
-    marginBottom: 24,
-    width: '100%',
-    borderWidth: 2,
-    borderColor: '#222',
-    padding: 5,
-    borderRadius: 10,
-  },
-
-  title: { fontSize: 22, fontFamily: 'Inter-Bold', marginBottom: 4 },
-  subtitle: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    marginBottom: 2,
-    textAlign: 'left',
-  },
-  description: { fontSize: 14, fontFamily: 'Inter-Regular', marginTop: 12 },
-  programsSection: {},
+  headerInfo: { marginBottom: 10, width: '100%' },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -420,10 +331,10 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 2,
   },
   datepicker: {
     backgroundColor: 'transparent',
@@ -431,80 +342,71 @@ const styles = StyleSheet.create({
   titlepicker: {
     backgroundColor: 'transparent',
   },
-  qrContainer: {
-    backgroundColor: '#ddd',
-    padding: 24,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  qrTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter-Medium',
-    marginBottom: 12,
-  },
-  shareButton: {
-    marginTop: 16,
-    fontSize: 10,
-    width: 200,
-    backgroundColor: '#25D366',
-  },
-  closeButton: {
-    marginTop: 12,
-    width: 120,
-    backgroundColor: '#333',
-  },
-  notFoundText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-  },
-
-  actionButton: {
-    flexDirection: 'row',
-    alignSelf: 'center',
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    backgroundColor: '#25D366',
-    marginBottom: 10,
-    gap: 5,
-    marginTop: 10,
-  },
-  actionText: {
-    color: 'white',
-    fontFamily: 'Inter-Medium',
-    fontSize: 12,
-    backgroundColor: '#25D366',
-  },
-  coverImage: {
-    width: '100%',
-    height: 180,
-    marginBottom: 16,
-    justifyContent: 'flex-end',
-  },
-
-  overlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-  },
-
-  coverTitle: {
-    fontSize: 20,
-    fontFamily: 'Inter-Bold',
-    color: '#fff',
-    textAlign: 'center',
-  },
   iosButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
     marginTop: 16,
   },
-  iosButton: {
-    width: '48%',
+  iosButton: { width: '48%' },
+  qrContainer: {
+    backgroundColor: '#ddd',
+    padding: 24,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  qrTitle: { fontSize: 16, fontFamily: 'Inter-Medium', marginBottom: 12 },
+  shareButton: { marginTop: 16, width: 200, backgroundColor: '#25D366' },
+  closeButton: { marginTop: 12, width: 120, backgroundColor: '#333' },
+  notFoundText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#25D366',
+    marginBottom: 12,
+    marginTop: 10,
+    gap: 8,
+  },
+  actionText: { color: 'white', fontFamily: 'Inter-Medium', fontSize: 13 },
+  coverImage: {
+    width: '100%',
+    height: 250,
+    justifyContent: 'flex-end',
+    marginBottom: 10,
+  },
+  overlayBottom: {
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    padding: 12,
+  },
+  coverTitle: {
+    fontSize: 20,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  overlayText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#eee',
+    textAlign: 'left',
+    marginBottom: 2,
+  },
+  overlayDescription: {
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+    color: '#ccc',
+    marginTop: 4,
+    textAlign: 'left',
+  },
+  programsSection: {
+    marginTop: 16,
   },
 });

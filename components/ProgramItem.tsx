@@ -61,10 +61,10 @@ export default function ProgramItem({ program, eventId }: ProgramItemProps) {
   return (
     <Pressable
       onPress={handleProgramPress}
-      android_ripple={{ color: colors.primary, borderless: false }}
+      android_ripple={{ color: `${colors.primary}50`, borderless: false }}
       style={({ pressed }) => [
         styles.cardWrapper,
-        pressed && Platform.OS === 'ios' && { opacity: 0.7 },
+        pressed && Platform.OS === 'ios' && { opacity: 0.9 },
       ]}
     >
       <Card style={styles.card}>

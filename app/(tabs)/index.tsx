@@ -98,7 +98,7 @@ export default function EventsScreen() {
           ? 'Nenhum evento encontrado'
           : 'Pesquisar evento existente'}
       </Text>
-      <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+      <Text style={[styles.emptySubtitle2, { color: colors.textSecondary }]}>
         Insira nome e código de acesso ou pesquise utilizando um QRcode criado
         para o evento
       </Text>
@@ -317,6 +317,12 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  emptySubtitle2: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
     marginBottom: 24,
     textAlign: 'center',
   },

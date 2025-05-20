@@ -291,7 +291,7 @@ export default function AddEventScreen() {
             source={{ uri: formValues.coverImage }}
             style={{
               width: '100%',
-              height: 220,
+              height: 200,
               borderRadius: 10,
               marginTop: 12,
               marginBottom: 8,
