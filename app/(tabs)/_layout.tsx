@@ -5,7 +5,7 @@ import { useColorScheme } from 'react-native';
 import {
   Calendar,
   Camera,
-  Chrome as Home,
+  Home,
   SquarePlus as PlusSquare,
   User,
 } from 'lucide-react-native';

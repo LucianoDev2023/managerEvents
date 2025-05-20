@@ -1,9 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, Alert } from 'react-native';
-import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
+import { useRouter } from 'expo-router';
+import { getAuth, signOut } from 'firebase/auth';
+
+import Colors from '@/constants/Colors';
 import { useEvents } from '@/context/EventsContext';
 import Button from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
+
 import {
   Settings,
   Moon,
@@ -13,10 +18,13 @@ import {
   CircleHelp as HelpCircle,
   Bell,
 } from 'lucide-react-native';
-import Card from '@/components/ui/Card';
 
 export default function ProfileScreen() {
   const { state } = useEvents();
+  const router = useRouter();
+  const auth = getAuth();
+  const user = auth.currentUser;
+
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -28,38 +36,53 @@ export default function ProfileScreen() {
 
   const handleThemeToggle = () => {
     Alert.alert(
-      'Change Theme',
-      'This would toggle between light and dark mode.',
+      'Tema',
+      'Aqui você pode alternar entre tema claro e escuro (não implementado).',
       [{ text: 'OK' }]
     );
   };
 
   const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log Out', style: 'destructive' },
+    Alert.alert('Sair da conta', 'Deseja mesmo sair?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut(auth);
+            router.replace('/login');
+          } catch (error) {
+            Alert.alert('Erro ao sair', (error as any).message);
+          }
+        },
+      },
     ]);
   };
 
   const handleClearData = () => {
     Alert.alert(
-      'Clear All Data',
-      'This will permanently delete all your events and programs. This action cannot be undone.',
+      'Limpar tudo?',
+      'Isso excluirá todos os eventos e programas permanentemente.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Delete Everything',
+          text: 'Excluir tudo',
           style: 'destructive',
           onPress: () => {
             Alert.alert(
-              'Data Cleared',
-              'All events and programs have been removed.'
+              'Dados apagados',
+              'Todos os eventos e programas foram removidos.'
             );
           },
         },
       ]
     );
   };
+
+  const displayName = user?.displayName ?? 'Usuário';
+  const email = user?.email ?? 'sem email';
+  console.log(email);
 
   return (
     <ScrollView
@@ -69,42 +92,44 @@ export default function ProfileScreen() {
       <View style={styles.profileHeader}>
         <Image
           source={{
-            uri: 'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
+            uri:
+              user?.photoURL ??
+              'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
           }}
           style={styles.profileImage}
         />
         <Text style={[styles.profileName, { color: colors.text }]}>
-          Jane Doe
+          {displayName}
         </Text>
         <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
-          jane.doe@example.com
+          {email}
         </Text>
       </View>
 
       <View style={styles.statsContainer}>
         <View style={[styles.statCard, { backgroundColor: colors.primary }]}>
           <Text style={styles.statNumber}>{totalEvents}</Text>
-          <Text style={styles.statLabel}>Events</Text>
+          <Text style={styles.statLabel}>Eventos</Text>
         </View>
 
         <View style={[styles.statCard, { backgroundColor: colors.secondary }]}>
           <Text style={styles.statNumber}>{totalPrograms}</Text>
-          <Text style={styles.statLabel}>Programs</Text>
+          <Text style={styles.statLabel}>Programas</Text>
         </View>
 
         <View style={[styles.statCard, { backgroundColor: colors.accent }]}>
           <Text style={styles.statNumber}>12</Text>
-          <Text style={styles.statLabel}>Photos</Text>
+          <Text style={styles.statLabel}>Fotos</Text>
         </View>
       </View>
 
       <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        Preferences
+        Preferências
       </Text>
 
       <Card>
         <Button
-          title="App Settings"
+          title="Configurações"
           icon={<Settings size={20} color={colors.text} />}
           onPress={() => {}}
           variant="ghost"
@@ -114,7 +139,7 @@ export default function ProfileScreen() {
         />
 
         <Button
-          title={`Theme: ${colorScheme === 'dark' ? 'Dark' : 'Light'}`}
+          title={`Tema: ${colorScheme === 'dark' ? 'Escuro' : 'Claro'}`}
           icon={
             colorScheme === 'dark' ? (
               <Moon size={20} color={colors.text} />
@@ -130,7 +155,7 @@ export default function ProfileScreen() {
         />
 
         <Button
-          title="Notifications"
+          title="Notificações"
           icon={<Bell size={20} color={colors.text} />}
           onPress={() => {}}
           variant="ghost"
@@ -140,11 +165,11 @@ export default function ProfileScreen() {
         />
       </Card>
 
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Support</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Suporte</Text>
 
       <Card>
         <Button
-          title="Help & Support"
+          title="Ajuda e Suporte"
           icon={<HelpCircle size={20} color={colors.text} />}
           onPress={() => {}}
           variant="ghost"
@@ -154,11 +179,11 @@ export default function ProfileScreen() {
         />
       </Card>
 
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Account</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Conta</Text>
 
       <Card>
         <Button
-          title="Clear All Data"
+          title="Limpar Tudo"
           icon={<Trash2 size={20} color={colors.error} />}
           onPress={handleClearData}
           variant="ghost"
@@ -168,7 +193,7 @@ export default function ProfileScreen() {
         />
 
         <Button
-          title="Log Out"
+          title="Sair da Conta"
           icon={<LogOut size={20} color={colors.error} />}
           onPress={handleLogout}
           variant="ghost"
@@ -179,7 +204,7 @@ export default function ProfileScreen() {
       </Card>
 
       <Text style={[styles.versionText, { color: colors.textSecondary }]}>
-        Version 1.0.0
+        Versão 1.0.0
       </Text>
     </ScrollView>
   );
