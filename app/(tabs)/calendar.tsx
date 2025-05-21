@@ -223,8 +223,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    paddingVertical: 8,
+    backgroundColor: '#6e56cf',
   },
   navButton: {
     padding: 8,
@@ -235,7 +234,6 @@ const styles = StyleSheet.create({
   },
   weekdaysContainer: {
     flexDirection: 'row',
-    marginBottom: 8,
   },
   weekday: {
     flex: 1,
@@ -247,14 +245,16 @@ const styles = StyleSheet.create({
   daysContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 24,
+    marginBottom: 10,
+    borderBottomColor: '#aaa',
+    borderBottomWidth: 1,
   },
   day: {
     width: `${100 / 7}%`,
     aspectRatio: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 2,
+    padding: 1,
   },
   emptyDay: {
     opacity: 0,
