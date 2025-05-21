@@ -90,14 +90,14 @@ export default function ProfileScreen() {
       contentContainerStyle={styles.contentContainer}
     >
       <View style={styles.profileHeader}>
-        <Image
+        {/* <Image
           source={{
             uri:
               user?.photoURL ??
               'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
           }}
           style={styles.profileImage}
-        />
+        /> */}
         <Text style={[styles.profileName, { color: colors.text }]}>
           {displayName}
         </Text>

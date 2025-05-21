@@ -1,28 +1,39 @@
 import React, { useState } from 'react';
-import { View, TextInput, useColorScheme } from 'react-native';
+import {
+  View,
+  TextInput,
+  useColorScheme,
+  TouchableOpacity,
+  Keyboard,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import Colors from '@/constants/Colors';
 import AuthScreen from '@/components/AuthScreen';
+import { Eye, EyeOff } from 'lucide-react-native';
 
 export default function LoginScreen() {
   const router = useRouter();
+
   const scheme = useColorScheme() ?? 'dark';
   const theme = Colors[scheme];
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(true);
 
   const handleLogin = async () => {
+    Keyboard.dismiss();
     if (!email || !password) return;
     setLoading(true);
+
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.replace('/(tabs)');
+      router.replace('/welcome');
     } catch (error: any) {
-      alert('Erro no login: ' + error.message);
+      alert('Erro no login: Confirme email e/ou senha');
     } finally {
       setLoading(false);
     }
@@ -65,18 +76,36 @@ export default function LoginScreen() {
               marginBottom: 12,
             }}
           />
-          <TextInput
-            placeholder="Digite sua senha"
-            placeholderTextColor={theme.textSecondary}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            style={{
-              color: theme.text,
-              fontSize: 16,
-              paddingVertical: 12,
-            }}
-          />
+          <View style={{ position: 'relative' }}>
+            <TextInput
+              placeholder="Digite sua senha"
+              placeholderTextColor={theme.textSecondary}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={showPassword}
+              style={{
+                color: theme.text,
+                fontSize: 16,
+                paddingVertical: 12,
+                paddingRight: 40, // espaço para o ícone
+              }}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword((prev) => !prev)}
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: 10,
+                padding: 8,
+              }}
+            >
+              {showPassword ? (
+                <EyeOff size={16} color={theme.textSecondary} />
+              ) : (
+                <Eye size={16} color={theme.textSecondary} />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       }
       onSubmit={handleLogin}

@@ -30,6 +30,7 @@ import ProgramItem from '@/components/ProgramItem';
 import Button from '@/components/ui/Button';
 import LoadingOverlay from '@/components/LoadingOverlay';
 import { Event } from '@/types';
+import { getAuth } from 'firebase/auth';
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -64,6 +65,12 @@ export default function EventDetailScreen() {
         <Button title="Voltar" onPress={() => router.back()} />
       </View>
     );
+  }
+  const authUserId = getAuth().currentUser?.uid;
+  if (event && event.userId === authUserId) {
+    console.log('Usuário é o criador do evento');
+  } else {
+    console.log('Usuário não é o criador do evento');
   }
 
   const qrPayload = JSON.stringify({

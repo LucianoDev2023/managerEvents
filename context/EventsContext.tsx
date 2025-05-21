@@ -20,6 +20,7 @@ import {
   getDownloadURL,
   deleteObject,
 } from 'firebase/storage';
+import { getAuth } from 'firebase/auth';
 
 // --- Types ---
 type EventsState = {
@@ -207,6 +208,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
           programs,
           accessCode: eventData.accessCode ?? '',
           coverImage: eventData.coverImage || '',
+          userId: eventData.userId,
         });
       }
 
@@ -221,12 +223,16 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const addEvent = async (data: Omit<Event, 'id' | 'programs'>) => {
+    const user = getAuth().currentUser;
+    if (!user) throw new Error('Usuário não autenticado');
+
     const docRef = await addDoc(collection(db, 'events'), {
       ...data,
+      userId: user.uid, // 🔐 Vincula o evento ao usuário
       startDate: Timestamp.fromDate(data.startDate),
       endDate: Timestamp.fromDate(data.endDate),
       createdAt: Timestamp.now(),
-      coverImage: data.coverImage || '', // ✅ salva a imagem se existir
+      coverImage: data.coverImage || '',
     });
 
     dispatch({
@@ -234,6 +240,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       payload: {
         id: docRef.id,
         ...data,
+        userId: user.uid,
         coverImage: data.coverImage ?? '',
         programs: [],
       },

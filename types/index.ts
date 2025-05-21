@@ -8,6 +8,7 @@ export type Event = {
   programs: Program[];
   accessCode?: string;
   coverImage?: string;
+  userId: string;
 };
 
 export type Program = {

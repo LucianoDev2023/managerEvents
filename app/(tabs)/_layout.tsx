@@ -33,11 +33,13 @@ export default function TabLayout() {
         headerTitleStyle: {
           fontFamily: 'Inter-Bold',
           fontSize: 20,
+          flex: 1,
           color: colors.text,
+          textAlign: 'center',
         },
         headerTintColor: colors.text,
         headerShadowVisible: false,
-        headerTitleAlign: 'center',
+        headerTitleAlign: 'left',
       }}
     >
       <Tabs.Screen
