@@ -87,9 +87,10 @@ export default function EditEventScreen() {
         id,
         ...formValues,
         programs: existingEvent.programs,
+        userId: existingEvent.userId,
       });
       Alert.alert('Evento Atualizado', 'Seu evento foi salvo com sucesso!', [
-        { text: 'OK', onPress: () => router.push(`/events/${id}`) },
+        { text: 'OK', onPress: () => router.replace(`/events/${id}`) },
       ]);
     } catch {
       Alert.alert('Erro', 'Falha ao salvar o evento.');

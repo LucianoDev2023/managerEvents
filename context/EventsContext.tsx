@@ -256,7 +256,8 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       description: event.description,
       startDate: Timestamp.fromDate(event.startDate),
       endDate: Timestamp.fromDate(event.endDate),
-      coverImage: event.coverImage || '', // ✅ atualiza se tiver imagem
+      coverImage: event.coverImage || '',
+      userId: event.userId,
     });
 
     dispatch({ type: 'UPDATE_EVENT', payload: event });

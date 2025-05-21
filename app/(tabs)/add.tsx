@@ -20,11 +20,13 @@ import LoadingOverlay from '@/components/LoadingOverlay';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
 import { uploadImageToCloudinary } from '@/lib/uploadImageToCloudinary';
+import { getAuth } from 'firebase/auth';
 
 export default function AddEventScreen() {
   const { addEvent } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const user = getAuth().currentUser;
 
   const [formValues, setFormValues] = useState<FormValues>({
     title: '',
@@ -33,6 +35,7 @@ export default function AddEventScreen() {
     endDate: new Date(new Date().setDate(new Date().getDate() + 1)),
     description: '',
     accessCode: '',
+    userId: user?.uid || '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -87,10 +90,19 @@ export default function AddEventScreen() {
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
+    const user = getAuth().currentUser;
+    if (!user) {
+      Alert.alert('Erro', 'Usuário não autenticado.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const newEventId = await addEvent(formValues); // agora retorna o ID
+      const newEventId = await addEvent({
+        ...formValues,
+        userId: user.uid,
+      });
 
       setTimeout(() => {
         Alert.alert('Evento criado', 'Seu evento foi criado com sucesso!', [

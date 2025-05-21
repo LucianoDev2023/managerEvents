@@ -33,7 +33,7 @@ export default function AddActivityScreen() {
   const colors = Colors[colorScheme];
 
   const [formValues, setFormValues] = useState<ActivityFormValues>({
-    time: '09:00 AM',
+    time: '09:00',
     title: '',
     description: '',
   });

@@ -39,7 +39,7 @@ export default function TabLayout() {
         },
         headerTintColor: colors.text,
         headerShadowVisible: false,
-        headerTitleAlign: 'left',
+        headerTitleAlign: 'center',
       }}
     >
       <Tabs.Screen

@@ -46,4 +46,5 @@ export type FormValues = {
   description: string;
   accessCode: string;
   coverImage?: string;
+  userId: string;
 };

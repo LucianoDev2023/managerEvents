@@ -43,7 +43,7 @@ export default function EditActivityScreen() {
     | undefined;
 
   const [formValues, setFormValues] = useState<ActivityFormValues>({
-    time: '09:00 AM',
+    time: '09:00',
     title: '',
     description: '',
   });

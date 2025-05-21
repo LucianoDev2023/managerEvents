@@ -16,8 +16,11 @@ import {
 } from 'lucide-react-native';
 import Card from '@/components/ui/Card';
 import { router } from 'expo-router';
+import { getAuth } from 'firebase/auth';
 
 export default function CalendarScreen() {
+  const authUserId = getAuth().currentUser?.uid;
+
   const { state } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -82,15 +85,15 @@ export default function CalendarScreen() {
       const eventEndMonth = event.endDate.getMonth();
       const eventEndYear = event.endDate.getFullYear();
 
-      return (
-        // Event starts in this month
+      const isInMonth =
         (eventStartMonth === month && eventStartYear === year) ||
-        // Event ends in this month
         (eventEndMonth === month && eventEndYear === year) ||
-        // Event spans over this month
         (eventStartYear * 12 + eventStartMonth <= year * 12 + month &&
-          eventEndYear * 12 + eventEndMonth >= year * 12 + month)
-      );
+          eventEndYear * 12 + eventEndMonth >= year * 12 + month);
+
+      const isOwner = event.userId === authUserId;
+
+      return isInMonth && isOwner;
     });
   }, [selectedMonth, state.events]);
 
