@@ -205,10 +205,12 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
           description: eventData.description,
           startDate: eventData.startDate.toDate(),
           endDate: eventData.endDate.toDate(),
-          programs,
           accessCode: eventData.accessCode ?? '',
           coverImage: eventData.coverImage || '',
           userId: eventData.userId,
+          createdBy: eventData.createdBy ?? '',
+          subAdmins: eventData.subAdmins ?? [], // ✅ Adicionado aqui
+          programs,
         });
       }
 
@@ -226,11 +228,20 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     const user = getAuth().currentUser;
     if (!user) throw new Error('Usuário não autenticado');
 
+    const userEmail = user.email?.toLowerCase() ?? '';
+    const normalizeDate = (date: Date) => {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
+
     const docRef = await addDoc(collection(db, 'events'), {
       ...data,
-      userId: user.uid, // 🔐 Vincula o evento ao usuário
-      startDate: Timestamp.fromDate(data.startDate),
-      endDate: Timestamp.fromDate(data.endDate),
+      userId: user.uid,
+      createdBy: userEmail, // 👈 Usa o email do usuário logado como criador
+      subAdmins: data.subAdmins ?? [],
+      startDate: Timestamp.fromDate(normalizeDate(data.startDate)),
+      endDate: Timestamp.fromDate(normalizeDate(data.endDate)),
       createdAt: Timestamp.now(),
       coverImage: data.coverImage || '',
     });
@@ -241,6 +252,8 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         id: docRef.id,
         ...data,
         userId: user.uid,
+        createdBy: userEmail, // 👈 Mantém a consistência com o que foi salvo
+        subAdmins: data.subAdmins ?? [],
         coverImage: data.coverImage ?? '',
         programs: [],
       },
@@ -258,6 +271,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       endDate: Timestamp.fromDate(event.endDate),
       coverImage: event.coverImage || '',
       userId: event.userId,
+      subAdmins: event.subAdmins ?? [], // ✅ Aqui também
     });
 
     dispatch({ type: 'UPDATE_EVENT', payload: event });

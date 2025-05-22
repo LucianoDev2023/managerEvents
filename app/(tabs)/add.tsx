@@ -28,6 +28,10 @@ export default function AddEventScreen() {
   const colors = Colors[colorScheme];
   const user = getAuth().currentUser;
 
+  if (!user) throw new Error('Usuário não autenticado');
+
+  const userEmail = user.email?.toLowerCase() ?? '';
+
   const [formValues, setFormValues] = useState<FormValues>({
     title: '',
     location: '',
@@ -36,6 +40,7 @@ export default function AddEventScreen() {
     description: '',
     accessCode: '',
     userId: user?.uid || '',
+    createdBy: userEmail,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -102,6 +107,7 @@ export default function AddEventScreen() {
       const newEventId = await addEvent({
         ...formValues,
         userId: user.uid,
+        createdBy: user.email?.toLowerCase() ?? '',
       });
 
       setTimeout(() => {

@@ -5,10 +5,15 @@ export type Event = {
   startDate: Date;
   endDate: Date;
   description: string;
-  programs: Program[];
   accessCode?: string;
   coverImage?: string;
   userId: string;
+  createdBy: string;
+  subAdmins?: {
+    email: string;
+    level: 'total' | 'parcial';
+  }[];
+  programs: Program[];
 };
 
 export type Program = {
@@ -47,4 +52,5 @@ export type FormValues = {
   accessCode: string;
   coverImage?: string;
   userId: string;
+  createdBy: string;
 };

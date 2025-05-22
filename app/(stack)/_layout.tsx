@@ -37,6 +37,25 @@ export default function StackLayout() {
             // headerTitle: ({ route }) => route.params?.eventTitle || 'Editar Evento'
           }}
         />
+
+        <Stack.Screen
+          name="myevents"
+          options={{
+            title: 'Lista de eventos',
+            headerShown: true,
+            // Para título dinâmico:
+            // headerTitle: ({ route }) => route.params?.eventTitle || 'Editar Evento'
+          }}
+        />
+        <Stack.Screen
+          name="permission-confirmation/[id]"
+          options={{
+            title: 'Administrar permissões',
+            headerShown: true,
+            // Para título dinâmico:
+            // headerTitle: ({ route }) => route.params?.eventTitle || 'Editar Evento'
+          }}
+        />
       </Stack>
     </View>
   );

@@ -18,22 +18,26 @@ import Card from '@/components/ui/Card';
 import { router } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 
+// 🔧 Normalizador de datas (zera hora/min/seg)
+const normalizeDate = (date: Date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
 export default function CalendarScreen() {
-  const authUserId = getAuth().currentUser?.uid;
+  const userEmail = getAuth().currentUser?.email?.toLowerCase() ?? '';
 
   const { state } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const [selectedMonth, setSelectedMonth] = useState(new Date());
 
-  // Calendar functions
-  const daysInMonth = (year: number, month: number) => {
-    return new Date(year, month + 1, 0).getDate();
-  };
+  const daysInMonth = (year: number, month: number) =>
+    new Date(year, month + 1, 0).getDate();
 
-  const firstDayOfMonth = (year: number, month: number) => {
-    return new Date(year, month, 1).getDay();
-  };
+  const firstDayOfMonth = (year: number, month: number) =>
+    new Date(year, month, 1).getDay();
 
   const moveMonth = (offset: number) => {
     const newMonth = new Date(selectedMonth);
@@ -41,7 +45,6 @@ export default function CalendarScreen() {
     setSelectedMonth(newMonth);
   };
 
-  // Create calendar data
   const calendarDays = useMemo(() => {
     const year = selectedMonth.getFullYear();
     const month = selectedMonth.getMonth();
@@ -50,22 +53,23 @@ export default function CalendarScreen() {
 
     const days = [];
 
-    // Add empty cells for days before first day of month
     for (let i = 0; i < firstDay; i++) {
       days.push({ day: 0, hasEvent: false });
     }
 
-    // Add days of the month
     for (let day = 1; day <= totalDays; day++) {
-      const date = new Date(year, month, day);
+      const date = normalizeDate(new Date(year, month, day));
 
-      // Check if any event is scheduled for this day
       const hasEvent = state.events.some((event) => {
-        // Check if this day falls within any event period
-        const eventStart = new Date(event.startDate);
-        const eventEnd = new Date(event.endDate);
+        if (!event.createdBy) return false;
+        const start = normalizeDate(event.startDate);
+        const end = normalizeDate(event.endDate);
 
-        return date >= eventStart && date <= eventEnd;
+        return (
+          event.createdBy.toLowerCase() === userEmail &&
+          date >= start &&
+          date <= end
+        );
       });
 
       days.push({ day, hasEvent });
@@ -74,36 +78,34 @@ export default function CalendarScreen() {
     return days;
   }, [selectedMonth, state.events]);
 
-  // Get events for the selected month
   const eventsThisMonth = useMemo(() => {
     const year = selectedMonth.getFullYear();
     const month = selectedMonth.getMonth();
 
     return state.events.filter((event) => {
-      const eventStartMonth = event.startDate.getMonth();
-      const eventStartYear = event.startDate.getFullYear();
-      const eventEndMonth = event.endDate.getMonth();
-      const eventEndYear = event.endDate.getFullYear();
+      if (!event.createdBy) return false;
+      const createdBy = event.createdBy.toLowerCase();
+      if (createdBy !== userEmail) return false;
+
+      const start = event.startDate;
+      const end = event.endDate;
 
       const isInMonth =
-        (eventStartMonth === month && eventStartYear === year) ||
-        (eventEndMonth === month && eventEndYear === year) ||
-        (eventStartYear * 12 + eventStartMonth <= year * 12 + month &&
-          eventEndYear * 12 + eventEndMonth >= year * 12 + month);
+        (start.getMonth() === month && start.getFullYear() === year) ||
+        (end.getMonth() === month && end.getFullYear() === year) ||
+        (start.getFullYear() * 12 + start.getMonth() <= year * 12 + month &&
+          end.getFullYear() * 12 + end.getMonth() >= year * 12 + month);
 
-      const isOwner = event.userId === authUserId;
-
-      return isInMonth && isOwner;
+      return isInMonth;
     });
   }, [selectedMonth, state.events]);
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', {
+  const formatDate = (date: Date) =>
+    date.toLocaleDateString('pt-BR', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-  };
 
   const handleEventPress = (eventId: string) => {
     router.push(`/(stack)/events/${eventId}`);
@@ -223,7 +225,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#6e56cf',
   },
   navButton: {
     padding: 8,
@@ -234,6 +235,7 @@ const styles = StyleSheet.create({
   },
   weekdaysContainer: {
     flexDirection: 'row',
+    marginTop: 8,
   },
   weekday: {
     flex: 1,
@@ -273,7 +275,7 @@ const styles = StyleSheet.create({
   eventsTitle: {
     fontSize: 18,
     fontFamily: 'Inter-Bold',
-    marginBottom: 16,
+    marginVertical: 16,
   },
   eventsContainer: {
     flex: 1,

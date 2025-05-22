@@ -232,18 +232,17 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    height: 80,
-    paddingRight: 30,
+    height: 110,
+    paddingRight: 65,
     borderBottomRightRadius: 180,
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'center',
   },
   icon: {
     width: 80,
     height: 80,
     position: 'absolute',
-    top: 20,
-    right: 10,
+    left: 35,
   },
   headerTitle: {
     fontSize: 19,

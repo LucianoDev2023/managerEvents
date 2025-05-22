@@ -25,12 +25,33 @@ export default function ProfileScreen() {
   const auth = getAuth();
   const user = auth.currentUser;
 
+  const userEmail = user?.email?.toLowerCase();
+  const userEvents = state.events.filter(
+    (event) => event.createdBy?.toLowerCase() === userEmail
+  );
+
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
-  const totalEvents = state.events.length;
-  const totalPrograms = state.events.reduce(
-    (sum, event) => sum + event.programs.length,
+  const totalEvents = userEvents.length;
+  const totalPrograms = userEvents.reduce(
+    (sum, e) => sum + e.programs.length,
+    0
+  );
+  const totalActivities = userEvents.reduce(
+    (sum, e) =>
+      sum + e.programs.reduce((pSum, p) => pSum + p.activities.length, 0),
+    0
+  );
+  const totalPhotos = userEvents.reduce(
+    (sum, e) =>
+      sum +
+      e.programs.reduce(
+        (pSum, p) =>
+          pSum +
+          p.activities.reduce((aSum, a) => aSum + (a.photos?.length ?? 0), 0),
+        0
+      ),
     0
   );
 
@@ -82,7 +103,9 @@ export default function ProfileScreen() {
 
   const displayName = user?.displayName ?? 'Usuário';
   const email = user?.email ?? 'sem email';
-  console.log(email);
+
+  const pluralize = (count: number, singular: string, plural: string) =>
+    count <= 1 ? singular : plural;
 
   return (
     <ScrollView
@@ -90,14 +113,6 @@ export default function ProfileScreen() {
       contentContainerStyle={styles.contentContainer}
     >
       <View style={styles.profileHeader}>
-        {/* <Image
-          source={{
-            uri:
-              user?.photoURL ??
-              'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-          }}
-          style={styles.profileImage}
-        /> */}
         <Text style={[styles.profileName, { color: colors.text }]}>
           {displayName}
         </Text>
@@ -106,20 +121,33 @@ export default function ProfileScreen() {
         </Text>
       </View>
 
-      <View style={styles.statsContainer}>
+      <View style={styles.statsGrid}>
         <View style={[styles.statCard, { backgroundColor: colors.primary }]}>
           <Text style={styles.statNumber}>{totalEvents}</Text>
-          <Text style={styles.statLabel}>Eventos</Text>
+          <Text style={styles.statLabel}>
+            {pluralize(totalEvents, 'Evento', 'Eventos')}
+          </Text>
         </View>
 
         <View style={[styles.statCard, { backgroundColor: colors.secondary }]}>
           <Text style={styles.statNumber}>{totalPrograms}</Text>
-          <Text style={styles.statLabel}>Programas</Text>
+          <Text style={styles.statLabel}>
+            {pluralize(totalPrograms, 'Programa', 'Programas')}
+          </Text>
         </View>
 
         <View style={[styles.statCard, { backgroundColor: colors.accent }]}>
-          <Text style={styles.statNumber}>12</Text>
-          <Text style={styles.statLabel}>Fotos</Text>
+          <Text style={styles.statNumber}>{totalActivities}</Text>
+          <Text style={styles.statLabel}>
+            {pluralize(totalActivities, 'Atividade', 'Atividades')}
+          </Text>
+        </View>
+
+        <View style={[styles.statCard, { backgroundColor: '#f39c12' }]}>
+          <Text style={styles.statNumber}>{totalPhotos}</Text>
+          <Text style={styles.statLabel}>
+            {pluralize(totalPhotos, 'Foto', 'Fotos')}
+          </Text>
         </View>
       </View>
 
@@ -129,9 +157,9 @@ export default function ProfileScreen() {
 
       <Card>
         <Button
-          title="Configurações"
-          icon={<Settings size={20} color={colors.text} />}
-          onPress={() => {}}
+          title="Meu eventos"
+          icon={<Settings size={24} color={colors.text} />}
+          onPress={() => router.push('/(stack)/myevents')}
           variant="ghost"
           fullWidth
           style={styles.menuButton}
@@ -219,14 +247,9 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     alignItems: 'center',
-    marginVertical: 24,
+    marginBottom: 20,
   },
-  profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 16,
-  },
+
   profileName: {
     fontSize: 24,
     fontFamily: 'Inter-Bold',
@@ -236,17 +259,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
   },
-  statsContainer: {
+  statsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 24,
   },
   statCard: {
-    flex: 1,
+    width: '48%',
     borderRadius: 10,
-    padding: 16,
+    padding: 10,
     alignItems: 'center',
-    marginHorizontal: 4,
+    marginBottom: 4,
   },
   statNumber: {
     color: 'white',
