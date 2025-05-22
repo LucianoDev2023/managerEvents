@@ -50,7 +50,7 @@ export default function AuthScreen({
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <LinearGradient colors={['#6e56cf', '#a26bfa']} style={styles.header}>
-        <StatusBar translucent backgroundColor="transparent" style="light" />
+        {/* <StatusBar translucent backgroundColor="transparent" style="light" /> */}
         <Image
           source={require('@/assets/images/loginpage.png')}
           style={styles.icon}
@@ -106,17 +106,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    height: 200,
+    height: 130,
+    paddingRight: 65,
+    paddingTop: 14,
     borderBottomRightRadius: 180,
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'center',
+    top: 20,
   },
   icon: {
-    width: 100,
-    height: 100,
+    width: 80,
+    height: 80,
     position: 'absolute',
-    top: 110,
-    right: 16,
+    left: 35,
+    top: 35,
   },
   title1: {
     fontSize: 19,
@@ -128,6 +131,7 @@ const styles = StyleSheet.create({
     paddingTop: 24,
   },
   title: {
+    marginTop: 50,
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',

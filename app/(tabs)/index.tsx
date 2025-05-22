@@ -232,7 +232,7 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    height: 110,
+    height: 100,
     paddingRight: 65,
     borderBottomRightRadius: 180,
     alignItems: 'flex-end',
