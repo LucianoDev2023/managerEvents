@@ -5,6 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Platform,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { useEvents } from '@/context/EventsContext';
 import Colors from '@/constants/Colors';
@@ -17,8 +19,9 @@ import {
 import Card from '@/components/ui/Card';
 import { router } from 'expo-router';
 import { getAuth } from 'firebase/auth';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 
-// 🔧 Normalizador de datas (zera hora/min/seg)
 const normalizeDate = (date: Date) => {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -27,10 +30,15 @@ const normalizeDate = (date: Date) => {
 
 export default function CalendarScreen() {
   const userEmail = getAuth().currentUser?.email?.toLowerCase() ?? '';
-
   const { state } = useEvents();
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
+
+  const gradientColors =
+    colorScheme === 'dark'
+      ? ['#0b0b0f', '#1b0033', '#3e1d73']
+      : ['#ffffff', '#e6e6f0', '#f9f9ff'];
+
   const [selectedMonth, setSelectedMonth] = useState(new Date());
 
   const daysInMonth = (year: number, month: number) =>
@@ -50,7 +58,6 @@ export default function CalendarScreen() {
     const month = selectedMonth.getMonth();
     const totalDays = daysInMonth(year, month);
     const firstDay = firstDayOfMonth(year, month);
-
     const days = [];
 
     for (let i = 0; i < firstDay; i++) {
@@ -59,19 +66,16 @@ export default function CalendarScreen() {
 
     for (let day = 1; day <= totalDays; day++) {
       const date = normalizeDate(new Date(year, month, day));
-
       const hasEvent = state.events.some((event) => {
         if (!event.createdBy) return false;
         const start = normalizeDate(event.startDate);
         const end = normalizeDate(event.endDate);
-
         return (
           event.createdBy.toLowerCase() === userEmail &&
           date >= start &&
           date <= end
         );
       });
-
       days.push({ day, hasEvent });
     }
 
@@ -81,12 +85,10 @@ export default function CalendarScreen() {
   const eventsThisMonth = useMemo(() => {
     const year = selectedMonth.getFullYear();
     const month = selectedMonth.getMonth();
-
     return state.events.filter((event) => {
       if (!event.createdBy) return false;
       const createdBy = event.createdBy.toLowerCase();
       if (createdBy !== userEmail) return false;
-
       const start = event.startDate;
       const end = event.endDate;
 
@@ -112,114 +114,153 @@ export default function CalendarScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.calendarHeader}>
-        <TouchableOpacity
-          onPress={() => moveMonth(-1)}
-          style={styles.navButton}
-        >
-          <ChevronLeft size={24} color={colors.text} />
-        </TouchableOpacity>
+    <LinearGradient
+      colors={
+        colorScheme === 'dark'
+          ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
+          : (['#f2f2f2', '#e6e6f0', '#ffffff'] as const)
+      }
+      locations={[0, 0.7, 1]}
+      style={styles.gradient}
+    >
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        style={colorScheme === 'dark' ? 'light' : 'dark'}
+      />
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop:
+              Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
+          },
+        ]}
+      >
+        <View style={styles.calendarHeader}>
+          <TouchableOpacity
+            onPress={() => moveMonth(-1)}
+            style={styles.navButton}
+          >
+            <ChevronLeft size={24} color={colors.text} />
+          </TouchableOpacity>
 
-        <Text style={[styles.monthTitle, { color: colors.text }]}>
-          {selectedMonth.toLocaleString('pt-BR', {
-            month: 'long',
-            year: 'numeric',
-          })}
+          <Text style={[styles.monthTitle, { color: colors.text }]}>
+            {selectedMonth.toLocaleString('pt-BR', {
+              month: 'long',
+              year: 'numeric',
+            })}
+          </Text>
+
+          <TouchableOpacity
+            onPress={() => moveMonth(1)}
+            style={styles.navButton}
+          >
+            <ChevronRight size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.weekdaysContainer}>
+          {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
+            <Text
+              key={day}
+              style={[styles.weekday, { color: colors.textSecondary }]}
+            >
+              {day}
+            </Text>
+          ))}
+        </View>
+
+        <View style={styles.daysContainer}>
+          {calendarDays.map((item, index) => (
+            <View
+              key={index}
+              style={[styles.day, item.day === 0 && styles.emptyDay]}
+            >
+              {item.day > 0 && (
+                <View
+                  style={[
+                    styles.dayNumber,
+                    item.hasEvent && { backgroundColor: colors.primary },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: item.hasEvent ? '#fff' : colors.text,
+                      fontFamily: 'Inter-Regular',
+                    }}
+                  >
+                    {item.day}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+
+        <Text style={[styles.eventsTitle1, { color: colors.text }]}>
+          Eventos para este Mês
         </Text>
 
-        <TouchableOpacity onPress={() => moveMonth(1)} style={styles.navButton}>
-          <ChevronRight size={24} color={colors.text} />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.weekdaysContainer}>
-        {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
-          <Text
-            key={day}
-            style={[styles.weekday, { color: colors.textSecondary }]}
-          >
-            {day}
-          </Text>
-        ))}
-      </View>
-
-      <View style={styles.daysContainer}>
-        {calendarDays.map((item, index) => (
-          <View
-            key={index}
-            style={[styles.day, item.day === 0 && styles.emptyDay]}
-          >
-            {item.day > 0 && (
-              <View
-                style={[
-                  styles.dayNumber,
-                  item.hasEvent && { backgroundColor: colors.primary },
-                ]}
+        <ScrollView style={styles.eventsContainer}>
+          {eventsThisMonth.length === 0 ? (
+            <View style={styles.noEventsContainer}>
+              <LucideCalendar size={48} color={colors.textSecondary} />
+              <Text
+                style={[styles.noEventsText, { color: colors.textSecondary }]}
               >
-                <Text
-                  style={[
-                    styles.dayText,
-                    { color: item.hasEvent ? 'white' : colors.text },
-                  ]}
-                >
-                  {item.day}
-                </Text>
-              </View>
-            )}
-          </View>
-        ))}
+                Nenhum evento disponível
+              </Text>
+            </View>
+          ) : (
+            eventsThisMonth.map((event) => (
+              <TouchableOpacity
+                key={event.id}
+                onPress={() => handleEventPress(event.id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.cardShadow}>
+                  <View
+                    style={[
+                      styles.eventCard,
+                      { backgroundColor: colors.backGroundSecondary },
+                    ]}
+                  >
+                    <Text style={[styles.eventTitle, { color: colors.text }]}>
+                      {event.title}
+                    </Text>
+                    <Text
+                      style={[styles.eventDates, { color: colors.primary }]}
+                    >
+                      {formatDate(event.startDate)} -{' '}
+                      {formatDate(event.endDate)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.eventLocation,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {event.location}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
       </View>
-
-      <Text style={[styles.eventsTitle, { color: colors.text }]}>
-        Eventos para este Mês
-      </Text>
-
-      <ScrollView style={styles.eventsContainer}>
-        {eventsThisMonth.length === 0 ? (
-          <View style={styles.noEventsContainer}>
-            <LucideCalendar size={48} color={colors.textSecondary} />
-            <Text
-              style={[styles.noEventsText, { color: colors.textSecondary }]}
-            >
-              Nenhum evento disponível
-            </Text>
-          </View>
-        ) : (
-          eventsThisMonth.map((event) => (
-            <TouchableOpacity
-              key={event.id}
-              onPress={() => handleEventPress(event.id)}
-              activeOpacity={0.7}
-            >
-              <Card style={styles.eventCard}>
-                <Text style={[styles.eventTitle, { color: colors.text }]}>
-                  {event.title}
-                </Text>
-                <Text style={[styles.eventDates, { color: colors.primary }]}>
-                  {formatDate(event.startDate)} - {formatDate(event.endDate)}
-                </Text>
-                <Text
-                  style={[
-                    styles.eventLocation,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {event.location}
-                </Text>
-              </Card>
-            </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
   },
   calendarHeader: {
     flexDirection: 'row',
@@ -232,6 +273,11 @@ const styles = StyleSheet.create({
   monthTitle: {
     fontSize: 18,
     fontFamily: 'Inter-Bold',
+  },
+  eventTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+    marginBottom: 4,
   },
   weekdaysContainer: {
     flexDirection: 'row',
@@ -248,7 +294,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginBottom: 10,
-    borderBottomColor: '#aaa',
     borderBottomWidth: 1,
   },
   day: {
@@ -268,15 +313,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dayText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-  },
-  eventsTitle: {
-    fontSize: 18,
-    fontFamily: 'Inter-Bold',
-    marginVertical: 16,
-  },
+
   eventsContainer: {
     flex: 1,
   },
@@ -291,14 +328,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: 'center',
   },
-  eventCard: {
-    marginBottom: 12,
-  },
-  eventTitle: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 16,
-    marginBottom: 4,
-  },
+
   eventDates: {
     fontFamily: 'Inter-Medium',
     fontSize: 14,
@@ -307,5 +337,26 @@ const styles = StyleSheet.create({
   eventLocation: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
+  },
+  cardShadow: {
+    borderRadius: 12,
+    backgroundColor: '#000', // fallback para Android shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 6,
+    marginBottom: 12,
+  },
+  eventCard: {
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#6e56cf',
+  },
+  eventsTitle1: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+    marginBottom: 16,
   },
 });

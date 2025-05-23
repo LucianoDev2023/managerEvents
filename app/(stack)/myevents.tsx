@@ -9,6 +9,9 @@ import {
   Modal,
   TextInput,
   Pressable,
+  Image,
+  Platform,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
@@ -16,17 +19,17 @@ import { useEvents } from '@/context/EventsContext';
 import { useColorScheme } from 'react-native';
 import Colors from '@/constants/Colors';
 import Button from '@/components/ui/Button';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
+import { ChevronRight } from 'lucide-react-native';
 
 export default function MyEventsScreen() {
   const { state, updateEvent } = useEvents();
   const router = useRouter();
   const auth = getAuth();
   const userEmail = auth.currentUser?.email?.toLowerCase();
-  const userId = auth.currentUser?.uid;
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
-  const scheme = useColorScheme() ?? 'dark';
-  const theme = Colors[scheme];
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -40,10 +43,7 @@ export default function MyEventsScreen() {
   );
 
   const handleNavigateToEvent = (eventId: string) => {
-    router.push({
-      pathname: '/events/[id]',
-      params: { id: eventId },
-    });
+    router.push({ pathname: '/events/[id]', params: { id: eventId } });
   };
 
   const handleOpenPermissionModal = (eventId: string) => {
@@ -52,7 +52,6 @@ export default function MyEventsScreen() {
   };
 
   const handleSavePermission = () => {
-    console.log('clicado em salvar permissão');
     if (!permissionEmail.trim()) {
       alert('Insira um email válido');
       return;
@@ -89,250 +88,260 @@ export default function MyEventsScreen() {
       };
 
       BackHandler.addEventListener('hardwareBackPress', onBackPress);
-
-      return () => {
+      return () =>
         BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-      };
     }, [])
   );
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('pt-BR', {
+
+  const formatDate = (date: Date) =>
+    new Date(date).toLocaleDateString('pt-BR', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-  };
+
+  const gradientColors =
+    colorScheme === 'dark'
+      ? ['#0b0b0f', '#1b0033', '#3e1d73']
+      : ['#ffffff', '#e6e6f0', '#f9f9ff'];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>Meus Eventos</Text>
-
-      <FlatList
-        data={filteredEvents}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View
-            style={{
-              flex: 1,
-              padding: 16,
-              alignContent: 'center',
-              gap: 10,
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: theme.border,
-              backgroundColor: theme.backgroundAlt,
-              shadowColor: scheme === 'dark' ? '#fff' : '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.1,
-              shadowRadius: 8,
-              elevation: 6,
-              marginBottom: 24,
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              // alignItems: 'center',
-            }}
-          >
-            <View style={styles.cardInfo}>
-              <Text style={[styles.eventTitle, { color: colors.text }]}>
-                {item.title}
-              </Text>
-              <Text style={[styles.eventDates, { color: colors.primary }]}>
-                {formatDate(item.startDate)} - {formatDate(item.endDate)}
-              </Text>
-            </View>
-
-            <View style={styles.actions}>
-              <Button
-                title="Abrir evento"
-                size="small"
-                onPress={() => handleNavigateToEvent(item.id)}
-                style={{
-                  backgroundColor:
-                    colorScheme === 'dark'
-                      ? colors.primaryDark
-                      : colors.primaryLight,
-                }}
-                textStyle={{ color: colors.text }}
-              />
-
-              <Button
-                title="Adicionar permissão"
-                size="small"
-                onPress={() => handleOpenPermissionModal(item.id)}
-                style={{
-                  backgroundColor:
-                    colorScheme === 'dark'
-                      ? colors.primary
-                      : colors.primaryDark,
-                }}
-                textStyle={{ color: colors.text }}
-              />
-            </View>
-          </View>
-        )}
-        ListEmptyComponent={
-          <Text
-            style={{
-              color: colors.textSecondary,
-              marginTop: 20,
-              textAlign: 'center',
-            }}
-          >
-            Nenhum evento disponível.
-          </Text>
-        }
+    <LinearGradient
+      colors={gradientColors}
+      style={styles.gradient}
+      locations={[0, 0.7, 1]}
+    >
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        style={colorScheme === 'dark' ? 'light' : 'dark'}
       />
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop:
+              Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
+          },
+        ]}
+      >
+        <Text style={[styles.title, { color: colors.text }]}>Meus Eventos</Text>
 
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.modalContent,
-              { backgroundColor: colors.background },
-            ]}
-          >
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Nova Permissão
+        <FlatList
+          data={filteredEvents}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity onPress={() => handleNavigateToEvent(item.id)}>
+              <View
+                style={[
+                  styles.cardWrapper,
+                  {
+                    borderColor: colors.border,
+                    backgroundColor: colors.backGroundSecondary,
+                    shadowColor: colorScheme === 'dark' ? '#fff' : '#000',
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.cardInfo,
+                    {
+                      backgroundColor: colors.backGroundSecondary,
+                      borderRadius: 12,
+                      padding: 12,
+                      shadowColor: colorScheme === 'dark' ? '#000' : '#aaa',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 6,
+                      elevation: 4,
+                    },
+                  ]}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    {item.coverImage && (
+                      <Image
+                        source={{ uri: item.coverImage }}
+                        style={{
+                          width: 60,
+                          height: 60,
+                          borderRadius: 8,
+                          marginRight: 12,
+                        }}
+                      />
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.eventTitle, { color: colors.text }]}>
+                        {item.title}
+                      </Text>
+                      <Text
+                        style={[styles.eventDates, { color: colors.primary }]}
+                      >
+                        {' '}
+                        {formatDate(item.startDate)} -{' '}
+                        {formatDate(item.endDate)}{' '}
+                      </Text>
+                    </View>
+                    <ChevronRight size={20} color={colors.textSecondary} />
+                  </View>
+                </View>
+
+                <View style={styles.actions}>
+                  <Button
+                    title="Adicionar permissão"
+                    size="small"
+                    onPress={() => handleOpenPermissionModal(item.id)}
+                    style={{
+                      backgroundColor: colors.primary,
+                      borderRadius: 20,
+                      paddingHorizontal: 24,
+                    }}
+                    textStyle={{ color: 'white', fontWeight: 'bold' }}
+                  />
+                </View>
+              </View>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              Nenhum evento disponível.
             </Text>
-            <TextInput
-              placeholder="Email do usuário"
-              value={permissionEmail}
-              onChangeText={setPermissionEmail}
-              style={[
-                styles.input,
-                { borderColor: colors.border, color: colors.text },
-              ]}
-              placeholderTextColor={colors.textSecondary}
-            />
-            <View style={styles.toggleContainer}>
-              <Pressable
-                onPress={() => setPermissionLevel('total')}
-                style={[
-                  styles.toggleButton,
-                  permissionLevel === 'total' && {
-                    backgroundColor: colors.primaryDark,
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: permissionLevel === 'total' ? 'white' : colors.text,
-                  }}
-                >
-                  Total
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setPermissionLevel('parcial')}
-                style={[
-                  styles.toggleButton,
-                  permissionLevel === 'parcial' && {
-                    backgroundColor: colors.primaryDark,
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color:
-                      permissionLevel === 'parcial' ? 'white' : colors.text,
-                  }}
-                >
-                  Parcial
-                </Text>
-              </Pressable>
-            </View>
-            <Button
-              title="Salvar"
-              size="small"
-              onPress={handleSavePermission}
-              style={{ backgroundColor: colors.primary }}
-              textStyle={{ color: 'white' }}
-            />
+          }
+        />
 
-            <Button
-              title="Cancelar"
-              size="small"
-              onPress={() => setModalVisible(false)}
-              style={{ backgroundColor: colors.secondary }}
-              textStyle={{ color: 'white' }}
-            />
+        <Modal visible={modalVisible} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View
+              style={[
+                styles.modalContent,
+                { backgroundColor: colors.background },
+              ]}
+            >
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Nova Permissão
+              </Text>
+              <TextInput
+                placeholder="Email do usuário"
+                value={permissionEmail}
+                onChangeText={setPermissionEmail}
+                style={[
+                  styles.input,
+                  { borderColor: colors.border, color: colors.text },
+                ]}
+                placeholderTextColor={colors.textSecondary}
+              />
+              <View style={styles.toggleContainer}>
+                {['total', 'parcial'].map((level) => (
+                  <Pressable
+                    key={level}
+                    onPress={() =>
+                      setPermissionLevel(level as 'total' | 'parcial')
+                    }
+                    style={[
+                      styles.toggleButton,
+                      permissionLevel === level && {
+                        backgroundColor: colors.primary,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: permissionLevel === level ? '#fff' : colors.text,
+                      }}
+                    >
+                      {level.charAt(0).toUpperCase() + level.slice(1)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Button
+                title="Salvar"
+                size="small"
+                onPress={handleSavePermission}
+                style={{ backgroundColor: colors.primary }}
+                textStyle={{ color: 'white' }}
+              />
+              <Button
+                title="Cancelar"
+                size="small"
+                onPress={() => setModalVisible(false)}
+                style={{ backgroundColor: '#d9534f' }}
+                textStyle={{ color: 'white' }}
+              />
+            </View>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    padding: 16,
-    justifyContent: 'center',
-    alignContent: 'center',
-    gap: 10,
+    paddingHorizontal: 16,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 12,
-    justifyContent: 'flex-start',
-    alignItems: 'flex-start',
   },
-  card: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  cardWrapper: {
+    padding: 16,
+    gap: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderRadius: 10,
-    padding: 8,
-    marginBottom: 12,
-    shadowColor: '#222',
-    backgroundColor: '#222',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 6,
+    marginBottom: 24,
   },
-  eventDates: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-  },
-
   cardInfo: {
     flex: 1,
     marginRight: 8,
   },
   actions: {
-    flex: 1,
     flexDirection: 'row',
-    gap: 10,
     justifyContent: 'center',
-    alignContent: 'center',
-    marginTop: 20,
+    marginTop: 12,
   },
   eventTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    padding: 10,
+    paddingBottom: 6,
+  },
+  eventDates: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  emptyText: {
+    marginTop: 20,
     textAlign: 'center',
   },
-
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.9)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    width: '80%',
-    height: '50%',
+    width: '85%',
     padding: 20,
-    borderRadius: 10,
-    elevation: 5,
-    justifyContent: 'center',
+    borderRadius: 12,
     gap: 15,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 12,
   },
   input: {
     borderWidth: 1,
@@ -343,7 +352,6 @@ const styles = StyleSheet.create({
   toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 16,
     gap: 8,
   },
   toggleButton: {
@@ -352,9 +360,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#333',
-  },
-  salvarButton: {
-    marginTop: 20,
   },
 });

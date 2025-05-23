@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
-import { View, TextInput, useColorScheme } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Keyboard,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '@/config/firebase';
-import Colors from '@/constants/Colors';
-import AuthScreen from '@/components/AuthScreen';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const scheme = useColorScheme() ?? 'dark';
-  const theme = Colors[scheme];
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -18,7 +23,9 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
+    Keyboard.dismiss();
     if (!name || !email || !password || !confirm) return;
+
     if (password !== confirm) {
       alert('As senhas não coincidem.');
       return;
@@ -41,88 +48,114 @@ export default function RegisterScreen() {
   };
 
   return (
-    <AuthScreen
-      type="register"
-      title="Criar Conta"
-      subtitle="Preencha seus dados"
-      buttonText="Registrar"
-      loading={loading}
-      inputs={
-        <View
-          style={{
-            borderRadius: 12,
-            padding: 16,
-            borderWidth: 1,
-            borderColor: theme.border,
-            backgroundColor: theme.backgroundAlt,
-            shadowColor: scheme === 'dark' ? '#fff' : '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            elevation: 6,
-            marginBottom: 24,
-          }}
-        >
-          <TextInput
-            placeholder="Nome"
-            placeholderTextColor={theme.textSecondary}
-            value={name}
-            onChangeText={setName}
-            style={{
-              color: theme.text,
-              fontSize: 16,
-              paddingVertical: 12,
-              borderBottomWidth: 1,
-              borderBottomColor: theme.border,
-              marginBottom: 12,
-            }}
-          />
-          <TextInput
-            placeholder="Email"
-            placeholderTextColor={theme.textSecondary}
-            value={email}
-            onChangeText={setEmail}
-            style={{
-              color: theme.text,
-              fontSize: 16,
-              paddingVertical: 12,
-              borderBottomWidth: 1,
-              borderBottomColor: theme.border,
-              marginBottom: 12,
-            }}
-          />
-          <TextInput
-            placeholder="Senha"
-            placeholderTextColor={theme.textSecondary}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            style={{
-              color: theme.text,
-              fontSize: 16,
-              paddingVertical: 12,
-              borderBottomWidth: 1,
-              borderBottomColor: theme.border,
-            }}
-          />
-          <TextInput
-            placeholder="Confirmar senha"
-            placeholderTextColor={theme.textSecondary}
-            value={confirm}
-            onChangeText={setConfirm}
-            secureTextEntry
-            style={{
-              color: theme.text,
-              fontSize: 16,
-              paddingVertical: 12,
-            }}
-          />
-        </View>
-      }
-      onSubmit={handleRegister}
-      bottomText="Já tem uma conta?"
-      bottomActionText="Fazer login"
-      onBottomAction={() => router.push('/login')}
-    />
+    <LinearGradient
+      colors={['#0b0b0f', '#1b0033', '#3e1d73']}
+      locations={[0, 0.7, 1]}
+      style={styles.container}
+    >
+      <Text style={styles.title}>Criar Conta</Text>
+
+      <TextInput
+        placeholder="Nome"
+        placeholderTextColor="#aaa"
+        style={styles.input}
+        value={name}
+        onChangeText={setName}
+      />
+
+      <TextInput
+        placeholder="Email"
+        placeholderTextColor="#aaa"
+        style={styles.input}
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+
+      <TextInput
+        placeholder="Senha"
+        placeholderTextColor="#aaa"
+        style={styles.input}
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+
+      <TextInput
+        placeholder="Confirmar senha"
+        placeholderTextColor="#aaa"
+        style={styles.input}
+        value={confirm}
+        onChangeText={setConfirm}
+        secureTextEntry
+      />
+
+      <TouchableOpacity
+        onPress={handleRegister}
+        style={styles.registerButton}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.registerText}>Registrar</Text>
+        )}
+      </TouchableOpacity>
+
+      <Text style={styles.bottomText}>
+        Já tem uma conta?{' '}
+        <Text style={styles.signInText} onPress={() => router.push('/login')}>
+          Fazer login
+        </Text>
+      </Text>
+    </LinearGradient>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    paddingLeft: 40,
+    paddingRight: 40,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 32,
+  },
+  input: {
+    backgroundColor: '#1f1f25',
+    color: '#fff',
+    width: '100%',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  registerButton: {
+    backgroundColor: '#b18aff',
+    borderRadius: 25,
+    width: '100%',
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 14,
+    marginTop: 20,
+  },
+  registerText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  bottomText: {
+    color: '#aaa',
+    fontSize: 14,
+  },
+  signInText: {
+    color: '#b18aff',
+  },
+});

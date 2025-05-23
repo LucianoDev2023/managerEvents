@@ -1,20 +1,26 @@
 import React, { useState } from 'react';
-import { View, TextInput, useColorScheme } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Keyboard,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '@/config/firebase';
-import Colors from '@/constants/Colors';
-import AuthScreen from '@/components/AuthScreen';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const scheme = useColorScheme() ?? 'dark';
-  const theme = Colors[scheme];
 
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleResetPassword = async () => {
+    Keyboard.dismiss();
     if (!email) {
       alert('Digite seu e-mail.');
       return;
@@ -33,46 +39,87 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <AuthScreen
-      type="recover"
-      title="Recuperar Senha"
-      subtitle="Informe seu e-mail para redefinir"
-      buttonText="Enviar"
-      loading={loading}
-      inputs={
-        <View
-          style={{
-            borderRadius: 10,
-            padding: 16,
-            borderWidth: 1,
-            borderColor: theme.border,
-            backgroundColor: theme.backgroundAlt,
-            shadowColor: scheme === 'dark' ? '#fff' : '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            elevation: 6,
-            marginBottom: 24,
-          }}
-        >
-          <TextInput
-            placeholder="Email"
-            placeholderTextColor={theme.textSecondary}
-            value={email}
-            onChangeText={setEmail}
-            style={{
-              color: theme.text,
-              fontSize: 16,
-            }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
-      }
-      onSubmit={handleResetPassword}
-      bottomText="Lembrou sua senha?"
-      bottomActionText="Voltar para login"
-      onBottomAction={() => router.push('/login')}
-    />
+    <LinearGradient
+      colors={['#0b0b0f', '#1b0033', '#3e1d73']}
+      locations={[0, 0.7, 1]}
+      style={styles.container}
+    >
+      <Text style={styles.title}>Recuperar Senha</Text>
+
+      <TextInput
+        placeholder="Digite seu e-mail"
+        placeholderTextColor="#aaa"
+        style={styles.input}
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+
+      <TouchableOpacity
+        onPress={handleResetPassword}
+        style={styles.resetButton}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.resetText}>Enviar</Text>
+        )}
+      </TouchableOpacity>
+
+      <Text style={styles.bottomText}>
+        Lembrou sua senha?{' '}
+        <Text style={styles.signInText} onPress={() => router.push('/login')}>
+          Voltar para login
+        </Text>
+      </Text>
+    </LinearGradient>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    paddingLeft: 40,
+    paddingRight: 40,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 40,
+  },
+  input: {
+    backgroundColor: '#1f1f25',
+    color: '#fff',
+    width: '100%',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  resetButton: {
+    backgroundColor: '#b18aff',
+    borderRadius: 25,
+    width: '100%',
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  resetText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  bottomText: {
+    color: '#aaa',
+    fontSize: 14,
+  },
+  signInText: {
+    color: '#b18aff',
+  },
+});

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,24 +10,42 @@ import {
   Pressable,
   Image,
   Platform,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
-import { useColorScheme } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import { useFocusEffect } from '@react-navigation/native';
 
 import EventCard from '@/components/EventCard';
-import Colors from '@/constants/Colors';
 import Button from '@/components/ui/Button';
+import Colors from '@/constants/Colors';
 import { KeyRound, Plus, SearchCheck } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import LoadingOverlay from '@/components/LoadingOverlay';
+import { useColorScheme } from 'react-native';
 
 export default function EventsScreen() {
+  const lastQueryRef = useRef('');
+  const lastCodeRef = useRef('');
+  useFocusEffect(
+    React.useCallback(() => {
+      if (lastQueryRef.current && lastCodeRef.current) {
+        setSearchQuery(lastQueryRef.current);
+        setConfirmedAccessCode(lastCodeRef.current);
+        setShowResults(true);
+      }
+    }, [])
+  );
+
   const { state } = useEvents();
   const scheme = useColorScheme() ?? 'dark';
   const colors = Colors[scheme];
+  const gradientColors =
+    scheme === 'dark'
+      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
+      : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
 
   const [inputValue, setInputValue] = useState('');
   const [accessCodeInput, setAccessCodeInput] = useState('');
@@ -47,18 +65,14 @@ export default function EventsScreen() {
       setConfirmedAccessCode(accessCode);
       setShowResults(true);
       setIsSearching(true);
-
-      setTimeout(() => {
-        setIsSearching(false);
-      }, 500);
+      setTimeout(() => setIsSearching(false), 500);
     }
   }, [accessCode, title]);
 
   const handleManualSearch = () => {
     Keyboard.dismiss();
-
     if (!inputValue.trim() || !accessCodeInput.trim()) {
-      alert('Por favor, preencha o nome do evento e o código de acesso.');
+      alert('Por favor, preencha o nome do evento e o c\u00f3digo de acesso.');
       return;
     }
 
@@ -87,10 +101,9 @@ export default function EventsScreen() {
   const handleAddEvent = () => router.push('/add');
 
   const renderEmptyState = () => (
-    <View
-      style={[styles.emptyContainer, { backgroundColor: colors.background }]}
-    >
+    <View style={styles.emptyContainer}>
       <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+        {' '}
         {searchQuery
           ? 'Nenhum evento encontrado'
           : 'Pesquisar evento existente'}
@@ -98,9 +111,7 @@ export default function EventsScreen() {
       <Text style={[styles.emptySubtitle2, { color: colors.textSecondary }]}>
         Insira nome e código de acesso ou utilize um QR Code
       </Text>
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>
-        Crie seu próprio evento
-      </Text>
+
       <Button
         title="Criar evento"
         onPress={handleAddEvent}
@@ -111,10 +122,26 @@ export default function EventsScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient colors={['#6e56cf', '#a26bfa']} style={styles.header}>
-        <StatusBar translucent backgroundColor="transparent" style="light" />
+    <LinearGradient
+      colors={gradientColors}
+      locations={[0, 0.7, 1]}
+      style={styles.container}
+    >
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        style={scheme === 'dark' ? 'light' : 'dark'}
+      />
 
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop:
+              Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
+          },
+        ]}
+      >
         <Image
           source={require('@/assets/images/loginpage.png')}
           style={styles.icon}
@@ -123,18 +150,14 @@ export default function EventsScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           Gerenciador de eventos
         </Text>
-      </LinearGradient>
+      </View>
 
       <View style={styles.content}>
-        {/* Inputs */}
         <View style={styles.inputRow}>
           <View
             style={[
               styles.searchInputContainer,
-              {
-                backgroundColor: colors.backgroundAlt,
-                borderColor: colors.border,
-              },
+              { backgroundColor: scheme === 'dark' ? '#1f1f25' : '#e0e0ec' },
             ]}
           >
             <SearchCheck
@@ -156,7 +179,7 @@ export default function EventsScreen() {
             icon={<Plus size={16} color="white" />}
             onPress={handleAddEvent}
             size="small"
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+            style={styles.actionButton}
           />
         </View>
 
@@ -164,10 +187,7 @@ export default function EventsScreen() {
           <View
             style={[
               styles.searchInputContainer,
-              {
-                backgroundColor: colors.backgroundAlt,
-                borderColor: colors.border,
-              },
+              { backgroundColor: scheme === 'dark' ? '#1f1f25' : '#e0e0ec' },
             ]}
           >
             <KeyRound
@@ -189,7 +209,7 @@ export default function EventsScreen() {
             icon={<SearchCheck size={16} color="white" />}
             onPress={handleManualSearch}
             size="small"
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+            style={styles.actionButton}
           />
         </View>
 
@@ -225,28 +245,33 @@ export default function EventsScreen() {
           renderEmptyState()
         )}
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+  },
   header: {
-    height: 100,
-    paddingRight: 65,
-    borderBottomRightRadius: 180,
-    alignItems: 'flex-end',
+    height: 110,
+    paddingHorizontal: 20,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   icon: {
-    width: 80,
-    height: 80,
+    width: 70,
+    height: 70,
     position: 'absolute',
-    left: 35,
+    left: 20,
+    top: 37,
   },
   headerTitle: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     flex: 1,
@@ -262,10 +287,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
     borderRadius: 10,
-    paddingHorizontal: 5,
-    minHeight: 40,
+    paddingHorizontal: 10,
+    minHeight: 42,
   },
   searchIcon: {
     marginRight: 10,
@@ -273,20 +297,16 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    marginLeft: 10,
-    height: 40,
-    paddingHorizontal: 10,
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+    height: 42,
   },
   actionButton: {
     marginLeft: 10,
-    height: 40,
-    paddingHorizontal: 10,
+    height: 42,
+    paddingHorizontal: 12,
+    backgroundColor: '#b18aff',
     borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
   },
   emptyContainer: {
     flex: 1,
@@ -304,7 +324,7 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
-    marginBottom: 24,
+    marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtitle2: {

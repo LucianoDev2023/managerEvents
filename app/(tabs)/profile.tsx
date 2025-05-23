@@ -1,5 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  ScrollView,
+  Alert,
+  Platform,
+  StatusBar as RNStatusBar,
+} from 'react-native';
 import { useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getAuth, signOut } from 'firebase/auth';
@@ -18,6 +27,8 @@ import {
   CircleHelp as HelpCircle,
   Bell,
 } from 'lucide-react-native';
+import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ProfileScreen() {
   const { state } = useEvents();
@@ -30,8 +41,14 @@ export default function ProfileScreen() {
     (event) => event.createdBy?.toLowerCase() === userEmail
   );
 
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
+  const textColor = colorScheme === 'dark' ? '#fff' : '#1a1a1a';
+  const textSecondary = colorScheme === 'dark' ? '#aaa' : '#555';
+  const gradientColors =
+    colorScheme === 'dark'
+      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
+      : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
 
   const totalEvents = userEvents.length;
   const totalPrograms = userEvents.reduce(
@@ -91,10 +108,7 @@ export default function ProfileScreen() {
           text: 'Excluir tudo',
           style: 'destructive',
           onPress: () => {
-            Alert.alert(
-              'Dados apagados',
-              'Todos os eventos e programas foram removidos.'
-            );
+            Alert.alert('Dados apagados', 'Todos os eventos foram removidos.');
           },
         },
       ]
@@ -108,148 +122,164 @@ export default function ProfileScreen() {
     count <= 1 ? singular : plural;
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.contentContainer}
+    <LinearGradient
+      colors={gradientColors}
+      locations={[0, 0.7, 1]}
+      style={styles.gradient}
     >
-      <View style={styles.profileHeader}>
-        <Text style={[styles.profileName, { color: colors.text }]}>
-          {displayName}
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        style={colorScheme === 'dark' ? 'light' : 'dark'}
+      />
+      <ScrollView
+        contentContainerStyle={[
+          styles.contentContainer,
+          {
+            paddingTop:
+              Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
+          },
+        ]}
+      >
+        <View style={styles.profileHeader}>
+          <Text style={[styles.profileName, { color: textColor }]}>
+            {displayName}
+          </Text>
+          <Text style={[styles.profileEmail, { color: textSecondary }]}>
+            {email}
+          </Text>
+        </View>
+
+        <View style={styles.statsGrid}>
+          <View style={[styles.statCard, { backgroundColor: colors.primary }]}>
+            <Text style={styles.statNumber}>{totalEvents}</Text>
+            <Text style={styles.statLabel}>
+              {pluralize(totalEvents, 'Evento', 'Eventos')}
+            </Text>
+          </View>
+
+          <View style={[styles.statCard, { backgroundColor: '#6c5ce7' }]}>
+            <Text style={styles.statNumber}>{totalPrograms}</Text>
+            <Text style={styles.statLabel}>
+              {pluralize(totalPrograms, 'Programa', 'Programas')}
+            </Text>
+          </View>
+
+          <View style={[styles.statCard, { backgroundColor: '#00cec9' }]}>
+            <Text style={styles.statNumber}>{totalActivities}</Text>
+            <Text style={styles.statLabel}>
+              {pluralize(totalActivities, 'Atividade', 'Atividades')}
+            </Text>
+          </View>
+
+          <View style={[styles.statCard, { backgroundColor: '#f39c12' }]}>
+            <Text style={styles.statNumber}>{totalPhotos}</Text>
+            <Text style={styles.statLabel}>
+              {pluralize(totalPhotos, 'Foto', 'Fotos')}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={[styles.sectionTitle, { color: textColor }]}>
+          Preferências
         </Text>
-        <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
-          {email}
+
+        <Card>
+          <Button
+            title="Meus eventos"
+            icon={<Settings size={24} color={textColor} />}
+            onPress={() => router.push('/(stack)/myevents')}
+            variant="ghost"
+            fullWidth
+            style={styles.menuButton}
+            textStyle={{ color: textColor }}
+          />
+
+          <Button
+            title={`Tema: ${colorScheme === 'dark' ? 'Escuro' : 'Claro'}`}
+            icon={
+              colorScheme === 'dark' ? (
+                <Moon size={20} color={textColor} />
+              ) : (
+                <Sun size={20} color={textColor} />
+              )
+            }
+            onPress={handleThemeToggle}
+            variant="ghost"
+            fullWidth
+            style={styles.menuButton}
+            textStyle={{ color: textColor }}
+          />
+
+          <Button
+            title="Notificações"
+            icon={<Bell size={20} color={textColor} />}
+            onPress={() => {}}
+            variant="ghost"
+            fullWidth
+            style={styles.menuButton}
+            textStyle={{ color: textColor }}
+          />
+        </Card>
+
+        <Text style={[styles.sectionTitle, { color: textColor }]}>Suporte</Text>
+
+        <Card>
+          <Button
+            title="Ajuda e Suporte"
+            icon={<HelpCircle size={20} color={textColor} />}
+            onPress={() => {}}
+            variant="ghost"
+            fullWidth
+            style={styles.menuButton}
+            textStyle={{ color: textColor }}
+          />
+        </Card>
+
+        <Text style={[styles.sectionTitle, { color: textColor }]}>Conta</Text>
+
+        <Card>
+          <Button
+            title="Limpar Tudo"
+            icon={<Trash2 size={20} color="#f44336" />}
+            onPress={handleClearData}
+            variant="ghost"
+            fullWidth
+            style={styles.menuButton}
+            textStyle={{ color: '#f44336' }}
+          />
+
+          <Button
+            title="Sair da Conta"
+            icon={<LogOut size={20} color="#f44336" />}
+            onPress={handleLogout}
+            variant="ghost"
+            fullWidth
+            style={styles.menuButton}
+            textStyle={{ color: '#f44336' }}
+          />
+        </Card>
+
+        <Text style={[styles.versionText, { color: textSecondary }]}>
+          Versão 1.0.0
         </Text>
-      </View>
-
-      <View style={styles.statsGrid}>
-        <View style={[styles.statCard, { backgroundColor: colors.primary }]}>
-          <Text style={styles.statNumber}>{totalEvents}</Text>
-          <Text style={styles.statLabel}>
-            {pluralize(totalEvents, 'Evento', 'Eventos')}
-          </Text>
-        </View>
-
-        <View style={[styles.statCard, { backgroundColor: colors.secondary }]}>
-          <Text style={styles.statNumber}>{totalPrograms}</Text>
-          <Text style={styles.statLabel}>
-            {pluralize(totalPrograms, 'Programa', 'Programas')}
-          </Text>
-        </View>
-
-        <View style={[styles.statCard, { backgroundColor: colors.accent }]}>
-          <Text style={styles.statNumber}>{totalActivities}</Text>
-          <Text style={styles.statLabel}>
-            {pluralize(totalActivities, 'Atividade', 'Atividades')}
-          </Text>
-        </View>
-
-        <View style={[styles.statCard, { backgroundColor: '#f39c12' }]}>
-          <Text style={styles.statNumber}>{totalPhotos}</Text>
-          <Text style={styles.statLabel}>
-            {pluralize(totalPhotos, 'Foto', 'Fotos')}
-          </Text>
-        </View>
-      </View>
-
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        Preferências
-      </Text>
-
-      <Card>
-        <Button
-          title="Meu eventos"
-          icon={<Settings size={24} color={colors.text} />}
-          onPress={() => router.push('/(stack)/myevents')}
-          variant="ghost"
-          fullWidth
-          style={styles.menuButton}
-          textStyle={{ color: colors.text }}
-        />
-
-        <Button
-          title={`Tema: ${colorScheme === 'dark' ? 'Escuro' : 'Claro'}`}
-          icon={
-            colorScheme === 'dark' ? (
-              <Moon size={20} color={colors.text} />
-            ) : (
-              <Sun size={20} color={colors.text} />
-            )
-          }
-          onPress={handleThemeToggle}
-          variant="ghost"
-          fullWidth
-          style={styles.menuButton}
-          textStyle={{ color: colors.text }}
-        />
-
-        <Button
-          title="Notificações"
-          icon={<Bell size={20} color={colors.text} />}
-          onPress={() => {}}
-          variant="ghost"
-          fullWidth
-          style={styles.menuButton}
-          textStyle={{ color: colors.text }}
-        />
-      </Card>
-
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Suporte</Text>
-
-      <Card>
-        <Button
-          title="Ajuda e Suporte"
-          icon={<HelpCircle size={20} color={colors.text} />}
-          onPress={() => {}}
-          variant="ghost"
-          fullWidth
-          style={styles.menuButton}
-          textStyle={{ color: colors.text }}
-        />
-      </Card>
-
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Conta</Text>
-
-      <Card>
-        <Button
-          title="Limpar Tudo"
-          icon={<Trash2 size={20} color={colors.error} />}
-          onPress={handleClearData}
-          variant="ghost"
-          fullWidth
-          style={styles.menuButton}
-          textStyle={{ color: colors.error }}
-        />
-
-        <Button
-          title="Sair da Conta"
-          icon={<LogOut size={20} color={colors.error} />}
-          onPress={handleLogout}
-          variant="ghost"
-          fullWidth
-          style={styles.menuButton}
-          textStyle={{ color: colors.error }}
-        />
-      </Card>
-
-      <Text style={[styles.versionText, { color: colors.textSecondary }]}>
-        Versão 1.0.0
-      </Text>
-    </ScrollView>
+      </ScrollView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  gradient: {
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
   },
   profileHeader: {
     alignItems: 'center',
     marginBottom: 20,
   },
-
   profileName: {
     fontSize: 24,
     fontFamily: 'Inter-Bold',

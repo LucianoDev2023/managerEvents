@@ -9,6 +9,7 @@ import {
   Modal,
   ImageBackground,
   Platform,
+  Image,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -23,6 +24,9 @@ import {
   Trash2,
   Edit,
   LucideQrCode,
+  CalendarDays,
+  MapPin,
+  ChevronRight,
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import ViewShot from 'react-native-view-shot';
@@ -37,6 +41,9 @@ export default function EventDetailScreen() {
   const { state, deleteEvent, addProgram } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const textColor = colors.text;
+  const overlayColor = colorScheme === 'dark' ? '#1a1a1a' : '#f2f2f2';
+
   const [isAddingProgram, setIsAddingProgram] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -44,6 +51,8 @@ export default function EventDetailScreen() {
   const qrRef = useRef<ViewShot>(null);
 
   const event = state.events.find((e) => e.id === id) as Event | undefined;
+
+  const authUserId = getAuth().currentUser?.uid;
 
   if (!event) {
     return (
@@ -65,12 +74,6 @@ export default function EventDetailScreen() {
         <Button title="Voltar" onPress={() => router.back()} />
       </View>
     );
-  }
-  const authUserId = getAuth().currentUser?.uid;
-  if (event && event.userId === authUserId) {
-    console.log('Usuário é o criador do evento');
-  } else {
-    console.log('Usuário não é o criador do evento');
   }
 
   const qrPayload = JSON.stringify({
@@ -167,7 +170,12 @@ export default function EventDetailScreen() {
           headerTitleStyle: { fontFamily: 'Inter-Bold', fontSize: 18 },
           headerLeft: () => (
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={() =>
+                router.replace({
+                  pathname: '/',
+                  params: { title: event.title, accessCode: event.accessCode },
+                })
+              }
               style={styles.headerButton}
             >
               <ArrowLeft size={24} color={colors.text} />
@@ -192,38 +200,41 @@ export default function EventDetailScreen() {
         }}
       />
 
-      {event.coverImage && (
-        <ImageBackground
-          source={{ uri: event.coverImage }}
-          style={styles.coverImage}
-        >
-          <View style={styles.overlayBottom}>
-            <Text style={styles.coverTitle}>{event.title}</Text>
-            <Text style={styles.overlayText}>
-              {formatDateRange(event.startDate, event.endDate)}
-            </Text>
-            <Text style={styles.overlayText}>{event.location}</Text>
-            {event.description && (
-              <Text style={styles.overlayDescription}>{event.description}</Text>
-            )}
-          </View>
-        </ImageBackground>
-      )}
+      <View>
+        {event.coverImage && (
+          <ImageBackground
+            source={{ uri: event.coverImage }}
+            style={styles.coverImage}
+          >
+            <View style={styles.overlayBottom}>
+              <Text style={styles.coverTitle}>{event.title}</Text>
+              <Text style={styles.overlayText}>
+                {formatDateRange(event.startDate, event.endDate)}
+              </Text>
+              <Text style={styles.overlayText}>{event.location}</Text>
+              {event.description && (
+                <Text style={styles.overlayDescription}>
+                  {event.description}
+                </Text>
+              )}
+            </View>
+          </ImageBackground>
+        )}
+      </View>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          Programação diária
+        </Text>
+        <Button
+          title="Add Dia"
+          icon={<Plus size={16} color="white" />}
+          onPress={handleAddProgramPress}
+          size="small"
+        />
+      </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.programsSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Programação diária
-            </Text>
-            <Button
-              title="Add Dia"
-              icon={<Plus size={16} color="white" />}
-              onPress={handleAddProgramPress}
-              size="small"
-            />
-          </View>
-
           {event.programs.length === 0 ? (
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
               Nenhum dia adicionado ainda.
@@ -323,11 +334,11 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 16, paddingBottom: 40 },
   headerButton: { padding: 8 },
   headerActions: { flexDirection: 'row' },
-  headerInfo: { marginBottom: 10, width: '100%' },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 12,
+    marginHorizontal: 16,
   },
   sectionTitle: { fontSize: 18, fontFamily: 'Inter-Bold' },
   emptyText: {
@@ -338,17 +349,12 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 2,
   },
-  datepicker: {
-    backgroundColor: 'transparent',
-  },
-  titlepicker: {
-    backgroundColor: 'transparent',
-  },
+  datepicker: { backgroundColor: 'transparent' },
+  titlepicker: { backgroundColor: 'transparent' },
   iosButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -390,14 +396,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   overlayBottom: {
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 12,
   },
   coverTitle: {
     fontSize: 20,
     fontFamily: 'Inter-Bold',
     color: '#fff',
-    textAlign: 'center',
+    textAlign: 'left',
   },
   overlayText: {
     fontSize: 14,
@@ -413,7 +419,5 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'left',
   },
-  programsSection: {
-    marginTop: 16,
-  },
+  programsSection: { marginTop: 16 },
 });

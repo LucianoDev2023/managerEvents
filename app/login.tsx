@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   View,
+  Text,
   TextInput,
-  useColorScheme,
   TouchableOpacity,
   Keyboard,
+  StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/config/firebase';
-import Colors from '@/constants/Colors';
-import AuthScreen from '@/components/AuthScreen';
 import { Eye, EyeOff } from 'lucide-react-native';
+import Colors from '@/constants/Colors';
+import { useColorScheme } from 'react-native';
 
 export default function LoginScreen() {
   const router = useRouter();
-
   const scheme = useColorScheme() ?? 'dark';
   const theme = Colors[scheme];
 
@@ -27,8 +29,8 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     Keyboard.dismiss();
     if (!email || !password) return;
-    setLoading(true);
 
+    setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.replace('/welcome');
@@ -40,78 +42,144 @@ export default function LoginScreen() {
   };
 
   return (
-    <AuthScreen
-      type="login"
-      title="Login"
-      subtitle="Bem-vindo"
-      buttonText="Entrar"
-      loading={loading}
-      inputs={
-        <View
-          style={{
-            borderRadius: 10,
-            padding: 16,
-            borderWidth: 1,
-            borderColor: theme.border,
-            backgroundColor: theme.backgroundAlt,
-            shadowColor: scheme === 'dark' ? '#fff' : '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            elevation: 6,
-            marginBottom: 24,
-          }}
+    <LinearGradient
+      colors={['#0b0b0f', '#1b0033', '#3e1d73']}
+      locations={[0, 0.7, 1]} // define onde cada cor aparece no degradê
+      style={styles.container}
+    >
+      <Text style={styles.title}>Login</Text>
+
+      <TextInput
+        placeholder="exemplo@gmail.com"
+        placeholderTextColor="#aaa"
+        style={styles.input}
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+
+      <View style={styles.passwordContainer}>
+        <TextInput
+          placeholder="Senha"
+          placeholderTextColor="#aaa"
+          style={styles.passwordInput}
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={showPassword}
+        />
+        <TouchableOpacity
+          onPress={() => setShowPassword((prev) => !prev)}
+          style={styles.eyeButton}
         >
-          <TextInput
-            placeholder="Digite seu email"
-            placeholderTextColor={theme.textSecondary}
-            value={email}
-            onChangeText={setEmail}
-            style={{
-              color: theme.text,
-              fontSize: 16,
-              paddingVertical: 12,
-              borderBottomWidth: 1,
-              borderBottomColor: theme.border,
-              marginBottom: 12,
-            }}
-          />
-          <View style={{ position: 'relative' }}>
-            <TextInput
-              placeholder="Digite sua senha"
-              placeholderTextColor={theme.textSecondary}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={showPassword}
-              style={{
-                color: theme.text,
-                fontSize: 16,
-                paddingVertical: 12,
-                paddingRight: 40, // espaço para o ícone
-              }}
-            />
-            <TouchableOpacity
-              onPress={() => setShowPassword((prev) => !prev)}
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 10,
-                padding: 8,
-              }}
-            >
-              {showPassword ? (
-                <EyeOff size={16} color={theme.textSecondary} />
-              ) : (
-                <Eye size={16} color={theme.textSecondary} />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      }
-      onSubmit={handleLogin}
-      bottomText="Não tem uma conta?"
-      bottomActionText="Criar conta"
-      onBottomAction={() => router.push('/register')}
-    />
+          {showPassword ? (
+            <EyeOff size={20} color="#aaa" />
+          ) : (
+            <Eye size={20} color="#aaa" />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        onPress={() => router.push('/forgot-password')}
+        style={styles.forgotLink}
+      >
+        <Text style={styles.forgotText}>Esqueceu a senha?</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={handleLogin}
+        style={styles.signInButton}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.signInText}>Login</Text>
+        )}
+      </TouchableOpacity>
+
+      <Text style={styles.bottomText}>
+        Não possui uma conta?{' '}
+        <Text
+          style={styles.signUpText}
+          onPress={() => router.push('/register')}
+        >
+          Cadastra-se
+        </Text>
+      </Text>
+    </LinearGradient>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    paddingLeft: 40,
+    paddingRight: 40,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 40,
+  },
+  input: {
+    backgroundColor: '#1f1f25',
+    color: '#fff',
+    width: '100%',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  passwordContainer: {
+    width: '100%',
+    position: 'relative',
+    marginBottom: 8,
+  },
+  passwordInput: {
+    backgroundColor: '#1f1f25',
+    color: '#fff',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingRight: 45,
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 12,
+    top: 10,
+  },
+  forgotLink: {
+    alignSelf: 'flex-end',
+    marginBottom: 24,
+  },
+  forgotText: {
+    color: '#b18aff',
+    fontSize: 14,
+  },
+  signInButton: {
+    backgroundColor: '#b18aff',
+    borderRadius: 25,
+    width: '100%',
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  signInText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  bottomText: {
+    color: '#aaa',
+    fontSize: 14,
+  },
+  signUpText: {
+    color: '#b18aff',
+  },
+});

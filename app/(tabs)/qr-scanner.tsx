@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Text, Alert } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Text,
+  Alert,
+  Platform,
+  StatusBar as RNStatusBar,
+} from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { BarcodeScanningResult } from 'expo-camera';
@@ -7,23 +14,22 @@ import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import Button from '@/components/ui/Button';
 import { ArrowLeft } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 
 export default function QRScannerScreen() {
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
   const [facing, setFacing] = useState<'front' | 'back'>('back');
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleBarCodeScanned = (scanningResult: BarcodeScanningResult) => {
     if (!scanned) {
       setScanned(true);
-
       try {
         const qrData = JSON.parse(scanningResult.data);
         console.log('Dados do QR Code:', qrData);
-
         router.push({
           pathname: '/(tabs)',
           params: {
@@ -38,43 +44,63 @@ export default function QRScannerScreen() {
       }
     }
   };
+
   useFocusEffect(
     React.useCallback(() => {
       setScanned(false);
-      return () => {
-        setScanned(false); // também no unfocus
-      };
+      return () => setScanned(false);
     }, [])
   );
 
-  if (!permission) {
-    return <View style={styles.container} />;
-  }
+  if (!permission) return <View style={styles.container} />;
 
   if (!permission.granted) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.permissionText, { color: colors.text }]}>
-          Precisamos da sua permissão para acessar a câmera
-        </Text>
-        <Button
-          title="Conceder Permissão"
-          onPress={requestPermission}
-          style={styles.permissionButton}
+      <LinearGradient
+        colors={['#0b0b0f', '#1b0033', '#3e1d73']}
+        locations={[0, 0.7, 1]}
+        style={styles.container}
+      >
+        <StatusBar
+          style={colorScheme === 'dark' ? 'light' : 'dark'}
+          translucent
+          backgroundColor="transparent"
         />
-      </View>
+        <View
+          style={[
+            styles.permissionContent,
+            {
+              paddingTop:
+                Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
+            },
+          ]}
+        >
+          <Text style={styles.permissionText}>
+            Precisamos da sua permissão para acessar a câmera
+          </Text>
+          <Button
+            title="Conceder Permissão"
+            onPress={requestPermission}
+            style={styles.permissionButton}
+          />
+        </View>
+      </LinearGradient>
     );
   }
 
   return (
     <View style={styles.container}>
+      <StatusBar
+        style={colorScheme === 'dark' ? 'light' : 'dark'}
+        translucent
+        backgroundColor="transparent"
+      />
+
       <CameraView
         style={StyleSheet.absoluteFill}
         facing={facing}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-        barcodeScannerSettings={{
-          barcodeTypes: ['qr'],
-        }}
+        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
       >
         <View style={styles.overlay}>
           <View style={styles.finder} />
@@ -91,13 +117,6 @@ export default function QRScannerScreen() {
             style={styles.backButton}
             size="small"
           />
-
-          {/* <Button
-            title={facing === 'back' ? 'Frontal' : 'Traseira'}
-            onPress={() => setFacing('back')}
-            style={styles.switchButton}
-            size="small"
-          /> */}
         </View>
       </CameraView>
     </View>
@@ -107,6 +126,22 @@ export default function QRScannerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  permissionContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  permissionText: {
+    textAlign: 'center',
+    marginBottom: 20,
+    fontSize: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Medium',
+  },
+  permissionButton: {
+    width: 200,
   },
   overlay: {
     flex: 1,
@@ -118,7 +153,7 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     borderWidth: 2,
-    borderColor: '#00FF00',
+    borderColor: '#b18aff',
     backgroundColor: 'transparent',
   },
   scanText: {
@@ -126,29 +161,22 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 14,
     fontWeight: 'bold',
-  },
-  permissionText: {
-    textAlign: 'center',
-    marginBottom: 20,
-    fontSize: 16,
-    paddingHorizontal: 20,
-  },
-  permissionButton: {
-    width: 200,
+    fontFamily: 'Inter-Medium',
   },
   header: {
     position: 'absolute',
-    top: 40,
+    top: Platform.select({
+      ios: 60,
+      android: (RNStatusBar.currentHeight ?? 24) + 16,
+    }),
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
+    zIndex: 10,
   },
   backButton: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  switchButton: {
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
 });

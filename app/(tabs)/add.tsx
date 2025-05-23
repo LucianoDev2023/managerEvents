@@ -6,6 +6,8 @@ import {
   ScrollView,
   Alert,
   Platform,
+  Image,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
@@ -18,18 +20,22 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { FormValues } from '@/types';
 import LoadingOverlay from '@/components/LoadingOverlay';
 import * as ImagePicker from 'expo-image-picker';
-import { Image } from 'react-native';
 import { uploadImageToCloudinary } from '@/lib/uploadImageToCloudinary';
 import { getAuth } from 'firebase/auth';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 
 export default function AddEventScreen() {
   const { addEvent } = useEvents();
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
+  const gradientColors =
+    colorScheme === 'dark'
+      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
+      : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
+
   const user = getAuth().currentUser;
-
   if (!user) throw new Error('Usuário não autenticado');
-
   const userEmail = user.email?.toLowerCase() ?? '';
 
   const [formValues, setFormValues] = useState<FormValues>({
@@ -39,7 +45,7 @@ export default function AddEventScreen() {
     endDate: new Date(new Date().setDate(new Date().getDate() + 1)),
     description: '',
     accessCode: '',
-    userId: user?.uid || '',
+    userId: user.uid,
     createdBy: userEmail,
   });
 
@@ -50,44 +56,30 @@ export default function AddEventScreen() {
   const [isUploadingCover, setIsUploadingCover] = useState(false);
 
   const updateFormValue = (key: keyof FormValues, value: any) => {
-    setFormValues({
-      ...formValues,
-      [key]: value,
-    });
-    // Clear error when user types
+    setFormValues((prev) => ({ ...prev, [key]: value }));
     if (errors[key]) {
-      setErrors({
-        ...errors,
-        [key]: '',
-      });
+      setErrors((prev) => ({ ...prev, [key]: '' }));
     }
   };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-
     if (!formValues.title.trim()) {
       newErrors.title = 'Título obrigatório.';
     } else if (formValues.title.length < 3) {
-      newErrors.title = 'O título deverá ter pelo menos 3 caracteres.';
+      newErrors.title = 'O título deve ter pelo menos 3 caracteres.';
     }
-
     if (!formValues.location.trim()) {
-      newErrors.location = 'Localização requerida.';
+      newErrors.location = 'Localização obrigatória.';
     }
-
     if (formValues.endDate < formValues.startDate) {
-      newErrors.endDate = 'Insira a data de início e fim.';
+      newErrors.endDate = 'Data de fim não pode ser anterior à de início.';
     }
-
     if (!formValues.accessCode.trim()) {
-      newErrors.accessCode =
-        'Código de acesso obrigatório (mínimo 3 caracteres).';
+      newErrors.accessCode = 'Código de acesso obrigatório.';
     } else if (formValues.accessCode.length < 3) {
-      newErrors.accessCode =
-        'Insira um código de acesso ao seu evento. Grave, não é possível recupera-lo.';
+      newErrors.accessCode = 'Código deve ter pelo menos 3 caracteres.';
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -95,70 +87,66 @@ export default function AddEventScreen() {
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
-    const user = getAuth().currentUser;
-    if (!user) {
-      Alert.alert('Erro', 'Usuário não autenticado.');
-      return;
-    }
-
     setIsSubmitting(true);
-
     try {
-      const newEventId = await addEvent({
-        ...formValues,
-        userId: user.uid,
-        createdBy: user.email?.toLowerCase() ?? '',
-      });
-
+      const newEventId = await addEvent({ ...formValues });
       setTimeout(() => {
-        Alert.alert('Evento criado', 'Seu evento foi criado com sucesso!', [
-          {
-            text: 'OK',
-            onPress: () => router.push(`/events/${newEventId}`),
-          },
+        Alert.alert('Sucesso', 'Evento criado com sucesso!', [
+          { text: 'OK', onPress: () => router.push(`/events/${newEventId}`) },
         ]);
-      }, 500);
-    } catch (error) {
+      }, 400);
+    } catch {
       Alert.alert('Erro', 'Não foi possível criar o evento.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', {
+  const formatDate = (date: Date) =>
+    date.toLocaleDateString('pt-BR', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-  };
 
   const onStartDateChange = (event: any, selectedDate?: Date) => {
     setShowStartDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
       updateFormValue('startDate', selectedDate);
-
-      // If end date is before start date, update it
       if (formValues.endDate < selectedDate) {
-        const newEndDate = new Date(selectedDate);
-        newEndDate.setDate(selectedDate.getDate() + 1);
-        updateFormValue('endDate', newEndDate);
+        const newEnd = new Date(selectedDate);
+        newEnd.setDate(newEnd.getDate() + 1);
+        updateFormValue('endDate', newEnd);
       }
     }
   };
 
   const onEndDateChange = (event: any, selectedDate?: Date) => {
     setShowEndDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      updateFormValue('endDate', selectedDate);
-    }
+    if (selectedDate) updateFormValue('endDate', selectedDate);
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <LinearGradient
+      colors={gradientColors}
+      style={{ flex: 1 }}
+      locations={[0, 0.7, 1]}
+    >
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        style={colorScheme === 'dark' ? 'light' : 'dark'}
+      />
+
       <ScrollView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={styles.contentContainer}
+        style={styles.container}
+        contentContainerStyle={[
+          styles.contentContainer,
+          {
+            paddingTop:
+              Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
+          },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         <Text style={[styles.heading, { color: colors.text }]}>
@@ -198,7 +186,7 @@ export default function AddEventScreen() {
                 Data de início
               </Text>
               <View style={[styles.dateButton, { borderColor: colors.border }]}>
-                <Calendar size={18} color={colors.primary} />
+                <Calendar size={14} color={colors.primary} />
                 <Text
                   style={[styles.dateText, { color: colors.text }]}
                   onPress={() => setShowStartDatePicker(true)}
@@ -215,10 +203,10 @@ export default function AddEventScreen() {
                   { color: colors.textSecondary },
                 ]}
               >
-                Data de encerramento
+                Data de fim
               </Text>
               <View style={[styles.dateButton, { borderColor: colors.border }]}>
-                <CalendarRange size={18} color={colors.primary} />
+                <CalendarRange size={14} color={colors.primary} />
                 <Text
                   style={[styles.dateText, { color: colors.text }]}
                   onPress={() => setShowEndDatePicker(true)}
@@ -256,7 +244,7 @@ export default function AddEventScreen() {
         )}
 
         <TextInput
-          label="Descrição (Opcional)"
+          label="Descrição (opcional)"
           placeholder="Insira uma descrição..."
           value={formValues.description}
           onChangeText={(text) => updateFormValue('description', text)}
@@ -264,13 +252,15 @@ export default function AddEventScreen() {
           numberOfLines={4}
           icon={<Info size={20} color={colors.textSecondary} />}
         />
+
         <TextInput
-          label="Código de Acesso (Salve este valor)"
-          placeholder="Ex: A1XD"
+          label="Código de Acesso"
+          placeholder="Ex: ABC123"
           value={formValues.accessCode}
           onChangeText={(text) => updateFormValue('accessCode', text)}
           error={errors.accessCode}
         />
+
         <Button
           variant="outline"
           title={
@@ -282,7 +272,7 @@ export default function AddEventScreen() {
             const result = await ImagePicker.launchImageLibraryAsync({
               allowsEditing: true,
               quality: 0.8,
-              aspect: [4, 3], // proporcional ao seu card de altura 220
+              aspect: [4, 3],
             });
 
             if (!result.canceled) {
@@ -291,9 +281,8 @@ export default function AddEventScreen() {
                 const uri = result.assets[0].uri;
                 const { uri: uploadedUrl } = await uploadImageToCloudinary(uri);
                 updateFormValue('coverImage', uploadedUrl);
-
-                Alert.alert('Sucesso', 'Imagem de capa enviada com sucesso!');
-              } catch (error) {
+                Alert.alert('Sucesso', 'Imagem enviada com sucesso!');
+              } catch {
                 Alert.alert('Erro', 'Não foi possível enviar a imagem.');
               } finally {
                 setIsUploadingCover(false);
@@ -332,28 +321,22 @@ export default function AddEventScreen() {
           />
         </View>
       </ScrollView>
+
       {isSubmitting && <LoadingOverlay message="Criando evento..." />}
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: 40,
-  },
+  container: { flex: 1 },
+  contentContainer: { padding: 16, paddingBottom: 40 },
   heading: {
     fontSize: 24,
     fontFamily: 'Inter-Bold',
     marginBottom: 24,
     textAlign: 'center',
   },
-  dateSection: {
-    marginBottom: 16,
-  },
+  dateSection: { marginBottom: 16 },
   dateLabel: {
     fontFamily: 'Inter-Medium',
     fontSize: 16,
@@ -394,10 +377,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 24,
   },
-  cancelButton: {
-    flex: 0.48,
-  },
-  submitButton: {
-    flex: 0.48,
-  },
+  cancelButton: { flex: 0.48 },
+  submitButton: { flex: 0.48 },
 });
