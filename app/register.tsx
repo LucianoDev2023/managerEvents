@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   View,
   Text,
@@ -9,11 +8,12 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth } from '@/config/firebase';
+import { useAuth } from '@/context/AuthContext';
 
 export default function RegisterScreen() {
+  const { register } = useAuth();
   const router = useRouter();
 
   const [name, setName] = useState('');
@@ -24,7 +24,10 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     Keyboard.dismiss();
-    if (!name || !email || !password || !confirm) return;
+    if (!name || !email || !password || !confirm) {
+      alert('Preencha todos os campos.');
+      return;
+    }
 
     if (password !== confirm) {
       alert('As senhas não coincidem.');
@@ -33,13 +36,7 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      await updateProfile(userCredential.user, { displayName: name });
-      router.replace('/(tabs)');
+      await register(email, password, name); // A lógica de profile + AsyncStorage está no contexto
     } catch (error: any) {
       alert('Erro ao registrar: ' + error.message);
     } finally {

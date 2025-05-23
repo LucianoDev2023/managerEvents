@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   View,
   Text,
@@ -9,17 +8,19 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/config/firebase';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Eye, EyeOff } from 'lucide-react-native';
-import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
+import { useRouter } from 'expo-router';
+
+import { useAuth } from '@/context/AuthContext';
+import Colors from '@/constants/Colors';
 
 export default function LoginScreen() {
-  const router = useRouter();
+  const { login } = useAuth();
   const scheme = useColorScheme() ?? 'dark';
   const theme = Colors[scheme];
+  const router = useRouter();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,12 +29,14 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     Keyboard.dismiss();
-    if (!email || !password) return;
+    if (!email || !password) {
+      alert('Preencha todos os campos.');
+      return;
+    }
 
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.replace('/welcome');
+      await login(email, password); // o AuthContext já lida com redirecionamento
     } catch (error: any) {
       alert('Erro no login: Confirme email e/ou senha');
     } finally {
@@ -44,7 +47,7 @@ export default function LoginScreen() {
   return (
     <LinearGradient
       colors={['#0b0b0f', '#1b0033', '#3e1d73']}
-      locations={[0, 0.7, 1]} // define onde cada cor aparece no degradê
+      locations={[0, 0.7, 1]}
       style={styles.container}
     >
       <Text style={styles.title}>Login</Text>
@@ -105,7 +108,7 @@ export default function LoginScreen() {
           style={styles.signUpText}
           onPress={() => router.push('/register')}
         >
-          Cadastra-se
+          Cadastre-se
         </Text>
       </Text>
     </LinearGradient>

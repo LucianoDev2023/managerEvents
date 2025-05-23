@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   View,
   Text,
@@ -9,11 +8,13 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '@/config/firebase';
+
+import { useAuth } from '@/context/AuthContext';
 
 export default function ForgotPasswordScreen() {
+  const { resetPassword } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -28,7 +29,7 @@ export default function ForgotPasswordScreen() {
 
     setLoading(true);
     try {
-      await sendPasswordResetEmail(auth, email);
+      await resetPassword(email);
       alert('Email de recuperação enviado!');
       router.push('/login');
     } catch (error: any) {
