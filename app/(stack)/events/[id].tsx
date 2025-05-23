@@ -256,13 +256,21 @@ export default function EventDetailScreen() {
         </View>
       </ScrollView>
 
-      <TouchableOpacity
-        onPress={() => setShowQR(true)}
-        style={styles.actionButton}
+      <View
+        style={{
+          borderTopWidth: 1,
+          borderTopColor: '#6e56cf',
+          marginHorizontal: 26,
+        }}
       >
-        <Text style={styles.actionText}>Compartilhar evento</Text>
-        <LucideQrCode size={16} color="white" />
-      </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setShowQR(true)}
+          style={styles.actionButton}
+        >
+          <Text style={styles.actionText}>Compartilhar evento</Text>
+          <LucideQrCode size={16} color="white" />
+        </TouchableOpacity>
+      </View>
 
       {isAddingProgram && <LoadingOverlay message="Adicionando dia..." />}
 
@@ -331,13 +339,17 @@ export default function EventDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 40 },
+  scrollContent: {
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+  },
+
   headerButton: { padding: 8 },
   headerActions: { flexDirection: 'row' },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 15,
     marginHorizontal: 16,
   },
   sectionTitle: { fontSize: 18, fontFamily: 'Inter-Bold' },
@@ -387,6 +399,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginTop: 10,
     gap: 8,
+    borderWidth: 1,
   },
   actionText: { color: 'white', fontFamily: 'Inter-Medium', fontSize: 13 },
   coverImage: {
