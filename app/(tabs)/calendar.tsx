@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   navButton: {
-    padding: 8,
+    padding: 1,
   },
   monthTitle: {
     fontSize: 18,
@@ -277,11 +277,11 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontFamily: 'Inter-Bold',
     fontSize: 16,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   weekdaysContainer: {
     flexDirection: 'row',
-    marginTop: 8,
+    marginTop: 2,
   },
   weekday: {
     flex: 1,

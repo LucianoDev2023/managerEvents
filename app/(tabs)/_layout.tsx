@@ -30,12 +30,14 @@ export default function TabLayout() {
         headerStyle: {
           backgroundColor: colors.background,
         },
+
         headerTitleStyle: {
           fontFamily: 'Inter-Bold',
           fontSize: 20,
           flex: 1,
-          color: colors.text,
+          color: colors.primary,
           textAlign: 'center',
+          marginTop: 20,
         },
         headerTintColor: colors.text,
         headerShadowVisible: false,

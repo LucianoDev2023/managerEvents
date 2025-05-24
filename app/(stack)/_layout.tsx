@@ -19,7 +19,7 @@ export default function StackLayout() {
           headerTitleStyle: {
             fontFamily: 'Inter-Bold',
             fontSize: 18,
-            color: colors.text,
+            color: colors.primary,
           },
           headerTintColor: colors.text,
           headerTitleAlign: 'center',
