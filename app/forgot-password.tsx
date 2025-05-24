@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,18 +10,26 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-
-import { useAuth } from '@/context/AuthContext';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '@/config/firebase';
+import { useAuthListener } from '@/hooks/useAuthListener';
 
 export default function ForgotPasswordScreen() {
-  const { resetPassword } = useAuth();
   const router = useRouter();
+  const { user, authLoading } = useAuthListener();
 
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/(tabs)');
+    }
+  }, [authLoading, user]);
+
   const handleResetPassword = async () => {
     Keyboard.dismiss();
+
     if (!email) {
       alert('Digite seu e-mail.');
       return;
@@ -29,15 +37,24 @@ export default function ForgotPasswordScreen() {
 
     setLoading(true);
     try {
-      await resetPassword(email);
+      await sendPasswordResetEmail(auth, email);
       alert('Email de recuperação enviado!');
       router.push('/login');
     } catch (error: any) {
+      console.error(error);
       alert('Erro ao enviar email: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#b18aff" />
+      </View>
+    );
+  }
 
   return (
     <LinearGradient
@@ -87,6 +104,12 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingLeft: 40,
     paddingRight: 40,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#0b0b0f',
   },
   title: {
     fontSize: 28,

@@ -10,11 +10,13 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { auth } from '@/config/firebase';
+import { useRegistrationFlow } from '@/context/RegistrationFlowContext';
 
 export default function RegisterScreen() {
-  const { register } = useAuth();
   const router = useRouter();
+  const { setCameFromRegister } = useRegistrationFlow();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -24,6 +26,7 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     Keyboard.dismiss();
+
     if (!name || !email || !password || !confirm) {
       alert('Preencha todos os campos.');
       return;
@@ -36,8 +39,21 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      await register(email, password, name); // A lógica de profile + AsyncStorage está no contexto
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      await updateProfile(userCredential.user, {
+        displayName: name,
+      });
+
+      // ✅ Marca que veio da tela de registro
+      setCameFromRegister(true);
+      router.replace('/accountCreatedScreen');
     } catch (error: any) {
+      console.error(error);
       alert('Erro ao registrar: ' + error.message);
     } finally {
       setLoading(false);
@@ -102,7 +118,10 @@ export default function RegisterScreen() {
 
       <Text style={styles.bottomText}>
         Já tem uma conta?{' '}
-        <Text style={styles.signInText} onPress={() => router.push('/login')}>
+        <Text
+          style={styles.signInText}
+          onPress={() => router.push('/(auth)/login')}
+        >
           Fazer login
         </Text>
       </Text>

@@ -12,12 +12,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
-
-import { useAuth } from '@/context/AuthContext';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/config/firebase';
 import Colors from '@/constants/Colors';
 
 export default function LoginScreen() {
-  const { login } = useAuth();
   const scheme = useColorScheme() ?? 'dark';
   const theme = Colors[scheme];
   const router = useRouter();
@@ -36,7 +35,8 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      await login(email, password); // o AuthContext já lida com redirecionamento
+      await signInWithEmailAndPassword(auth, email, password);
+      // Redirecionamento será feito no (auth)/_layout.tsx
     } catch (error: any) {
       alert('Erro no login: Confirme email e/ou senha');
     } finally {
@@ -106,7 +106,7 @@ export default function LoginScreen() {
         Não possui uma conta?{' '}
         <Text
           style={styles.signUpText}
-          onPress={() => router.push('/register')}
+          onPress={() => router.push('/(auth)/register')}
         >
           Cadastre-se
         </Text>

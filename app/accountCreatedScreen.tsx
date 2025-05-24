@@ -5,19 +5,44 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuthListener } from '@/hooks/useAuthListener';
+import { useRegistrationFlow } from '@/context/RegistrationFlowContext';
 
 const { height } = Dimensions.get('window');
 
 export default function AccountCreatedScreen() {
   const router = useRouter();
+  const { user, authLoading } = useAuthListener();
+  const { cameFromRegister, setCameFromRegister } = useRegistrationFlow();
+
+  // Se o usuário acessar manualmente essa rota, redireciona
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        router.replace('/login');
+      } else if (!cameFromRegister) {
+        router.replace('/welcome');
+      }
+    }
+  }, [authLoading, user, cameFromRegister]);
 
   const handleContinue = () => {
-    router.replace('/(tabs)');
+    setCameFromRegister(false); // limpa o estado após seguir
+    router.replace('/welcome');
   };
+
+  if (authLoading || !cameFromRegister) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6e56cf" />
+      </View>
+    );
+  }
 
   return (
     <LinearGradient
@@ -46,6 +71,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 60,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#0b0b0f',
   },
   iconWrapper: {
     alignItems: 'center',

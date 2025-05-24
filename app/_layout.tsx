@@ -1,56 +1,51 @@
-import { Slot } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet, Platform } from 'react-native';
-
-import { EventsProvider } from '@/context/EventsContext';
-import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { useCachedFonts } from '@/hooks/useFonts';
-import Colors from '@/constants/Colors';
+import React, { useEffect } from 'react';
+import { Slot, useRouter, useSegments } from 'expo-router';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useColorScheme } from 'react-native';
+import { useAuthListener } from '@/hooks/useAuthListener';
+import { EventsProvider } from '@/context/EventsContext';
+import Colors from '@/constants/Colors';
+import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+import { RegistrationFlowProvider } from '@/context/RegistrationFlowContext';
 
-function AppContent() {
-  const { fontsLoaded, fontError } = useCachedFonts();
+export default function RootLayout() {
+  useFrameworkReady();
+  const { user, authLoading } = useAuthListener();
+  const segments = useSegments(); // ex: ['(auth)', 'login']
+  const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
-  const { authLoading } = useAuth();
 
-  if (!fontsLoaded || authLoading) {
+  // Protege rotas privadas e evita acesso de usuários logados a rotas públicas
+  useEffect(() => {
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (!authLoading) {
+      if (!user && !inAuthGroup) {
+        router.replace('/login'); // redireciona para login se não autenticado
+      }
+    }
+  }, [authLoading, user, segments]);
+
+  if (authLoading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <EventsProvider>
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <RegistrationFlowProvider>
+      <EventsProvider>
         <Slot />
-        <StatusBar
-          style={colorScheme === 'dark' ? 'light' : 'dark'}
-          backgroundColor={
-            Platform.OS === 'android' ? colors.background : 'transparent'
-          }
-          translucent
-        />
-      </View>
-    </EventsProvider>
-  );
-}
-
-export default function RootLayout() {
-  useFrameworkReady();
-
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+      </EventsProvider>
+    </RegistrationFlowProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',

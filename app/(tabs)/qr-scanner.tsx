@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -23,32 +23,44 @@ export default function QRScannerScreen() {
   const [facing, setFacing] = useState<'front' | 'back'>('back');
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleBarCodeScanned = (scanningResult: BarcodeScanningResult) => {
-    if (!scanned) {
-      setScanned(true);
-      try {
-        const qrData = JSON.parse(scanningResult.data);
-        console.log('Dados do QR Code:', qrData);
-        router.push({
-          pathname: '/(tabs)',
-          params: {
-            accessCode: qrData.accessCode,
-            title: qrData.eventTitle,
-          },
-        });
-      } catch (error) {
-        console.error('Erro ao processar QR Code:', error);
-        Alert.alert('Erro', 'QR Code inválido');
+    if (scanned) return;
+
+    setScanned(true);
+
+    try {
+      const qrData = JSON.parse(scanningResult.data);
+      console.log('Dados do QR Code:', qrData);
+
+      router.push({
+        pathname: '/(tabs)',
+        params: {
+          accessCode: qrData.accessCode,
+          title: qrData.eventTitle,
+        },
+      });
+    } catch (error) {
+      console.error('Erro ao processar QR Code:', error);
+      Alert.alert('Erro', 'QR Code inválido');
+    } finally {
+      // Resetar escaneamento após 1 segundo
+      scanTimeoutRef.current = setTimeout(() => {
         setScanned(false);
-      }
+      }, 1000);
     }
   };
 
   useFocusEffect(
     React.useCallback(() => {
       setScanned(false);
-      return () => setScanned(false);
+
+      return () => {
+        if (scanTimeoutRef.current) {
+          clearTimeout(scanTimeoutRef.current);
+        }
+      };
     }, [])
   );
 
@@ -99,7 +111,7 @@ export default function QRScannerScreen() {
       <CameraView
         style={StyleSheet.absoluteFill}
         facing={facing}
-        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        onBarcodeScanned={handleBarCodeScanned}
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
       >
         <View style={styles.overlay}>

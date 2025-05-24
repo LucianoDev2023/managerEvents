@@ -1,17 +1,17 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Image,
   ScrollView,
   Alert,
   Platform,
   StatusBar as RNStatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getAuth, signOut } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 
 import Colors from '@/constants/Colors';
 import { useEvents } from '@/context/EventsContext';
@@ -29,26 +29,41 @@ import {
 } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
+import { auth } from '@/config/firebase';
+import { useAuthListener } from '@/hooks/useAuthListener';
 
 export default function ProfileScreen() {
+  const { user, authLoading } = useAuthListener();
   const { state } = useEvents();
   const router = useRouter();
-  const auth = getAuth();
-  const user = auth.currentUser;
-
-  const userEmail = user?.email?.toLowerCase();
-  const userEvents = state.events.filter(
-    (event) => event.createdBy?.toLowerCase() === userEmail
-  );
 
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
   const textColor = colorScheme === 'dark' ? '#fff' : '#1a1a1a';
   const textSecondary = colorScheme === 'dark' ? '#aaa' : '#555';
-  const gradientColors =
+  const gradientColors: [string, string, ...string[]] =
     colorScheme === 'dark'
-      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
-      : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
+      ? ['#0b0b0f', '#1b0033', '#3e1d73']
+      : ['#ffffff', '#f0f0ff', '#e9e6ff'];
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/login');
+    }
+  }, [authLoading, user]);
+
+  if (authLoading) {
+    return (
+      <View style={[styles.gradient, styles.center]}>
+        <ActivityIndicator size="large" color="#6e56cf" />
+      </View>
+    );
+  }
+
+  const userEmail = user?.email?.toLowerCase();
+  const userEvents = state.events.filter(
+    (event) => event.createdBy?.toLowerCase() === userEmail
+  );
 
   const totalEvents = userEvents.length;
   const totalPrograms = userEvents.reduce(
@@ -124,8 +139,8 @@ export default function ProfileScreen() {
   return (
     <LinearGradient
       colors={gradientColors}
+      style={[styles.gradient, { backgroundColor: gradientColors[0] }]} // <- fallback de cor
       locations={[0, 0.7, 1]}
-      style={styles.gradient}
     >
       <StatusBar
         translucent
@@ -195,7 +210,7 @@ export default function ProfileScreen() {
             textStyle={{ color: textColor }}
           />
 
-          <Button
+          {/* <Button
             title={`Tema: ${colorScheme === 'dark' ? 'Escuro' : 'Claro'}`}
             icon={
               colorScheme === 'dark' ? (
@@ -209,7 +224,7 @@ export default function ProfileScreen() {
             fullWidth
             style={styles.menuButton}
             textStyle={{ color: textColor }}
-          />
+          /> */}
 
           <Button
             title="Notificações"
@@ -271,6 +286,11 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   gradient: {
     flex: 1,
+    backgroundColor: '#0b0b0f', // fallback no estilo também
+  },
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   contentContainer: {
     paddingHorizontal: 16,
