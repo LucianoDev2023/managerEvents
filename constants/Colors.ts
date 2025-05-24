@@ -6,6 +6,7 @@ export default {
     textSecondary: '#444',
     border: '#ccc',
     primary: '#6e56cf',
+    primary2: '#483887',
     primaryligh: '#6e56cf', // substituto mais leve ao b18aff
     error: '#e63946',
     text2: '#fff',
@@ -19,5 +20,6 @@ export default {
     primary: '#b18aff',
     error: '#f44336',
     text2: '#fff',
+    primary2: '#483887',
   },
 };

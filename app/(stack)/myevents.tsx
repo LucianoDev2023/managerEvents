@@ -100,10 +100,11 @@ export default function MyEventsScreen() {
       day: 'numeric',
     });
 
-  const gradientColors =
-    colorScheme === 'dark'
-      ? ['#0b0b0f', '#1b0033', '#3e1d73']
-      : ['#ffffff', '#e6e6f0', '#f9f9ff'];
+  const gradientColors: [string, string, ...string[]] = [
+    '#0b0b0f',
+    '#1b0033',
+    '#3e1d73',
+  ];
 
   return (
     <LinearGradient
@@ -131,77 +132,82 @@ export default function MyEventsScreen() {
           data={filteredEvents}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => handleNavigateToEvent(item.id)}>
+            <TouchableOpacity
+              onPress={() => handleNavigateToEvent(item.id)}
+              activeOpacity={0.85}
+            >
               <View
                 style={[
                   styles.cardWrapper,
                   {
-                    borderColor: colors.border,
                     backgroundColor: colors.backGroundSecondary,
-                    shadowColor: colorScheme === 'dark' ? '#fff' : '#000',
+                    borderRadius: 16,
+                    padding: 12,
+                    marginBottom: 16,
+                    shadowColor: colorScheme === 'dark' ? '#000' : '#ccc',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.12,
+                    shadowRadius: 8,
+                    elevation: 5,
                   },
                 ]}
               >
-                <View
-                  style={[
-                    styles.cardInfo,
-                    {
-                      backgroundColor: colors.backGroundSecondary,
-                      borderRadius: 12,
-                      padding: 12,
-                      shadowColor: colorScheme === 'dark' ? '#000' : '#aaa',
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.1,
-                      shadowRadius: 6,
-                      elevation: 4,
-                    },
-                  ]}
-                >
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    {item.coverImage && (
-                      <Image
-                        source={{ uri: item.coverImage }}
-                        style={{
-                          width: 60,
-                          height: 60,
-                          borderRadius: 8,
-                          marginRight: 12,
-                        }}
-                      />
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.eventTitle, { color: colors.text }]}>
-                        {item.title}
-                      </Text>
-                      <Text
-                        style={[styles.eventDates, { color: colors.primary }]}
-                      >
-                        {' '}
-                        {formatDate(item.startDate)} -{' '}
-                        {formatDate(item.endDate)}{' '}
-                      </Text>
-                    </View>
-                    <ChevronRight size={20} color={colors.textSecondary} />
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {item.coverImage && (
+                    <Image
+                      source={{ uri: item.coverImage }}
+                      style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: 12,
+                        marginRight: 12,
+                      }}
+                    />
+                  )}
+
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: '600',
+                        color: colors.text,
+                        marginBottom: 4,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {item.title}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        color: colors.primary,
+                        fontWeight: '500',
+                        marginRight: 10,
+                      }}
+                    >
+                      {formatDate(item.startDate)} - {formatDate(item.endDate)}
+                    </Text>
                   </View>
+
+                  <ChevronRight size={20} color={colors.primary} />
                 </View>
 
-                <View style={styles.actions}>
+                <View style={{ marginTop: 12, alignItems: 'flex-end' }}>
                   <Button
                     title="Adicionar permissão"
                     size="small"
                     onPress={() => handleOpenPermissionModal(item.id)}
                     style={{
                       backgroundColor: colors.primary,
-                      borderRadius: 20,
-                      paddingHorizontal: 24,
+                      borderRadius: 100,
+                      paddingHorizontal: 20,
+                      paddingVertical: 8,
                     }}
-                    textStyle={{ color: 'white', fontWeight: 'bold' }}
+                    textStyle={{
+                      color: 'white',
+                      fontWeight: '600',
+                      fontSize: 14,
+                    }}
                   />
                 </View>
               </View>
@@ -306,8 +312,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   cardInfo: {
-    flex: 1,
-    marginRight: 8,
+    marginRight: 2,
   },
   actions: {
     flexDirection: 'row',

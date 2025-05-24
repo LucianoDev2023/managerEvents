@@ -160,9 +160,6 @@ export default function ProfileScreen() {
           <Text style={[styles.profileName, { color: textColor }]}>
             {displayName}
           </Text>
-          <Text style={[styles.profileEmail, { color: textSecondary }]}>
-            {email}
-          </Text>
         </View>
 
         <View style={styles.statsGrid}>
@@ -173,21 +170,21 @@ export default function ProfileScreen() {
             </Text>
           </View>
 
-          <View style={[styles.statCard, { backgroundColor: '#6c5ce7' }]}>
+          <View style={[styles.statCard, { backgroundColor: colors.primary2 }]}>
             <Text style={styles.statNumber}>{totalPrograms}</Text>
             <Text style={styles.statLabel}>
               {pluralize(totalPrograms, 'Programa', 'Programas')}
             </Text>
           </View>
 
-          <View style={[styles.statCard, { backgroundColor: '#00cec9' }]}>
+          <View style={[styles.statCard, { backgroundColor: colors.primary2 }]}>
             <Text style={styles.statNumber}>{totalActivities}</Text>
             <Text style={styles.statLabel}>
               {pluralize(totalActivities, 'Atividade', 'Atividades')}
             </Text>
           </View>
 
-          <View style={[styles.statCard, { backgroundColor: '#f39c12' }]}>
+          <View style={[styles.statCard, { backgroundColor: colors.primary }]}>
             <Text style={styles.statNumber}>{totalPhotos}</Text>
             <Text style={styles.statLabel}>
               {pluralize(totalPhotos, 'Foto', 'Fotos')}
@@ -199,7 +196,7 @@ export default function ProfileScreen() {
           Preferências
         </Text>
 
-        <Card>
+        <View style={[styles.card]}>
           <Button
             title="Meus eventos"
             icon={<Settings size={24} color={textColor} />}
@@ -235,11 +232,11 @@ export default function ProfileScreen() {
             style={styles.menuButton}
             textStyle={{ color: textColor }}
           />
-        </Card>
+        </View>
 
         <Text style={[styles.sectionTitle, { color: textColor }]}>Suporte</Text>
 
-        <Card>
+        <View style={[styles.card]}>
           <Button
             title="Ajuda e Suporte"
             icon={<HelpCircle size={20} color={textColor} />}
@@ -249,11 +246,11 @@ export default function ProfileScreen() {
             style={styles.menuButton}
             textStyle={{ color: textColor }}
           />
-        </Card>
+        </View>
 
         <Text style={[styles.sectionTitle, { color: textColor }]}>Conta</Text>
 
-        <Card>
+        <View style={[styles.card]}>
           <Button
             title="Limpar Tudo"
             icon={<Trash2 size={20} color="#f44336" />}
@@ -273,7 +270,7 @@ export default function ProfileScreen() {
             style={styles.menuButton}
             textStyle={{ color: '#f44336' }}
           />
-        </Card>
+        </View>
 
         <Text style={[styles.versionText, { color: textSecondary }]}>
           Versão 1.0.0
@@ -297,7 +294,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   profileHeader: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 20,
   },
   profileName: {
@@ -319,9 +316,11 @@ const styles = StyleSheet.create({
   statCard: {
     width: '48%',
     borderRadius: 10,
-    padding: 10,
+    padding: 8,
     alignItems: 'center',
     marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#666',
   },
   statNumber: {
     color: 'white',
@@ -346,9 +345,17 @@ const styles = StyleSheet.create({
   },
   versionText: {
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: 'Inter-Regular',
-    marginTop: 24,
-    marginBottom: 16,
+    marginTop: 30,
+    marginBottom: 4,
+  },
+  card: {
+    backgroundColor: 'transparent', // ← isso torna o card transparente
+    borderRadius: 12,
+    padding: 12,
+    // opcionalmente remova sombra ou borda
+    elevation: 0,
+    shadowColor: 'transparent',
   },
 });
