@@ -13,7 +13,7 @@ export default {
   },
   dark: {
     background: '#0b0b0f',
-    backGroundSecondary: '#222',
+    backGroundSecondary: 'transparent',
     text: '#fff',
     textSecondary: '#aaa',
     border: '#555',

@@ -34,12 +34,14 @@ export default function MyEventsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [permissionEmail, setPermissionEmail] = useState('');
-  const [permissionLevel, setPermissionLevel] = useState<'total' | 'parcial'>(
-    'parcial'
+  const [permissionLevel, setPermissionLevel] = useState<'Adm' | 'Parcial'>(
+    'Parcial'
   );
 
   const filteredEvents = state.events.filter(
-    (event) => event.createdBy?.toLowerCase() === userEmail
+    (event) =>
+      event.createdBy?.toLowerCase() === userEmail ||
+      event.subAdmins?.some((admin) => admin.email.toLowerCase() === userEmail)
   );
 
   const handleNavigateToEvent = (eventId: string) => {
@@ -83,7 +85,7 @@ export default function MyEventsScreen() {
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        router.push('/profile');
+        router.push('/');
         return true;
       };
 
@@ -100,11 +102,10 @@ export default function MyEventsScreen() {
       day: 'numeric',
     });
 
-  const gradientColors: [string, string, ...string[]] = [
-    '#0b0b0f',
-    '#1b0033',
-    '#3e1d73',
-  ];
+  const gradientColors: [string, string, ...string[]] =
+    colorScheme === 'dark'
+      ? ['#0b0b0f', '#1b0033', '#3e1d73']
+      : ['#ffffff', '#f0f0ff', '#e9e6ff'];
 
   return (
     <LinearGradient
@@ -131,88 +132,118 @@ export default function MyEventsScreen() {
         <FlatList
           data={filteredEvents}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => handleNavigateToEvent(item.id)}
-              activeOpacity={0.85}
-            >
-              <View
-                style={[
-                  styles.cardWrapper,
-                  {
-                    backgroundColor: colors.backGroundSecondary,
-                    borderRadius: 16,
-                    padding: 12,
-                    marginBottom: 16,
-                    shadowColor: colorScheme === 'dark' ? '#000' : '#ccc',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.12,
-                    shadowRadius: 8,
-                    elevation: 5,
-                  },
-                ]}
+          renderItem={({ item }) => {
+            const isCreator = item.createdBy?.toLowerCase() === userEmail;
+            const isAdm = item.subAdmins?.some(
+              (admin) =>
+                (admin.email.toLowerCase() === userEmail &&
+                  admin.level === 'Adm') ||
+                admin.level === 'Parcial'
+            );
+
+            return (
+              <TouchableOpacity
+                onPress={() => handleNavigateToEvent(item.id)}
+                activeOpacity={0.85}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {item.coverImage && (
-                    <Image
-                      source={{ uri: item.coverImage }}
-                      style={{
-                        width: 80,
-                        height: 80,
-                        borderRadius: 12,
-                        marginRight: 12,
-                      }}
-                    />
-                  )}
+                <View
+                  style={[
+                    styles.cardWrapper,
+                    {
+                      backgroundColor: colors.backGroundSecondary,
+                      shadowColor: colorScheme === 'dark' ? '#000' : '#ccc',
+                    },
+                  ]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {item.coverImage && (
+                      <Image
+                        source={{ uri: item.coverImage }}
+                        style={{
+                          width: 80,
+                          height: 80,
+                          borderRadius: 12,
+                          marginRight: 12,
+                        }}
+                      />
+                    )}
 
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        fontWeight: '600',
-                        color: colors.text,
-                        marginBottom: 4,
-                      }}
-                      numberOfLines={1}
-                    >
-                      {item.title}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        color: colors.primary,
-                        fontWeight: '500',
-                        marginRight: 10,
-                      }}
-                    >
-                      {formatDate(item.startDate)} - {formatDate(item.endDate)}
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.cardTitle,
+                            { color: colors.text, flex: 1 },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {item.title}
+                        </Text>
+                      </View>
+
+                      <Text
+                        style={[styles.cardDate, { color: colors.primary }]}
+                      >
+                        {formatDate(item.startDate)} -{' '}
+                        {formatDate(item.endDate)}
+                      </Text>
+                    </View>
+
+                    <ChevronRight size={20} color={colors.primary} />
                   </View>
+                  {(() => {
+                    if (isCreator) {
+                      return (
+                        <View style={styles.badgeContainer}>
+                          <Text style={styles.badgeText}>Criador</Text>
+                        </View>
+                      );
+                    }
 
-                  <ChevronRight size={20} color={colors.primary} />
-                </View>
+                    const subAdmin = item.subAdmins?.find(
+                      (admin) => admin.email.toLowerCase() === userEmail
+                    );
 
-                <View style={{ marginTop: 12, alignItems: 'flex-end' }}>
-                  <Button
-                    title="Adicionar permissão"
-                    size="small"
-                    onPress={() => handleOpenPermissionModal(item.id)}
-                    style={{
-                      backgroundColor: colors.primary,
-                      borderRadius: 100,
-                      paddingHorizontal: 20,
-                      paddingVertical: 8,
-                    }}
-                    textStyle={{
-                      color: 'white',
-                      fontWeight: '600',
-                      fontSize: 14,
-                    }}
-                  />
+                    if (subAdmin) {
+                      const label =
+                        subAdmin.level === 'Adm'
+                          ? 'Administrador'
+                          : 'Adm parcial';
+
+                      return (
+                        <View style={styles.badgeContainer}>
+                          <Text style={styles.badgeText}>{label}</Text>
+                        </View>
+                      );
+                    }
+
+                    return null;
+                  })()}
+
+                  {(isCreator || isAdm) && (
+                    <View style={{ marginTop: 12, alignItems: 'flex-end' }}>
+                      <Button
+                        title="Adicionar permissão"
+                        size="small"
+                        onPress={() => handleOpenPermissionModal(item.id)}
+                        style={[
+                          styles.permissionButton,
+                          { backgroundColor: colors.primary },
+                        ]}
+                        textStyle={styles.permissionButtonText}
+                      />
+                    </View>
+                  )}
                 </View>
-              </View>
-            </TouchableOpacity>
-          )}
+              </TouchableOpacity>
+            );
+          }}
           ListEmptyComponent={
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
               Nenhum evento disponível.
@@ -242,11 +273,11 @@ export default function MyEventsScreen() {
                 placeholderTextColor={colors.textSecondary}
               />
               <View style={styles.toggleContainer}>
-                {['total', 'parcial'].map((level) => (
+                {['Adm', 'Parcial'].map((level) => (
                   <Pressable
                     key={level}
                     onPress={() =>
-                      setPermissionLevel(level as 'total' | 'parcial')
+                      setPermissionLevel(level as 'Adm' | 'Parcial')
                     }
                     style={[
                       styles.toggleButton,
@@ -288,50 +319,25 @@ export default function MyEventsScreen() {
 }
 
 const styles = StyleSheet.create({
-  gradient: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
+  gradient: { flex: 1 },
+  container: { flex: 1, paddingHorizontal: 16 },
+  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
   cardWrapper: {
-    padding: 16,
-    gap: 10,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 16,
+    marginBottom: 16,
     borderWidth: 1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
-    marginBottom: 24,
+    borderColor: '#b18aff',
   },
-  cardInfo: {
-    marginRight: 2,
+  cardTitle: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
+  cardDate: { fontSize: 14, fontWeight: '500', marginRight: 10 },
+  permissionButton: {
+    borderRadius: 100,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
   },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  eventTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    paddingBottom: 6,
-  },
-  eventDates: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-  },
-  emptyText: {
-    marginTop: 20,
-    textAlign: 'center',
-  },
+  permissionButtonText: { color: 'white', fontWeight: '600', fontSize: 14 },
+  emptyText: { marginTop: 20, textAlign: 'center' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.8)',
@@ -344,16 +350,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 15,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
-  },
+  modalTitle: { fontSize: 18, fontWeight: 'bold' },
+  input: { borderWidth: 1, borderRadius: 8, padding: 10, marginBottom: 12 },
   toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -365,5 +363,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 10,
     borderWidth: 1,
+  },
+  badgeContainer: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    backgroundColor: '#5E780F',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });

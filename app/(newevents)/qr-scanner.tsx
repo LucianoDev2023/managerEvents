@@ -121,7 +121,7 @@ export default function QRScannerScreen() {
           </Text>
         </View>
 
-        <View style={styles.header}>
+        {/* <View style={styles.header}>
           <Button
             title="Voltar"
             onPress={() => router.back()}
@@ -129,7 +129,7 @@ export default function QRScannerScreen() {
             style={styles.backButton}
             size="small"
           />
-        </View>
+        </View> */}
       </CameraView>
     </View>
   );

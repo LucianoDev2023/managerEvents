@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Platform,
   StatusBar as RNStatusBar,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -37,6 +38,8 @@ export default function ProfileScreen() {
   const { state } = useEvents();
   const router = useRouter();
 
+  const [supportVisible, setSupportVisible] = useState(false);
+
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
   const textColor = colorScheme === 'dark' ? '#fff' : '#1a1a1a';
@@ -48,7 +51,7 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.replace('/login');
+      router.push('/login');
     }
   }, [authLoading, user]);
 
@@ -62,7 +65,9 @@ export default function ProfileScreen() {
 
   const userEmail = user?.email?.toLowerCase();
   const userEvents = state.events.filter(
-    (event) => event.createdBy?.toLowerCase() === userEmail
+    (event) =>
+      event.createdBy?.toLowerCase() === userEmail ||
+      event.subAdmins?.some((admin) => admin.email.toLowerCase() === userEmail)
   );
 
   const totalEvents = userEvents.length;
@@ -86,14 +91,6 @@ export default function ProfileScreen() {
       ),
     0
   );
-
-  const handleThemeToggle = () => {
-    Alert.alert(
-      'Tema',
-      'Aqui você pode alternar entre tema claro e escuro (não implementado).',
-      [{ text: 'OK' }]
-    );
-  };
 
   const handleLogout = () => {
     Alert.alert('Sair da conta', 'Deseja mesmo sair?', [
@@ -131,7 +128,6 @@ export default function ProfileScreen() {
   };
 
   const displayName = user?.displayName ?? 'Usuário';
-  const email = user?.email ?? 'sem email';
 
   const pluralize = (count: number, singular: string, plural: string) =>
     count <= 1 ? singular : plural;
@@ -139,7 +135,7 @@ export default function ProfileScreen() {
   return (
     <LinearGradient
       colors={gradientColors}
-      style={[styles.gradient, { backgroundColor: gradientColors[0] }]} // <- fallback de cor
+      style={[styles.gradient, { backgroundColor: gradientColors[0] }]}
       locations={[0, 0.7, 1]}
     >
       <StatusBar
@@ -169,21 +165,18 @@ export default function ProfileScreen() {
               {pluralize(totalEvents, 'Evento', 'Eventos')}
             </Text>
           </View>
-
           <View style={[styles.statCard, { backgroundColor: colors.primary2 }]}>
             <Text style={styles.statNumber}>{totalPrograms}</Text>
             <Text style={styles.statLabel}>
               {pluralize(totalPrograms, 'Programa', 'Programas')}
             </Text>
           </View>
-
           <View style={[styles.statCard, { backgroundColor: colors.primary2 }]}>
             <Text style={styles.statNumber}>{totalActivities}</Text>
             <Text style={styles.statLabel}>
               {pluralize(totalActivities, 'Atividade', 'Atividades')}
             </Text>
           </View>
-
           <View style={[styles.statCard, { backgroundColor: colors.primary }]}>
             <Text style={styles.statNumber}>{totalPhotos}</Text>
             <Text style={styles.statLabel}>
@@ -195,10 +188,9 @@ export default function ProfileScreen() {
         <Text style={[styles.sectionTitle, { color: textColor }]}>
           Preferências
         </Text>
-
-        <View style={[styles.card]}>
+        <View style={styles.card}>
           <Button
-            title="Meus eventos"
+            title="Meus eventos ou compartilhados"
             icon={<Settings size={24} color={textColor} />}
             onPress={() => router.push('/(stack)/myevents')}
             variant="ghost"
@@ -206,23 +198,6 @@ export default function ProfileScreen() {
             style={styles.menuButton}
             textStyle={{ color: textColor }}
           />
-
-          {/* <Button
-            title={`Tema: ${colorScheme === 'dark' ? 'Escuro' : 'Claro'}`}
-            icon={
-              colorScheme === 'dark' ? (
-                <Moon size={20} color={textColor} />
-              ) : (
-                <Sun size={20} color={textColor} />
-              )
-            }
-            onPress={handleThemeToggle}
-            variant="ghost"
-            fullWidth
-            style={styles.menuButton}
-            textStyle={{ color: textColor }}
-          /> */}
-
           <Button
             title="Notificações"
             icon={<Bell size={20} color={textColor} />}
@@ -235,12 +210,11 @@ export default function ProfileScreen() {
         </View>
 
         <Text style={[styles.sectionTitle, { color: textColor }]}>Suporte</Text>
-
-        <View style={[styles.card]}>
+        <View style={styles.card}>
           <Button
             title="Ajuda e Suporte"
             icon={<HelpCircle size={20} color={textColor} />}
-            onPress={() => {}}
+            onPress={() => setSupportVisible(true)}
             variant="ghost"
             fullWidth
             style={styles.menuButton}
@@ -249,8 +223,7 @@ export default function ProfileScreen() {
         </View>
 
         <Text style={[styles.sectionTitle, { color: textColor }]}>Conta</Text>
-
-        <View style={[styles.card]}>
+        <View style={styles.card}>
           <Button
             title="Limpar Tudo"
             icon={<Trash2 size={20} color="#f44336" />}
@@ -260,7 +233,6 @@ export default function ProfileScreen() {
             style={styles.menuButton}
             textStyle={{ color: '#f44336' }}
           />
-
           <Button
             title="Sair da Conta"
             icon={<LogOut size={20} color="#f44336" />}
@@ -276,36 +248,51 @@ export default function ProfileScreen() {
           Versão 1.0.0
         </Text>
       </ScrollView>
+
+      <Modal visible={supportVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: colors.background },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Ajuda e Suporte
+            </Text>
+            <Text style={{ color: colors.text, marginBottom: 20 }}>
+              Em caso de dúvidas, entre em contato:
+            </Text>
+            <Text
+              selectable
+              style={{
+                color: colors.primary,
+                fontWeight: 'bold',
+                fontSize: 16,
+              }}
+            >
+              planejejasuporte@gmail.com
+            </Text>
+            <Button
+              title="Fechar"
+              onPress={() => setSupportVisible(false)}
+              style={{ backgroundColor: colors.primary, marginTop: 24 }}
+              textStyle={{ color: '#fff' }}
+            />
+          </View>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: {
-    flex: 1,
-    backgroundColor: '#0b0b0f', // fallback no estilo também
-  },
-  center: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  contentContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-  },
-  profileHeader: {
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
-  profileName: {
-    fontSize: 24,
-    fontFamily: 'Inter-Bold',
-    marginBottom: 4,
-  },
-  profileEmail: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-  },
+  gradient: { flex: 1, backgroundColor: '#0b0b0f' },
+  center: { justifyContent: 'center', alignItems: 'center' },
+  contentContainer: { paddingHorizontal: 16, paddingBottom: 20 },
+  profileHeader: { alignItems: 'flex-start', marginBottom: 20 },
+  profileName: { fontSize: 24, fontFamily: 'Inter-Bold', marginBottom: 4 },
+  profileEmail: { fontSize: 16, fontFamily: 'Inter-Regular' },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -328,21 +315,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     marginBottom: 4,
   },
-  statLabel: {
-    color: 'white',
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-  },
+  statLabel: { color: 'white', fontSize: 14, fontFamily: 'Inter-Medium' },
   sectionTitle: {
     fontSize: 18,
     fontFamily: 'Inter-Bold',
     marginTop: 8,
     marginBottom: 12,
   },
-  menuButton: {
-    justifyContent: 'flex-start',
-    paddingVertical: 12,
-  },
+  menuButton: { justifyContent: 'flex-start', paddingVertical: 12 },
   versionText: {
     textAlign: 'center',
     fontSize: 12,
@@ -351,11 +331,23 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   card: {
-    backgroundColor: 'transparent', // ← isso torna o card transparente
+    backgroundColor: 'transparent',
     borderRadius: 12,
     padding: 12,
-    // opcionalmente remova sombra ou borda
     elevation: 0,
     shadowColor: 'transparent',
   },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  modalContent: {
+    width: '85%',
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
 });

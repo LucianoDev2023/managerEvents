@@ -1,8 +1,18 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, useColorScheme, Animated } from 'react-native';
+import React, { useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  useColorScheme,
+  Platform,
+  StatusBar as RNStatusBar,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import Colors from '@/constants/Colors';
+import LottieView from 'lottie-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -11,74 +21,114 @@ export default function WelcomeScreen() {
   const scheme = useColorScheme() ?? 'dark';
   const theme = Colors[scheme];
 
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  const gradientColors =
+    scheme === 'dark'
+      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
+      : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
 
   useEffect(() => {
-    // Inicia a animação da barra
-    Animated.timing(progressAnim, {
-      toValue: 1,
-      duration: 4000,
-      useNativeDriver: false,
-    }).start();
-
     const timeout = setTimeout(() => {
       router.replace('/(tabs)');
-    }, 4000);
+    }, 6000);
 
     return () => clearTimeout(timeout);
   }, []);
 
-  const animatedWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
-
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <Text style={[styles.text, { color: theme.text }]}>
-        BEM VINDO,{' '}
-        <Text style={{ color: theme.primary }}>{name.toUpperCase()}</Text>
-        {'\n'}AO SEU GERENCIADOR DE EVENTOS
-      </Text>
+    <LinearGradient
+      colors={gradientColors}
+      locations={[0, 0.7, 1]}
+      style={styles.container}
+    >
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        style={scheme === 'dark' ? 'light' : 'dark'}
+      />
 
-      <View style={styles.progressBarBackground}>
-        <Animated.View
-          style={[
-            styles.progressBarFill,
-            {
-              backgroundColor: theme.primary,
-              width: animatedWidth,
-            },
-          ]}
+      <View
+        style={[
+          styles.content,
+          {
+            paddingTop:
+              Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
+          },
+        ]}
+      >
+        <View style={styles.textBlock}>
+          <Text style={[styles.welcomeText, { color: theme.text }]}>
+            BEM-VINDO!
+          </Text>
+
+          <Text style={[styles.userName, { color: theme.primary }]}>
+            {name.toUpperCase()}
+          </Text>
+
+          <Text style={[styles.subtitle, { color: theme.text }]}>
+            Esse é seu gerenciador de
+          </Text>
+          <Text style={[styles.userName, { color: theme.text }]}>EVENTOS</Text>
+        </View>
+
+        <LottieView
+          source={require('../assets/images/loading.json')}
+          autoPlay
+          loop
+          style={styles.lottie}
         />
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  content: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 24,
   },
+  textBlock: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+
+  welcomeText: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+
+  userName: {
+    fontSize: 22,
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+
+  subtitle: {
+    fontSize: 16,
+    fontFamily: 'Inter',
+    opacity: 0.8,
+    textAlign: 'center',
+  },
+
   text: {
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
     lineHeight: 38,
     marginBottom: 40,
+    fontFamily: 'Inter',
   },
-  progressBarBackground: {
-    width: '80%',
-    height: 12,
-    backgroundColor: '#ddd',
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 6,
+  lottie: {
+    width: 150,
+    height: 150,
   },
 });

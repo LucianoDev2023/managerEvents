@@ -52,7 +52,17 @@ export default function EventDetailScreen() {
 
   const event = state.events.find((e) => e.id === id) as Event | undefined;
 
-  const authUserId = getAuth().currentUser?.uid;
+  const authUser = getAuth().currentUser;
+  const userEmail = authUser?.email?.toLowerCase();
+
+  const isCreator = event?.createdBy?.toLowerCase() === userEmail;
+  const isAdm = event?.subAdmins?.some(
+    (admin) =>
+      (admin.email.toLowerCase() === userEmail && admin.level === 'Adm') ||
+      admin.level === 'Parcial'
+  );
+  const hasAdminPermission = isCreator || isAdm;
+  const hasAdminPermissionDelete = isCreator;
 
   if (!event) {
     return (
@@ -181,56 +191,56 @@ export default function EventDetailScreen() {
               <ArrowLeft size={24} color={colors.text} />
             </TouchableOpacity>
           ),
-          headerRight: () => (
-            <View style={styles.headerActions}>
-              <TouchableOpacity
-                onPress={handleEditEvent}
-                style={styles.headerButton}
-              >
-                <Edit size={20} color={colors.text} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleDeleteEvent}
-                style={styles.headerButton}
-              >
-                <Trash2 size={20} color={colors.error} />
-              </TouchableOpacity>
-            </View>
-          ),
+          headerRight: () =>
+            hasAdminPermissionDelete ? (
+              <View style={styles.headerActions}>
+                <TouchableOpacity
+                  onPress={handleEditEvent}
+                  style={styles.headerButton}
+                >
+                  <Edit size={20} color={colors.text} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleDeleteEvent}
+                  style={styles.headerButton}
+                >
+                  <Trash2 size={20} color={colors.error} />
+                </TouchableOpacity>
+              </View>
+            ) : null,
         }}
       />
 
-      <View>
-        {event.coverImage && (
-          <ImageBackground
-            source={{ uri: event.coverImage }}
-            style={styles.coverImage}
-          >
-            <View style={styles.overlayBottom}>
-              <Text style={styles.coverTitle}>{event.title}</Text>
-              <Text style={styles.overlayText}>
-                {formatDateRange(event.startDate, event.endDate)}
-              </Text>
-              <Text style={styles.overlayText}>{event.location}</Text>
-              {event.description && (
-                <Text style={styles.overlayDescription}>
-                  {event.description}
-                </Text>
-              )}
-            </View>
-          </ImageBackground>
-        )}
-      </View>
+      {event.coverImage && (
+        <ImageBackground
+          source={{ uri: event.coverImage }}
+          style={styles.coverImage}
+        >
+          <View style={styles.overlayBottom}>
+            <Text style={styles.coverTitle}>{event.title}</Text>
+            <Text style={styles.overlayText}>
+              {formatDateRange(event.startDate, event.endDate)}
+            </Text>
+            <Text style={styles.overlayText}>{event.location}</Text>
+            {event.description && (
+              <Text style={styles.overlayDescription}>{event.description}</Text>
+            )}
+          </View>
+        </ImageBackground>
+      )}
+
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           Programação diária
         </Text>
-        <Button
-          title="Add Dia"
-          icon={<Plus size={16} color="white" />}
-          onPress={handleAddProgramPress}
-          size="small"
-        />
+        {hasAdminPermission && (
+          <Button
+            title="Add Dia"
+            icon={<Plus size={16} color="white" />}
+            onPress={handleAddProgramPress}
+            size="small"
+          />
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -339,11 +349,7 @@ export default function EventDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: 10,
-    paddingBottom: 10,
-  },
-
+  scrollContent: { paddingHorizontal: 10, paddingBottom: 10 },
   headerButton: { padding: 8 },
   headerActions: { flexDirection: 'row' },
   sectionHeader: {

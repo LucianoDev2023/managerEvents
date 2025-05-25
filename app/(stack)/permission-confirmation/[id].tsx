@@ -26,8 +26,8 @@ export default function PermissionConfirmationScreen() {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [permissionEmail, setPermissionEmail] = useState('');
-  const [permissionLevel, setPermissionLevel] = useState<'total' | 'parcial'>(
-    'parcial'
+  const [permissionLevel, setPermissionLevel] = useState<'Adm' | 'Parcial'>(
+    'Parcial'
   );
 
   const event = state.events.find((e) => e.id === id);
@@ -119,40 +119,31 @@ export default function PermissionConfirmationScreen() {
             />
             <View style={styles.toggleContainer}>
               <Pressable
-                onPress={() => setPermissionLevel('total')}
+                onPress={() => setPermissionLevel('Adm')}
                 style={[
                   styles.toggleButton,
-                  permissionLevel === 'total' && {
-                    backgroundColor: colors.primaryDark,
+                  permissionLevel === 'Adm' && {
+                    backgroundColor: colors.primary,
                   },
                 ]}
               >
                 <Text
                   style={{
-                    color: permissionLevel === 'total' ? 'white' : colors.text,
+                    color: permissionLevel === 'Adm' ? 'white' : colors.text,
                   }}
                 >
                   Total
                 </Text>
               </Pressable>
-              <Pressable
-                onPress={() => setPermissionLevel('parcial')}
+              {/* <Pressable
+                onPress={() => setPermissionLevel('Parcial')}
                 style={[
                   styles.toggleButton,
-                  permissionLevel === 'parcial' && {
-                    backgroundColor: colors.primaryDark,
+                  permissionLevel === 'Parcial' && {
+                    backgroundColor: colors.primary,
                   },
                 ]}
-              >
-                <Text
-                  style={{
-                    color:
-                      permissionLevel === 'parcial' ? 'white' : colors.text,
-                  }}
-                >
-                  Parcial
-                </Text>
-              </Pressable>
+              ></Pressable> */}
             </View>
             <Button
               title="Salvar"
@@ -163,7 +154,10 @@ export default function PermissionConfirmationScreen() {
             <Button
               title="Cancelar"
               onPress={() => setModalVisible(false)}
-              style={{ backgroundColor: colors.secondary, marginTop: 10 }}
+              style={{
+                backgroundColor: colors.backGroundSecondary,
+                marginTop: 10,
+              }}
               textStyle={{ color: 'white' }}
             />
           </View>

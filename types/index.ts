@@ -11,7 +11,7 @@ export type Event = {
   createdBy: string;
   subAdmins?: {
     email: string;
-    level: 'total' | 'parcial';
+    level: 'Adm' | 'Parcial';
   }[];
   programs: Program[];
 };

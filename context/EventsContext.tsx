@@ -221,7 +221,13 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   useEffect(() => {
-    fetchEvents();
+    const unsubscribe = getAuth().onAuthStateChanged((user) => {
+      if (user) {
+        fetchEvents();
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const addEvent = async (data: Omit<Event, 'id' | 'programs'>) => {

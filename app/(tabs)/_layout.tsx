@@ -48,18 +48,19 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Início',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
         }}
       />
-      <Tabs.Screen
+      {/* <Tabs.Screen
         name="add"
         options={{
-          title: 'Add evento',
+          title: 'Aicionar evento',
           tabBarIcon: ({ color, size }) => (
             <PlusSquare size={size} color={color} />
           ),
         }}
-      />
+      /> */}
       <Tabs.Screen
         name="calendar"
         options={{
@@ -69,14 +70,14 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+      {/* <Tabs.Screen
         name="qr-scanner"
         options={{
           title: 'QR Code',
           tabBarIcon: ({ color, size }) => <Camera size={size} color={color} />,
           headerShown: true,
         }}
-      />
+      /> */}
       <Tabs.Screen
         name="profile"
         options={{

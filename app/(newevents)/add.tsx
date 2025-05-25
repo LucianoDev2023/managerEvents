@@ -150,7 +150,7 @@ export default function AddEventScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={[styles.heading, { color: colors.text }]}>
-          Criar novo evento
+          Criar seus evento
         </Text>
 
         <TextInput
@@ -316,7 +316,6 @@ export default function AddEventScreen() {
           <Button
             title="Criar evento"
             onPress={handleSubmit}
-            loading={isSubmitting}
             style={styles.submitButton}
           />
         </View>
