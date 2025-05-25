@@ -66,16 +66,21 @@ export default function CalendarScreen() {
 
     for (let day = 1; day <= totalDays; day++) {
       const date = normalizeDate(new Date(year, month, day));
+
       const hasEvent = state.events.some((event) => {
         if (!event.createdBy) return false;
+
         const start = normalizeDate(event.startDate);
         const end = normalizeDate(event.endDate);
-        return (
-          event.createdBy.toLowerCase() === userEmail &&
-          date >= start &&
-          date <= end
+
+        const isCreator = event.createdBy.toLowerCase() === userEmail;
+        const isSubAdmin = event.subAdmins?.some(
+          (admin) => admin.email.toLowerCase() === userEmail
         );
+
+        return (isCreator || isSubAdmin) && date >= start && date <= end;
       });
+
       days.push({ day, hasEvent });
     }
 
@@ -85,12 +90,19 @@ export default function CalendarScreen() {
   const eventsThisMonth = useMemo(() => {
     const year = selectedMonth.getFullYear();
     const month = selectedMonth.getMonth();
+
     return state.events.filter((event) => {
       if (!event.createdBy) return false;
-      const createdBy = event.createdBy.toLowerCase();
-      if (createdBy !== userEmail) return false;
+
       const start = event.startDate;
       const end = event.endDate;
+
+      const isCreator = event.createdBy.toLowerCase() === userEmail;
+      const isSubAdmin = event.subAdmins?.some(
+        (admin) => admin.email.toLowerCase() === userEmail
+      );
+
+      if (!isCreator && !isSubAdmin) return false;
 
       const isInMonth =
         (start.getMonth() === month && start.getFullYear() === year) ||

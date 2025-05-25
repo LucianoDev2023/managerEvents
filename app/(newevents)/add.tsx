@@ -80,6 +80,9 @@ export default function AddEventScreen() {
     } else if (formValues.accessCode.length < 3) {
       newErrors.accessCode = 'Código deve ter pelo menos 3 caracteres.';
     }
+    if (!formValues.coverImage) {
+      newErrors.coverImage = 'Imagem do evento é obrigatória.';
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -304,6 +307,11 @@ export default function AddEventScreen() {
               marginBottom: 8,
             }}
           />
+        )}
+        {errors.coverImage && (
+          <Text style={[styles.errorText, { color: colors.error }]}>
+            {errors.coverImage}
+          </Text>
         )}
 
         <View style={styles.buttonsContainer}>

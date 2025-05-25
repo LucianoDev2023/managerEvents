@@ -305,7 +305,7 @@ export default function EventDetailScreen() {
         </View>
       </Modal>
 
-      {showDatePicker && (
+      {Platform.OS === 'ios' && showDatePicker && (
         <Modal visible={showDatePicker} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.datepicker}>
@@ -313,35 +313,45 @@ export default function EventDetailScreen() {
               <DateTimePicker
                 value={selectedDate}
                 mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                display="spinner"
                 minimumDate={event.startDate}
                 maximumDate={event.endDate}
                 onChange={handleDateChange}
                 locale="pt-BR"
               />
-              {Platform.OS === 'ios' && (
-                <View style={styles.iosButtonsContainer}>
-                  <Button
-                    title="Cancelar"
-                    onPress={() => {
-                      setShowDatePicker(false);
-                      setSelectedDate(event.startDate);
-                    }}
-                    style={styles.iosButton}
-                  />
-                  <Button
-                    title="Confirmar"
-                    onPress={() => {
-                      setShowDatePicker(false);
-                      confirmAddProgram(selectedDate);
-                    }}
-                    style={styles.iosButton}
-                  />
-                </View>
-              )}
+              <View style={styles.iosButtonsContainer}>
+                <Button
+                  title="Cancelar"
+                  onPress={() => {
+                    setShowDatePicker(false);
+                    setSelectedDate(event.startDate);
+                  }}
+                  style={styles.iosButton}
+                />
+                <Button
+                  title="Confirmar"
+                  onPress={() => {
+                    setShowDatePicker(false);
+                    confirmAddProgram(selectedDate);
+                  }}
+                  style={styles.iosButton}
+                />
+              </View>
             </View>
           </View>
         </Modal>
+      )}
+
+      {Platform.OS === 'android' && showDatePicker && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display="default"
+          minimumDate={event.startDate}
+          maximumDate={event.endDate}
+          onChange={handleDateChange}
+          locale="pt-BR"
+        />
       )}
     </View>
   );
