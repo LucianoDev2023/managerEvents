@@ -22,7 +22,9 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Permissão para acessar a câmera é necessária para ler QR codes"
+          "cameraPermission": "Permissão para acessar a câmera é necessária",
+          "microphonePermission": "Permissão para acessar o microfone é necessária",
+          "recordAudioAndroid": true
         }
       ]
     ],
