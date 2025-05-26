@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
   },
-  dateText: { marginLeft: 8, fontFamily: 'Inter-Regular', fontSize: 14 },
+  dateText: { marginLeft: 8, fontFamily: 'Inter-Regular', fontSize: 13 },
   errorText: { fontFamily: 'Inter-Regular', fontSize: 12, marginTop: 4 },
   buttonsContainer: {
     flexDirection: 'row',
