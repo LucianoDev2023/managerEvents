@@ -186,7 +186,6 @@ export default function AddEventScreen() {
           value={formValues.location}
           onChangeText={() => {}} // <- necessário mesmo se não for editável
           editable={false}
-          icon={<MapPin size={20} color={colors.textSecondary} />}
           error={errors.location}
         />
 
@@ -197,8 +196,8 @@ export default function AddEventScreen() {
               : 'Selecionar Localização no Mapa'
           }
           onPress={() => router.push('/selectLocationScreen')}
-          icon={<Map size={16} color={colors.primary} />}
-          style={{ marginTop: 8, marginBottom: 12 }}
+          icon={<MapPin size={20} color={colors.text} />}
+          style={{ marginTop: 4, marginBottom: 12 }}
         />
 
         <View style={styles.dateSection}>
@@ -343,7 +342,7 @@ export default function AddEventScreen() {
           style={{
             flexDirection: 'row',
             justifyContent: 'space-between',
-            marginTop: 24,
+            marginTop: 20,
           }}
         >
           <Button

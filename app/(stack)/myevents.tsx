@@ -21,7 +21,9 @@ import Colors from '@/constants/Colors';
 import Button from '@/components/ui/Button';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronRight, KeyRoundIcon, MapPin } from 'lucide-react-native';
+import { Linking } from 'react-native';
+import RoleBadge from '@/components/ui/RoleBadge';
 
 export default function MyEventsScreen() {
   const { state, updateEvent } = useEvents();
@@ -106,6 +108,13 @@ export default function MyEventsScreen() {
     colorScheme === 'dark'
       ? ['#0b0b0f', '#1b0033', '#3e1d73']
       : ['#ffffff', '#f0f0ff', '#e9e6ff'];
+
+  const handleOpenInMaps = (location: string) => {
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+      location
+    )}`;
+    Linking.openURL(mapsUrl);
+  };
 
   return (
     <LinearGradient
@@ -193,61 +202,79 @@ export default function MyEventsScreen() {
                         {formatDate(item.startDate)} -{' '}
                         {formatDate(item.endDate)}
                       </Text>
+                      <Text
+                        style={[
+                          styles.location,
+                          { color: colors.text, flex: 1 },
+                        ]}
+                      >
+                        {item.location}
+                      </Text>
+
+                      <TouchableOpacity
+                        onPress={() => handleOpenInMaps(item.location)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          paddingVertical: 4,
+                          paddingHorizontal: 8,
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: colors.primary,
+                        }}
+                      >
+                        <MapPin size={14} color={colors.primary} />
+                        <Text style={{ color: colors.primary, marginLeft: 4 }}>
+                          Ver no mapa
+                        </Text>
+                      </TouchableOpacity>
+                      {(isCreator || isAdm) && (
+                        <View>
+                          <Button
+                            title="Adicionar permissão"
+                            size="small"
+                            onPress={() => handleOpenPermissionModal(item.id)}
+                            icon={<KeyRoundIcon size={14} color="white" />} // ✅ aqui está o ícone
+                            style={[
+                              styles.permissionButton,
+                              { backgroundColor: colors.primary },
+                            ]}
+                            textStyle={styles.permissionButtonText}
+                          />
+                        </View>
+                      )}
                     </View>
 
                     <ChevronRight size={20} color={colors.primary} />
                   </View>
                   {(() => {
-                    if (isCreator) {
-                      return (
-                        <View style={styles.badgeContainer}>
-                          <Text style={styles.badgeText}>Criador</Text>
-                        </View>
-                      );
-                    }
+                    if (isCreator) return <RoleBadge role="Criador" />;
 
                     const subAdmin = item.subAdmins?.find(
                       (admin) => admin.email.toLowerCase() === userEmail
                     );
 
                     if (subAdmin) {
-                      const label =
-                        subAdmin.level === 'Adm'
-                          ? 'Administrador'
-                          : 'Adm parcial';
-
                       return (
-                        <View style={styles.badgeContainer}>
-                          <Text style={styles.badgeText}>{label}</Text>
-                        </View>
+                        <RoleBadge
+                          role={
+                            subAdmin.level === 'Adm' ? 'Admin' : 'Adm parcial'
+                          }
+                        />
                       );
                     }
-
-                    return null;
                   })()}
-
-                  {(isCreator || isAdm) && (
-                    <View style={{ marginTop: 12, alignItems: 'flex-end' }}>
-                      <Button
-                        title="Adicionar permissão"
-                        size="small"
-                        onPress={() => handleOpenPermissionModal(item.id)}
-                        style={[
-                          styles.permissionButton,
-                          { backgroundColor: colors.primary },
-                        ]}
-                        textStyle={styles.permissionButtonText}
-                      />
-                    </View>
-                  )}
                 </View>
               </TouchableOpacity>
             );
           }}
           ListEmptyComponent={
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Nenhum evento disponível.
-            </Text>
+            <View>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                Nenhum evento disponível.
+              </Text>
+            </View>
           }
         />
 
@@ -328,13 +355,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#b18aff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   cardTitle: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
   cardDate: { fontSize: 14, fontWeight: '500', marginRight: 10 },
   permissionButton: {
-    borderRadius: 100,
+    marginTop: 10,
+    borderRadius: 10,
     paddingHorizontal: 20,
     paddingVertical: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   permissionButtonText: { color: 'white', fontWeight: '600', fontSize: 14 },
   emptyText: { marginTop: 20, textAlign: 'center' },
@@ -367,14 +402,18 @@ const styles = StyleSheet.create({
   badgeContainer: {
     alignSelf: 'flex-start',
     marginTop: 4,
-    backgroundColor: '#5E780F',
+    backgroundColor: '#4C610C',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 20,
   },
   badgeText: {
-    color: '#fff',
+    color: '#AEDE1C',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  location: {
+    fontSize: 12,
+    paddingVertical: 5,
   },
 });

@@ -179,7 +179,6 @@ export default function EditEventScreen() {
           value={formValues.location}
           onChangeText={(text) => updateFormValue('location', text)}
           error={errors.location}
-          icon={<MapPin size={20} color={colors.textSecondary} />}
         />
         <Button
           title="Selecionar no mapa"
@@ -189,7 +188,8 @@ export default function EditEventScreen() {
               params: { id }, // <- envia o id do evento
             })
           }
-          style={{ marginTop: 8, marginBottom: 12 }}
+          icon={<MapPin size={20} color={colors.text} />}
+          style={{ marginTop: 4, marginBottom: 12 }}
         />
 
         <View style={styles.dateSection}>
@@ -282,7 +282,6 @@ export default function EditEventScreen() {
         />
 
         <Button
-          variant="outline"
           title={
             formValues.coverImage
               ? 'Alterar imagem do evento'
