@@ -156,6 +156,9 @@ export default function ProfileScreen() {
           <Text style={[styles.profileName, { color: textColor }]}>
             {displayName}
           </Text>
+          <Text style={[styles.profileEmail, { color: textColor }]}>
+            {userEmail}
+          </Text>
         </View>
 
         <View style={styles.statsGrid}>
@@ -186,11 +189,11 @@ export default function ProfileScreen() {
         </View>
 
         <Text style={[styles.sectionTitle, { color: textColor }]}>
-          Preferências
+          Controle
         </Text>
         <View style={styles.card}>
           <Button
-            title="Meus eventos ou compartilhados"
+            title="Meus eventos"
             icon={<Settings size={24} color={textColor} />}
             onPress={() => router.push('/(stack)/myevents')}
             variant="ghost"
@@ -298,7 +301,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     gap: 8,
-    marginBottom: 24,
+    marginBottom: 10,
   },
   statCard: {
     width: '48%',

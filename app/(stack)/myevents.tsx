@@ -278,65 +278,148 @@ export default function MyEventsScreen() {
           }
         />
 
-        <Modal visible={modalVisible} transparent animationType="slide">
+        <Modal visible={modalVisible} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View
               style={[
                 styles.modalContent,
-                { backgroundColor: colors.background },
+                {
+                  backgroundColor: colors.background,
+                  borderRadius: 20,
+                  padding: 24,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 8,
+                  elevation: 8,
+                  width: '90%',
+                },
               ]}
             >
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                Nova Permissão
+              <Text
+                style={[
+                  {
+                    marginBottom: 6,
+                    color: colors.textSecondary,
+                    fontSize: 15,
+                  },
+                ]}
+              >
+                🔐 Permissões:
               </Text>
+              <View style={{ marginBottom: 12 }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: colors.textSecondary,
+                    lineHeight: 18,
+                  }}
+                >
+                  <Text style={{ fontWeight: '600' }}>Adm/Total:</Text>
+                  <Text>
+                    {' '}
+                    usuário poderá adicionar novos dias, atividades ou fotos
+                    além de gerenciar o evento, mas{' '}
+                  </Text>
+                  <Text style={{ fontWeight: '600' }}>não pode deletar</Text>
+                  <Text>o evento principal, apenas programas e dias.</Text>
+                </Text>
+
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: colors.textSecondary,
+                    lineHeight: 18,
+                    marginTop: 6,
+                  }}
+                >
+                  <Text style={{ fontWeight: '600' }}>Parcial:</Text>
+                  <Text>
+                    {' '}
+                    O usuário poderá adicionar novos dias, atividades ou fotos,{' '}
+                  </Text>
+                  <Text style={{ fontWeight: '600' }}>
+                    mas, permissão limita para deletar apenas programas ou
+                    eventos que seja o criador.
+                  </Text>
+                </Text>
+              </View>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                👥 Adiconar Permissão
+              </Text>
+
               <TextInput
                 placeholder="Email do usuário"
                 value={permissionEmail}
                 onChangeText={setPermissionEmail}
                 style={[
                   styles.input,
-                  { borderColor: colors.border, color: colors.text },
+                  {
+                    borderColor: colors.border,
+                    color: colors.text,
+                    backgroundColor: colors.backGroundSecondary,
+                    borderRadius: 12,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    marginBottom: 16,
+                    fontSize: 15,
+                  },
                 ]}
                 placeholderTextColor={colors.textSecondary}
               />
+
+              <Text style={[{ marginBottom: 8, color: colors.textSecondary }]}>
+                Tipo de permissão
+              </Text>
+
               <View style={styles.toggleContainer}>
-                {['Adm', 'Parcial'].map((level) => (
-                  <Pressable
-                    key={level}
-                    onPress={() =>
-                      setPermissionLevel(level as 'Adm' | 'Parcial')
-                    }
-                    style={[
-                      styles.toggleButton,
-                      permissionLevel === level && {
-                        backgroundColor: colors.primary,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={{
-                        color: permissionLevel === level ? '#fff' : colors.text,
-                      }}
+                {['Total', 'Parcial'].map((level) => {
+                  const isSelected = permissionLevel === level;
+                  return (
+                    <Pressable
+                      key={level}
+                      onPress={() =>
+                        setPermissionLevel(level as 'Adm' | 'Parcial')
+                      }
+                      style={[
+                        styles.toggleButton,
+                        {
+                          backgroundColor: isSelected
+                            ? '#3C780B'
+                            : colors.backGroundSecondary,
+                          borderColor: isSelected ? '#5BFF00' : colors.border,
+                        },
+                      ]}
                     >
-                      {level.charAt(0).toUpperCase() + level.slice(1)}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <Text
+                        style={{
+                          color: isSelected ? '#fff' : colors.text,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {level}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
-              <Button
-                title="Salvar"
-                size="small"
-                onPress={handleSavePermission}
-                style={{ backgroundColor: colors.primary }}
-                textStyle={{ color: 'white' }}
-              />
-              <Button
-                title="Cancelar"
-                size="small"
-                onPress={() => setModalVisible(false)}
-                style={{ backgroundColor: '#d9534f' }}
-                textStyle={{ color: 'white' }}
-              />
+
+              <View style={styles.buttonRow}>
+                <Button
+                  title="Cancelar"
+                  size="small"
+                  onPress={() => setModalVisible(false)}
+                  style={{ backgroundColor: '#d9534f', flex: 1 }}
+                  textStyle={{ color: 'white' }}
+                />
+                <Button
+                  title="Salvar"
+                  size="small"
+                  onPress={handleSavePermission}
+                  style={{ backgroundColor: colors.primary, flex: 1 }}
+                  textStyle={{ color: 'white' }}
+                />
+              </View>
             </View>
           </View>
         </Modal>
@@ -384,6 +467,12 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 12,
     gap: 15,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    gap: 12,
   },
   modalTitle: { fontSize: 18, fontWeight: 'bold' },
   input: { borderWidth: 1, borderRadius: 8, padding: 10, marginBottom: 12 },
