@@ -59,7 +59,12 @@ export default function HomeScreen() {
         <View style={styles.buttons}>
           <TouchableOpacity
             style={styles.button}
-            onPress={() => router.push('/(newevents)/add')}
+            onPress={() =>
+              router.push({
+                pathname: '/(newevents)/event-form',
+                params: { mode: 'create' },
+              })
+            }
             activeOpacity={0.85}
           >
             <Text style={styles.buttonText}>Criar um evento novo</Text>
@@ -110,7 +115,7 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     marginBottom: 32,
-    borderRadius: 150,
+    borderRadius: 250,
   },
   title: {
     fontSize: 20,

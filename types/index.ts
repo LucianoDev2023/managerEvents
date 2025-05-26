@@ -54,3 +54,11 @@ export type FormValues = {
   userId: string;
   createdBy: string;
 };
+
+type LocationScreenParams = {
+  redirectTo: string;
+  id?: string;
+  lat?: string;
+  lng?: string;
+  locationName?: string;
+};

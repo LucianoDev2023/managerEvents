@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "bolt-expo-nativewind",
-    "slug": "bolt-expo-nativewind",
+    "name": "Meus eventos",
+    "slug": "gerenciador-de-eventos",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -14,8 +14,6 @@
     "android": {
       "permissions": [
         "CAMERA",
-        "RECORD_AUDIO",
-        "MICROPHONE",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ]

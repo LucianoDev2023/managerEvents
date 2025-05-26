@@ -1,4 +1,3 @@
-// app/select-location.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -8,57 +7,111 @@ import {
   Text,
   Platform,
   StatusBar as RNStatusBar,
+  Image,
 } from 'react-native';
 import MapView, { Marker, MapPressEvent } from 'react-native-maps';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
-import Constants from 'expo-constants'; // Apenas para Expo Managed Workflow
-import Colors from '@/constants/Colors'; // Assumindo que você tem Colors definido
+import Constants from 'expo-constants';
+import * as Location from 'expo-location';
+import Colors from '@/constants/Colors';
+import { LocateFixed } from 'lucide-react-native';
 import 'react-native-get-random-values';
 
-// Obtenha sua chave de API do Google Places do Constants.expoConfig
 const GOOGLE_PLACES_API_KEY = 'AIzaSyD_UKirzoq-kOOBaxo63sct1QbH-46zvTs';
 
 export default function SelectLocationScreen() {
   const router = useRouter();
-  const mapRef = useRef<MapView>(null); // Ref para controlar o MapView
-  const colorScheme = 'light'; // Ou use useColorScheme() ?? 'dark'; se relevante
+  const mapRef = useRef<MapView>(null);
+  const colorScheme = 'light';
   const colors = Colors[colorScheme];
-  const { id } = useLocalSearchParams();
+  const {
+    id,
+    mode = 'create',
+    lat,
+    lng,
+    locationName,
+  } = useLocalSearchParams<{
+    id?: string;
+    mode?: 'create' | 'edit';
+    lat?: string;
+    lng?: string;
+    locationName?: string;
+  }>();
 
-  // Estado para a localização selecionada, pode ser por toque no mapa ou pelo autocomplete
   const [selected, setSelected] = useState<{
     latitude: number;
     longitude: number;
-    name?: string; // Nome opcional do local, útil para exibir
+    name?: string;
   } | null>(null);
 
-  // Estado para a região inicial do mapa (pode ser a localização atual do usuário ou uma padrão)
   const [mapRegion, setMapRegion] = useState({
-    latitude: -23.55052, // São Paulo, Brasil (Latitude padrão)
-    longitude: -46.633308, // São Paulo, Brasil (Longitude padrão)
+    latitude: -15.793889, // Brasília
+    longitude: -47.882778,
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
 
-  // useEffect para verificar a chave da API
   useEffect(() => {
-    if (!GOOGLE_PLACES_API_KEY) {
-      Alert.alert(
-        'Erro de Configuração',
-        'A chave de API do Google Places não está configurada no app.json ou nos arquivos nativos. Verifique a documentação.'
-      );
-    }
+    const setupLocation = async () => {
+      console.log('enviou do mode do botao', mode);
+      if (mode === 'edit' && lat && lng) {
+        const latitude = parseFloat(lat);
+        const longitude = parseFloat(lng);
+        setSelected({
+          latitude,
+          longitude,
+          name: locationName ?? 'Local do evento',
+        });
+        setMapRegion({
+          latitude,
+          longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+        mapRef.current?.animateToRegion({
+          latitude,
+          longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+      } else {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({});
+          const { latitude, longitude } = location.coords;
+          const reverse = await Location.reverseGeocodeAsync({
+            latitude,
+            longitude,
+          });
+          const name = reverse?.[0]?.name || 'Minha localização atual';
+
+          setSelected({ latitude, longitude, name });
+          setMapRegion({
+            latitude,
+            longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          });
+          mapRef.current?.animateToRegion({
+            latitude,
+            longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          });
+        }
+      }
+    };
+
+    setupLocation();
   }, []);
 
-  // Lidar com o toque no mapa
   const handleMapPress = (e: MapPressEvent) => {
     setSelected({
       latitude: e.nativeEvent.coordinate.latitude,
       longitude: e.nativeEvent.coordinate.longitude,
-      name: 'Local no Mapa', // Nome genérico para um toque manual
+      name: 'Local no Mapa',
     });
-    // Opcional: Animar o mapa para o ponto selecionado
     mapRef.current?.animateToRegion(
       {
         ...e.nativeEvent.coordinate,
@@ -69,21 +122,15 @@ export default function SelectLocationScreen() {
     );
   };
 
-  // Lidar com a seleção de um local no autocomplete
   const handlePlaceSelect = (data: any, details: any | null = null) => {
     if (details) {
       const { lat, lng } = details.geometry.location;
-      setSelected({
-        latitude: lat,
-        longitude: lng,
-        name: data.description, // Nome completo do local
-      });
-      // Animar o mapa para a localização selecionada
+      setSelected({ latitude: lat, longitude: lng, name: data.description });
       mapRef.current?.animateToRegion(
         {
           latitude: lat,
           longitude: lng,
-          latitudeDelta: 0.005, // Zoom maior para o local específico
+          latitudeDelta: 0.005,
           longitudeDelta: 0.005,
         },
         500
@@ -91,22 +138,45 @@ export default function SelectLocationScreen() {
     }
   };
 
-  // Lidar com a confirmação da localização
   const handleConfirmLocation = () => {
     if (!selected) {
       Alert.alert('Selecione um ponto no mapa ou pesquise um local.');
       return;
     }
-    // Volta para a tela anterior e define os parâmetros
-    router.back();
-    router.push({
-      pathname: '/(stack)/events/[id]/edit_event', // ou o caminho correto da tela
+    router.replace({
+      pathname: '/(newevents)/event-form',
       params: {
-        id: id?.toString(),
+        redirectTo: '(newevents)/event-form',
+        id,
+        mode,
         lat: selected.latitude.toString(),
         lng: selected.longitude.toString(),
         locationName: selected.name ?? '',
       },
+    });
+  };
+
+  const handleGoToUserLocation = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permissão negada',
+        'Ative a localização para usar essa funcionalidade.'
+      );
+      return;
+    }
+    const location = await Location.getCurrentPositionAsync({});
+    const { latitude, longitude } = location.coords;
+    const reverse = await Location.reverseGeocodeAsync({ latitude, longitude });
+    const name = reverse?.[0]?.name || 'Minha localização';
+
+    setSelected({ latitude, longitude, name });
+
+    mapRef.current?.animateToRegion({
+      latitude,
+      longitude,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
     });
   };
 
@@ -131,15 +201,15 @@ export default function SelectLocationScreen() {
         query={{
           key: GOOGLE_PLACES_API_KEY,
           language: 'pt-BR',
-          components: 'country:br', // Opcional: restringir a um país
+          components: 'country:br',
         }}
-        fetchDetails={true} // Importante para obter latitude e longitude
+        fetchDetails
         styles={{
           container: {
             position: 'absolute',
-            width: '90%', // Ajuste para ficar dentro do padding
-            zIndex: 1, // Garante que o autocomplete fique sobre o mapa
-            alignSelf: 'center', // Centraliza o container
+            width: '90%',
+            zIndex: 1,
+            alignSelf: 'center',
             marginTop:
               Platform.OS === 'android'
                 ? (RNStatusBar.currentHeight ?? 0) + 10
@@ -147,7 +217,7 @@ export default function SelectLocationScreen() {
           },
           textInputContainer: {
             width: '100%',
-            backgroundColor: colors.background, // Fundo do campo de texto
+            backgroundColor: colors.background,
             padding: 10,
             borderRadius: 20,
             marginTop: 10,
@@ -158,15 +228,14 @@ export default function SelectLocationScreen() {
             shadowOpacity: 0.1,
             shadowRadius: 2,
             elevation: 3,
-            paddingVertical: 0, // Remover padding extra
+            paddingVertical: 0,
           },
           textInput: {
             height: 50,
             color: colors.text,
-
             fontSize: 16,
             paddingHorizontal: 15,
-            backgroundColor: colors.background, // Fundo do texto input
+            backgroundColor: colors.background,
           },
           listView: {
             backgroundColor: colors.background,
@@ -183,7 +252,7 @@ export default function SelectLocationScreen() {
             fontWeight: 'bold',
           },
           predefinedPlacesDescription: {
-            color: colors.primary, // Cor para locais predefinidos
+            color: colors.primary,
           },
           row: {
             padding: 13,
@@ -195,16 +264,16 @@ export default function SelectLocationScreen() {
             backgroundColor: colors.border,
           },
         }}
-        debounce={300} // Atraso para evitar muitas requisições
-        enablePoweredByContainer={false} // Opcional: remove o "Powered by Google"
+        debounce={300}
+        enablePoweredByContainer={false}
       />
 
       <MapView
-        ref={mapRef} // Atribui a ref ao MapView
+        ref={mapRef}
         style={styles.map}
         onPress={handleMapPress}
         initialRegion={mapRegion}
-        showsUserLocation={true} // Mostra a localização do usuário no mapa
+        showsUserLocation={true}
       >
         {selected && (
           <Marker
@@ -214,6 +283,14 @@ export default function SelectLocationScreen() {
         )}
       </MapView>
 
+      {selected && (
+        <View style={styles.selectionInfo}>
+          <Text style={styles.selectionText}>
+            📍 Local selecionado: {selected.name}
+          </Text>
+        </View>
+      )}
+
       <TouchableOpacity
         style={[styles.button, { backgroundColor: colors.primary }]}
         onPress={handleConfirmLocation}
@@ -222,14 +299,19 @@ export default function SelectLocationScreen() {
           Confirmar Localização
         </Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.floatingButton}
+        onPress={handleGoToUserLocation}
+      >
+        <LocateFixed size={20} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -248,21 +330,60 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
-  map: {
-    flex: 1,
-  },
+  map: { flex: 1 },
   button: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 100,
     left: 20,
     right: 20,
     padding: 16,
     borderRadius: 25,
     alignItems: 'center',
     marginHorizontal: 25,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 40,
+    right: 20,
+    width: 50,
+    height: 50,
+    backgroundColor: '#6e56cf',
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   buttonText: {
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  selectionInfo: {
+    position: 'absolute',
+    top:
+      Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 0) + 80 : 100,
+    alignSelf: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  selectionText: {
+    color: '#333',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

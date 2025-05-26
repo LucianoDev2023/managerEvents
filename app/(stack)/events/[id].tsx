@@ -108,8 +108,11 @@ export default function EventDetailScreen() {
 
   const handleEditEvent = () => {
     router.push({
-      pathname: '/(stack)/events/[id]/edit_event',
-      params: { id: event.id },
+      pathname: '/(newevents)/event-form',
+      params: {
+        mode: 'edit',
+        id: event.id,
+      },
     });
   };
 
