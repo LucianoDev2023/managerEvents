@@ -33,7 +33,8 @@
           "microphonePermission": "Permissão para acessar o microfone é necessária",
           "recordAudioAndroid": true
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
