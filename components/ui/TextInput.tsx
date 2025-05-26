@@ -115,7 +115,11 @@ export default function TextInput({
           placeholder={placeholder}
           placeholderTextColor={colors.textSecondary}
           value={value}
-          onChangeText={onChangeText}
+          onChangeText={(text) => {
+            if (editable) {
+              onChangeText(text);
+            }
+          }}
           secureTextEntry={secureTextEntry && !showPassword}
           multiline={multiline}
           numberOfLines={multiline ? numberOfLines : undefined}

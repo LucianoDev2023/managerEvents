@@ -174,6 +174,7 @@ export default function EditEventScreen() {
         <TextInput
           key={formValues.location}
           label="Local"
+          editable={false}
           placeholder="Digite o local"
           value={formValues.location}
           onChangeText={(text) => updateFormValue('location', text)}
