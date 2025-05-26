@@ -1,0 +1,8 @@
+POST https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyD_UKirzoq-kOOBaxo63sct1QbH-46zvTs
+Content-Type: application/json
+
+{
+  "email": "teste@example.com",
+  "password": "senha123",
+  "returnSecureToken": true
+}

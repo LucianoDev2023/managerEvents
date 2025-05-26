@@ -11,6 +11,15 @@
     "ios": {
       "supportsTablet": true
     },
+    "android": {
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MICROPHONE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
     "web": {
       "bundler": "metro",
       "output": "single",

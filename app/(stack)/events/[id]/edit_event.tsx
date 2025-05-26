@@ -20,12 +20,37 @@ import { Event, FormValues } from '@/types';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinary } from '@/lib/uploadImageToCloudinary';
 import LoadingOverlay from '@/components/LoadingOverlay';
+import { useEffect } from 'react';
+import { getAuth } from 'firebase/auth';
 
 export default function EditEventScreen() {
+  const user = getAuth().currentUser;
+  if (!user) throw new Error('Usuário não autenticado');
+  const userEmail = user.email?.toLowerCase() ?? '';
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { state, updateEvent } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { lat, lng, locationName } = useLocalSearchParams();
+
+  useEffect(() => {
+    if (lat && lng) {
+      const latitude = parseFloat(lat as string);
+      const longitude = parseFloat(lng as string);
+      updateFormValue(
+        'location',
+        (locationName as string) ?? `Lat: ${latitude}, Lng: ${longitude}`
+      );
+      console.log('Atualizando location para:', locationName);
+
+      // Limpa os parâmetros após aplicar
+      router.setParams({
+        lat: undefined,
+        lng: undefined,
+        locationName: undefined,
+      });
+    }
+  }, [lat, lng, locationName]);
 
   const existingEvent = state.events.find((e) => e.id === id);
 
@@ -39,6 +64,8 @@ export default function EditEventScreen() {
           description: event.description,
           accessCode: event.accessCode ?? '',
           coverImage: event.coverImage ?? '',
+          userId: user.uid,
+          createdBy: event.createdBy ?? userEmail,
         }
       : {
           title: '',
@@ -48,6 +75,8 @@ export default function EditEventScreen() {
           description: '',
           accessCode: '',
           coverImage: '',
+          userId: '',
+          createdBy: userEmail,
         };
   };
 
@@ -143,12 +172,23 @@ export default function EditEventScreen() {
         />
 
         <TextInput
+          key={formValues.location}
           label="Local"
           placeholder="Digite o local"
           value={formValues.location}
           onChangeText={(text) => updateFormValue('location', text)}
           error={errors.location}
           icon={<MapPin size={20} color={colors.textSecondary} />}
+        />
+        <Button
+          title="Selecionar no mapa"
+          onPress={() =>
+            router.push({
+              pathname: '/selectLocationScreen',
+              params: { id }, // <- envia o id do evento
+            })
+          }
+          style={{ marginTop: 8, marginBottom: 12 }}
         />
 
         <View style={styles.dateSection}>

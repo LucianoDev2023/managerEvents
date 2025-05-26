@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,19 @@ import {
   Image,
   StatusBar as RNStatusBar,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import TextInput from '@/components/ui/TextInput';
 import Button from '@/components/ui/Button';
-import { Calendar, MapPin, CalendarRange, Info } from 'lucide-react-native';
+import {
+  Calendar,
+  MapPin,
+  CalendarRange,
+  Info,
+  Map,
+} from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { FormValues } from '@/types';
 import LoadingOverlay from '@/components/LoadingOverlay';
@@ -49,6 +55,25 @@ export default function AddEventScreen() {
     createdBy: userEmail,
   });
 
+  const [selectedLocation, setSelectedLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+
+  const { lat, lng, locationName } = useLocalSearchParams();
+  useEffect(() => {
+    if (lat && lng) {
+      const latitude = parseFloat(lat as string);
+      const longitude = parseFloat(lng as string);
+      setSelectedLocation({ latitude, longitude });
+      setFormValues((prev) => ({
+        ...prev,
+        location:
+          (locationName as string) ?? `Lat: ${latitude}, Lng: ${longitude}`,
+      }));
+    }
+  }, [lat, lng]);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
@@ -64,32 +89,25 @@ export default function AddEventScreen() {
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-    if (!formValues.title.trim()) {
-      newErrors.title = 'Título obrigatório.';
-    } else if (formValues.title.length < 3) {
+    if (!formValues.title.trim()) newErrors.title = 'Título obrigatório.';
+    else if (formValues.title.length < 3)
       newErrors.title = 'O título deve ter pelo menos 3 caracteres.';
-    }
-    if (!formValues.location.trim()) {
+    if (!formValues.location.trim())
       newErrors.location = 'Localização obrigatória.';
-    }
-    if (formValues.endDate < formValues.startDate) {
+    if (formValues.endDate < formValues.startDate)
       newErrors.endDate = 'Data de fim não pode ser anterior à de início.';
-    }
-    if (!formValues.accessCode.trim()) {
+    if (!formValues.accessCode.trim())
       newErrors.accessCode = 'Código de acesso obrigatório.';
-    } else if (formValues.accessCode.length < 3) {
+    else if (formValues.accessCode.length < 3)
       newErrors.accessCode = 'Código deve ter pelo menos 3 caracteres.';
-    }
-    if (!formValues.coverImage) {
+    if (!formValues.coverImage)
       newErrors.coverImage = 'Imagem do evento é obrigatória.';
-    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
-
     setIsSubmitting(true);
     try {
       const newEventId = await addEvent({ ...formValues });
@@ -143,13 +161,11 @@ export default function AddEventScreen() {
 
       <ScrollView
         style={styles.container}
-        contentContainerStyle={[
-          styles.contentContainer,
-          {
-            paddingTop:
-              Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
-          },
-        ]}
+        contentContainerStyle={{
+          padding: 24,
+          paddingTop:
+            Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
+        }}
         keyboardShouldPersistTaps="handled"
       >
         <Text style={[styles.heading, { color: colors.text }]}>
@@ -166,18 +182,29 @@ export default function AddEventScreen() {
 
         <TextInput
           label="Localização"
-          placeholder="Insira a localização do evento"
+          placeholder="Selecione no mapa..."
           value={formValues.location}
-          onChangeText={(text) => updateFormValue('location', text)}
-          error={errors.location}
+          onChangeText={() => {}} // <- necessário mesmo se não for editável
+          editable={false}
           icon={<MapPin size={20} color={colors.textSecondary} />}
+          error={errors.location}
+        />
+
+        <Button
+          title={
+            selectedLocation
+              ? 'Alterar Localização no Mapa'
+              : 'Selecionar Localização no Mapa'
+          }
+          onPress={() => router.push('/selectLocationScreen')}
+          icon={<Map size={16} color={colors.primary} />}
+          style={{ marginTop: 8, marginBottom: 12 }}
         />
 
         <View style={styles.dateSection}>
           <Text style={[styles.dateLabel, { color: colors.text }]}>
-            Período do evento
+            Datas do Evento
           </Text>
-
           <View style={styles.datePickersContainer}>
             <View style={styles.datePickerWrapper}>
               <Text
@@ -186,10 +213,10 @@ export default function AddEventScreen() {
                   { color: colors.textSecondary },
                 ]}
               >
-                Data de início
+                Início
               </Text>
               <View style={[styles.dateButton, { borderColor: colors.border }]}>
-                <Calendar size={14} color={colors.primary} />
+                <Calendar size={18} color={colors.primary} />
                 <Text
                   style={[styles.dateText, { color: colors.text }]}
                   onPress={() => setShowStartDatePicker(true)}
@@ -198,7 +225,6 @@ export default function AddEventScreen() {
                 </Text>
               </View>
             </View>
-
             <View style={styles.datePickerWrapper}>
               <Text
                 style={[
@@ -206,10 +232,10 @@ export default function AddEventScreen() {
                   { color: colors.textSecondary },
                 ]}
               >
-                Data de fim
+                Fim
               </Text>
               <View style={[styles.dateButton, { borderColor: colors.border }]}>
-                <CalendarRange size={14} color={colors.primary} />
+                <CalendarRange size={18} color={colors.primary} />
                 <Text
                   style={[styles.dateText, { color: colors.text }]}
                   onPress={() => setShowEndDatePicker(true)}
@@ -265,7 +291,6 @@ export default function AddEventScreen() {
         />
 
         <Button
-          variant="outline"
           title={
             formValues.coverImage
               ? 'Alterar imagem do Evento'
@@ -309,22 +334,28 @@ export default function AddEventScreen() {
           />
         )}
         {errors.coverImage && (
-          <Text style={[styles.errorText, { color: colors.error }]}>
+          <Text style={{ color: colors.error, fontSize: 12 }}>
             {errors.coverImage}
           </Text>
         )}
 
-        <View style={styles.buttonsContainer}>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginTop: 24,
+          }}
+        >
           <Button
             title="Cancelar"
             onPress={() => router.back()}
             variant="cancel"
-            style={styles.cancelButton}
+            style={{ flex: 0.48 }}
           />
           <Button
             title="Criar evento"
             onPress={handleSubmit}
-            style={styles.submitButton}
+            style={{ flex: 0.48 }}
           />
         </View>
       </ScrollView>
@@ -335,8 +366,12 @@ export default function AddEventScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  contentContainer: { padding: 16, paddingBottom: 40 },
+  container: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingBottom: 40,
+  },
   heading: {
     fontSize: 24,
     fontFamily: 'Inter-Bold',
@@ -344,18 +379,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   dateSection: { marginBottom: 16 },
-  dateLabel: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    marginBottom: 8,
-  },
+  dateLabel: { fontFamily: 'Inter-Medium', fontSize: 16, marginBottom: 8 },
   datePickersContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  datePickerWrapper: {
-    flex: 0.48,
-  },
+  datePickerWrapper: { flex: 0.48 },
   datePickerLabel: {
     fontFamily: 'Inter-Regular',
     fontSize: 14,
@@ -365,25 +394,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    borderRadius: 8,
+    padding: 12,
   },
-  dateText: {
-    marginLeft: 8,
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-  },
-  errorText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  buttonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 24,
-  },
-  cancelButton: { flex: 0.48 },
-  submitButton: { flex: 0.48 },
+  dateText: { marginLeft: 8, fontFamily: 'Inter-Regular', fontSize: 14 },
+  errorText: { fontFamily: 'Inter-Regular', fontSize: 12, marginTop: 4 },
 });
