@@ -8,16 +8,34 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#503581"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização para exibir o mapa corretamente.",
+        "NSLocationAlwaysUsageDescription": "Permita acesso à sua localização mesmo em segundo plano."
+      }
     },
     "android": {
       "permissions": [
         "CAMERA",
+        "RECORD_AUDIO",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
-      ]
+      ],
+      "package": "com.luciano_dev_2025.gerenciadordeeventos",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyD_UKirzoq-kOOBaxo63sct1QbH-46zvTs"
+        }
+      },
+      "backgroundColor": "#3e1d73"
     },
+
     "web": {
       "bundler": "metro",
       "output": "single",
@@ -34,10 +52,19 @@
           "recordAudioAndroid": true
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-location"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "0b93c50d-c72a-4fe0-aefd-d4cafb8f6583"
+      }
     }
   }
 }

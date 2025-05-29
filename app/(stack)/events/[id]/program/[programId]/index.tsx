@@ -158,9 +158,7 @@ export default function ProgramDetailScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
-        <View
-          style={[styles.header, { backgroundColor: colors.backgroundAlt }]}
-        >
+        <View style={[styles.header, { backgroundColor: colors.background }]}>
           <View style={styles.dateContainer}>
             <Calendar size={20} color={colors.primary} />
             <Text style={[styles.dateText, { color: colors.text }]}>

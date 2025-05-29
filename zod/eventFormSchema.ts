@@ -6,7 +6,8 @@ export const eventFormSchema = z
     location: z.string().min(3, 'Localização obrigatória.'),
     startDate: z.date(),
     endDate: z.date(),
-    description: z.string().optional(),
+    description: z.string().min(1, 'Descrição obrigatória'),
+
     accessCode: z
       .string()
       .min(3, 'Código de acesso deve ter pelo menos 3 caracteres.'),

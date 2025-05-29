@@ -26,9 +26,7 @@ import {
   LucideQrCode,
   CalendarDays,
   MapPin,
-  ChevronRight,
 } from 'lucide-react-native';
-import QRCode from 'react-native-qrcode-svg';
 import ViewShot from 'react-native-view-shot';
 import ProgramItem from '@/components/ProgramItem';
 import Button from '@/components/ui/Button';
@@ -41,14 +39,10 @@ export default function EventDetailScreen() {
   const { state, deleteEvent, addProgram } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
-  const textColor = colors.text;
-  const overlayColor = colorScheme === 'dark' ? '#1a1a1a' : '#f2f2f2';
 
   const [isAddingProgram, setIsAddingProgram] = useState(false);
-  const [showQR, setShowQR] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const qrRef = useRef<ViewShot>(null);
 
   const event = state.events.find((e) => e.id === id) as Event | undefined;
 
@@ -90,21 +84,6 @@ export default function EventDetailScreen() {
     eventTitle: event.title,
     accessCode: event.accessCode,
   });
-
-  const handleShareQR = async () => {
-    if (!qrRef.current) return;
-    try {
-      const uri = await qrRef.current.capture?.();
-      if (!uri) return;
-      const fileUri = FileSystem.cacheDirectory + `qrcode_${Date.now()}.png`;
-      await FileSystem.copyAsync({ from: uri, to: fileUri });
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (!isAvailable) return;
-      await Sharing.shareAsync(fileUri);
-    } catch {
-      Alert.alert('Erro', 'Não foi possível compartilhar o QR Code.');
-    }
-  };
 
   const handleEditEvent = () => {
     router.push({
@@ -221,10 +200,17 @@ export default function EventDetailScreen() {
         >
           <View style={styles.overlayBottom}>
             <Text style={styles.coverTitle}>{event.title}</Text>
-            <Text style={styles.overlayText}>
-              {formatDateRange(event.startDate, event.endDate)}
-            </Text>
-            <Text style={styles.overlayText}>{event.location}</Text>
+            <View style={styles.row}>
+              <CalendarDays size={16} color="#fff" />
+              <Text style={styles.meta}>
+                {new Date(event.startDate).toLocaleDateString('pt-BR')} até{' '}
+                {new Date(event.endDate).toLocaleDateString('pt-BR')}
+              </Text>
+            </View>
+            <View style={styles.row}>
+              <MapPin size={16} color="#fff" />
+              <Text style={styles.meta}>{event.location}</Text>
+            </View>
             {event.description && (
               <Text style={styles.overlayDescription}>{event.description}</Text>
             )}
@@ -269,44 +255,7 @@ export default function EventDetailScreen() {
         </View>
       </ScrollView>
 
-      <View
-        style={{
-          borderTopWidth: 1,
-          borderTopColor: '#6e56cf',
-          marginHorizontal: 26,
-        }}
-      >
-        <TouchableOpacity
-          onPress={() => setShowQR(true)}
-          style={styles.actionButton}
-        >
-          <Text style={styles.actionText}>Compartilhar evento</Text>
-          <LucideQrCode size={16} color="white" />
-        </TouchableOpacity>
-      </View>
-
       {isAddingProgram && <LoadingOverlay message="Adicionando dia..." />}
-
-      <Modal visible={showQR} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.qrContainer}>
-            <Text style={styles.qrTitle}>Compartilhe seu evento!</Text>
-            <ViewShot ref={qrRef} options={{ format: 'png', quality: 1 }}>
-              <QRCode value={qrPayload} size={200} />
-            </ViewShot>
-            <Button
-              title="Enviar QR Code"
-              onPress={handleShareQR}
-              style={styles.shareButton}
-            />
-            <Button
-              title="Fechar"
-              onPress={() => setShowQR(false)}
-              style={styles.closeButton}
-            />
-          </View>
-        </View>
-      </Modal>
 
       {Platform.OS === 'ios' && showDatePicker && (
         <Modal visible={showDatePicker} transparent animationType="fade">
@@ -425,17 +374,21 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 250,
     justifyContent: 'flex-end',
-    marginBottom: 10,
+    marginBottom: 20,
   },
   overlayBottom: {
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 12,
+    paddingLeft: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
   },
   coverTitle: {
     fontSize: 20,
     fontFamily: 'Inter-Bold',
     color: '#fff',
     textAlign: 'left',
+    paddingVertical: 5,
   },
   overlayText: {
     fontSize: 14,
@@ -451,5 +404,18 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'left',
   },
-  programsSection: { marginTop: 16 },
+  programsSection: {
+    marginTop: 16,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  meta: {
+    color: 'white',
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+  },
 });

@@ -1,3 +1,5 @@
+export type PermissionLevel = 'Adm' | 'Parcial';
+
 export type Event = {
   id: string;
   title: string;
@@ -9,11 +11,13 @@ export type Event = {
   coverImage?: string;
   userId: string;
   createdBy: string;
-  subAdmins?: {
-    email: string;
-    level: 'Adm' | 'Parcial';
-  }[];
+  subAdmins?: SubAdmin[];
   programs: Program[];
+};
+
+export type SubAdmin = {
+  email: string;
+  level: PermissionLevel;
 };
 
 export type Program = {

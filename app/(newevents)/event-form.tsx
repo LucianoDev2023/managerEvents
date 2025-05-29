@@ -125,15 +125,23 @@ export default function EventFormScreen() {
         }
 
         await updateEvent({
-          ...existingEvent, // mantém programas e subAdmins
-          ...data, // sobrescreve campos atualizados
-          id, // por segurança
+          ...existingEvent,
+          ...data,
+          id,
         });
 
         Alert.alert('Sucesso', 'Evento atualizado com sucesso!');
-        router.back();
+        router.replace(`/events/${id}`);
+      } else {
+        const newEventId = await addEvent({
+          ...data,
+          description: data.description ?? '', // força ser string
+        });
+        Alert.alert('Sucesso', 'Evento criado com sucesso!');
+        router.replace(`/events/${newEventId}`);
       }
-    } catch {
+    } catch (error) {
+      console.error('Erro ao salvar evento:', error);
       Alert.alert('Erro', 'Não foi possível salvar o evento.');
     } finally {
       setIsSubmitting(false);
@@ -158,20 +166,6 @@ export default function EventFormScreen() {
         <Text style={[styles.heading, { color: colors.text }]}>
           {mode === 'edit' ? 'Editar Evento' : 'Criar Evento'}
         </Text>
-
-        <Controller
-          control={control}
-          name="title"
-          render={({ field }) => (
-            <TextInput
-              label="Título"
-              value={field.value}
-              onChangeText={field.onChange}
-              error={errors.title?.message}
-            />
-          )}
-        />
-
         <Controller
           control={control}
           name="location"
@@ -199,6 +193,19 @@ export default function EventFormScreen() {
                 icon={<MapPin size={18} color={colors.primary} />}
               />
             </TouchableOpacity>
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="title"
+          render={({ field }) => (
+            <TextInput
+              label="Título"
+              value={field.value}
+              onChangeText={field.onChange}
+              error={errors.title?.message}
+            />
           )}
         />
 

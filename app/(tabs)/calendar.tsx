@@ -36,8 +36,8 @@ export default function CalendarScreen() {
 
   const gradientColors =
     colorScheme === 'dark'
-      ? ['#0b0b0f', '#1b0033', '#3e1d73']
-      : ['#ffffff', '#e6e6f0', '#f9f9ff'];
+      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
+      : (['#ffffff', '#e6e6f0', '#f9f9ff'] as const);
 
   const [selectedMonth, setSelectedMonth] = useState(new Date());
 
@@ -127,11 +127,7 @@ export default function CalendarScreen() {
 
   return (
     <LinearGradient
-      colors={
-        colorScheme === 'dark'
-          ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
-          : (['#f2f2f2', '#e6e6f0', '#ffffff'] as const)
-      }
+      colors={gradientColors}
       locations={[0, 0.7, 1]}
       style={styles.gradient}
     >

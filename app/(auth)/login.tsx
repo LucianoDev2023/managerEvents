@@ -7,6 +7,9 @@ import {
   Keyboard,
   StyleSheet,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Eye, EyeOff } from 'lucide-react-native';
@@ -36,7 +39,6 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // Redirecionamento será feito no (auth)/_layout.tsx
     } catch (error: any) {
       alert('Erro no login: Confirme email e/ou senha');
     } finally {
@@ -45,73 +47,80 @@ export default function LoginScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={['#0b0b0f', '#1b0033', '#3e1d73']}
-      locations={[0, 0.7, 1]}
-      style={styles.container}
-    >
-      <Text style={styles.title}>Login</Text>
-
-      <TextInput
-        placeholder="exemplo@gmail.com"
-        placeholderTextColor="#aaa"
-        style={styles.input}
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-
-      <View style={styles.passwordContainer}>
-        <TextInput
-          placeholder="Senha"
-          placeholderTextColor="#aaa"
-          style={styles.passwordInput}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={showPassword}
-        />
-        <TouchableOpacity
-          onPress={() => setShowPassword((prev) => !prev)}
-          style={styles.eyeButton}
-        >
-          {showPassword ? (
-            <EyeOff size={20} color="#aaa" />
-          ) : (
-            <Eye size={20} color="#aaa" />
-          )}
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity
-        onPress={() => router.push('/(auth)/forgot-password')}
-        style={styles.forgotLink}
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <LinearGradient
+        colors={['#0b0b0f', '#1b0033', '#3e1d73']}
+        locations={[0, 0.7, 1]}
+        style={{ flex: 1 }}
       >
-        <Text style={styles.forgotText}>Esqueceu a senha?</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        onPress={handleLogin}
-        style={styles.signInButton}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.signInText}>Login</Text>
-        )}
-      </TouchableOpacity>
-
-      <Text style={styles.bottomText}>
-        Não possui uma conta?{' '}
-        <Text
-          style={styles.signUpText}
-          onPress={() => router.push('/(auth)/register')}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
         >
-          Cadastre-se
-        </Text>
-      </Text>
-    </LinearGradient>
+          <Text style={styles.title}>Login</Text>
+
+          <TextInput
+            placeholder="exemplo@gmail.com"
+            placeholderTextColor="#aaa"
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+
+          <View style={styles.passwordContainer}>
+            <TextInput
+              placeholder="Senha"
+              placeholderTextColor="#aaa"
+              style={styles.passwordInput}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={showPassword}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword((prev) => !prev)}
+              style={styles.eyeButton}
+            >
+              {showPassword ? (
+                <EyeOff size={20} color="#aaa" />
+              ) : (
+                <Eye size={20} color="#aaa" />
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => router.push('/(auth)/forgot-password')}
+            style={styles.forgotLink}
+          >
+            <Text style={styles.forgotText}>Esqueceu a senha?</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleLogin}
+            style={styles.signInButton}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.signInText}>Login</Text>
+            )}
+          </TouchableOpacity>
+
+          <Text style={styles.bottomText}>
+            Não possui uma conta?{' '}
+            <Text
+              style={styles.signUpText}
+              onPress={() => router.push('/(auth)/register')}
+            >
+              Cadastre-se
+            </Text>
+          </Text>
+        </KeyboardAvoidingView>
+      </LinearGradient>
+    </TouchableWithoutFeedback>
   );
 }
 

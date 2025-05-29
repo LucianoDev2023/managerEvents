@@ -1,7 +1,7 @@
 export default {
   light: {
     background: '#ffffff',
-    backGroundSecondary: '#ddd',
+    backGroundSecondary: '#fff',
     text: '#111',
     textSecondary: '#444',
     border: '#ccc',

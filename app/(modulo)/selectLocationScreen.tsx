@@ -50,7 +50,6 @@ export default function SelectLocationScreen() {
     longitude: -47.882778,
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
-    DES,
   });
 
   useEffect(() => {

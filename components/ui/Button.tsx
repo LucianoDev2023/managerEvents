@@ -80,7 +80,7 @@ export default function Button({
       case 'secondary':
         return {
           ...baseStyle,
-          backgroundColor: colors.secondary,
+          backgroundColor: colors.backGroundSecondary,
         };
       case 'ghost':
         return {
@@ -102,7 +102,7 @@ export default function Button({
       case 'cancel':
         return {
           ...baseStyle,
-          backgroundColor: '#333',
+          backgroundColor: '#aaa',
         };
       default: // primary
         return {

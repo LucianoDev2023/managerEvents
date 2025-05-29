@@ -1,125 +1,54 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
-  Keyboard,
   Pressable,
-  Image,
+  ImageBackground,
   Platform,
   StatusBar as RNStatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
+import { useColorScheme } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import { useFocusEffect } from '@react-navigation/native';
-
-import EventCard from '@/components/EventCard';
-import Button from '@/components/ui/Button';
 import Colors from '@/constants/Colors';
-import { KeyRound, Plus, SearchCheck } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import LoadingOverlay from '@/components/LoadingOverlay';
-import { useColorScheme } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { MapPin, CalendarDays } from 'lucide-react-native';
 
-export default function EventsScreen() {
-  const lastQueryRef = useRef('');
-  const lastCodeRef = useRef('');
-  useFocusEffect(
-    React.useCallback(() => {
-      if (lastQueryRef.current && lastCodeRef.current) {
-        setSearchQuery(lastQueryRef.current);
-        setConfirmedAccessCode(lastCodeRef.current);
-        setShowResults(true);
-      }
-    }, [])
-  );
-
-  const { state } = useEvents();
-  const scheme = useColorScheme() ?? 'dark';
-  const colors = Colors[scheme];
-  const gradientColors =
-    scheme === 'dark'
-      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
-      : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
-
-  const [inputValue, setInputValue] = useState('');
-  const [accessCodeInput, setAccessCodeInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [confirmedAccessCode, setConfirmedAccessCode] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-
+export default function FoundEventScreen() {
   const { accessCode, title } = useLocalSearchParams<{
     accessCode?: string;
     title?: string;
   }>();
 
+  const { state } = useEvents();
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
+  const gradientColors =
+    colorScheme === 'dark'
+      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
+      : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
+
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
-    if (accessCode && title) {
-      setSearchQuery(title);
-      setConfirmedAccessCode(accessCode);
-      setShowResults(true);
-      setIsSearching(true);
-      setTimeout(() => setIsSearching(false), 500);
+    if (state.events.length > 0) {
+      setIsLoading(false);
     }
-  }, [accessCode, title]);
+  }, [state.events]);
 
-  const handleManualSearch = () => {
-    Keyboard.dismiss();
-    if (!inputValue.trim() || !accessCodeInput.trim()) {
-      alert('Por favor, preencha o nome do evento e o c\u00f3digo de acesso.');
-      return;
-    }
-
-    setIsSearching(true);
-    setSearchQuery(inputValue.trim());
-    setConfirmedAccessCode(accessCodeInput.trim());
-    setInputValue('');
-    setAccessCodeInput('');
-
-    setTimeout(() => {
-      setIsSearching(false);
-      setShowResults(true);
-    }, 500);
-  };
-
-  const filteredEvents =
-    searchQuery === '' || confirmedAccessCode === ''
-      ? []
-      : state.events.filter(
-          (event) =>
-            event.title.toLowerCase().trim() === searchQuery.toLowerCase() &&
-            event.accessCode?.toLowerCase().trim() ===
-              confirmedAccessCode.toLowerCase()
-        );
-
-  const handleAddEvent = () => router.push('/add');
-
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-        {' '}
-        {searchQuery
-          ? 'Nenhum evento encontrado'
-          : 'Pesquisar evento existente'}
-      </Text>
-      <Text style={[styles.emptySubtitle2, { color: colors.textSecondary }]}>
-        Insira nome e código de acesso ou utilize um QR Code
-      </Text>
-
-      <Button
-        title="Criar evento"
-        onPress={handleAddEvent}
-        style={styles.createButton}
-        icon={<Plus size={18} color="white" />}
-      />
-    </View>
-  );
+  const eventFound = useMemo(() => {
+    if (!accessCode || !title) return null;
+    return state.events.find(
+      (event) =>
+        event.title.toLowerCase().trim() === title.toLowerCase().trim() &&
+        event.accessCode?.toLowerCase().trim() ===
+          accessCode.toLowerCase().trim()
+    );
+  }, [accessCode, title, state.events]);
 
   return (
     <LinearGradient
@@ -127,11 +56,7 @@ export default function EventsScreen() {
       locations={[0, 0.7, 1]}
       style={styles.container}
     >
-      <StatusBar
-        translucent
-        backgroundColor="transparent"
-        style={scheme === 'dark' ? 'light' : 'dark'}
-      />
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
 
       <View
         style={[
@@ -142,107 +67,65 @@ export default function EventsScreen() {
           },
         ]}
       >
-        <Image
-          source={require('@/assets/images/loginpage.png')}
-          style={styles.icon}
-          resizeMode="contain"
-        />
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Gerenciador de eventos
+          Evento Encontrado
         </Text>
       </View>
 
       <View style={styles.content}>
-        <View style={styles.inputRow}>
-          <View
-            style={[
-              styles.searchInputContainer,
-              { backgroundColor: scheme === 'dark' ? '#1f1f25' : '#e0e0ec' },
-            ]}
-          >
-            <SearchCheck
-              size={20}
-              color={colors.primary}
-              style={styles.searchIcon}
-            />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Nome do evento"
-              placeholderTextColor={colors.textSecondary}
-              value={inputValue}
-              onChangeText={setInputValue}
-            />
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.text }]}>
+              Buscando evento...
+            </Text>
           </View>
-
-          <Button
-            title="Novo"
-            icon={<Plus size={16} color="white" />}
-            onPress={handleAddEvent}
-            size="small"
-            style={styles.actionButton}
-          />
-        </View>
-
-        {/* <View style={styles.inputRow}>
-          <View
-            style={[
-              styles.searchInputContainer,
-              { backgroundColor: scheme === 'dark' ? '#1f1f25' : '#e0e0ec' },
-            ]}
-          >
-            <KeyRound
-              size={20}
-              color={colors.primary}
-              style={styles.searchIcon}
-            />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Código de acesso"
-              placeholderTextColor={colors.textSecondary}
-              value={accessCodeInput}
-              onChangeText={setAccessCodeInput}
-            />
-          </View>
-
-          <Button
-            title="Buscar"
-            icon={<SearchCheck size={16} color="white" />}
-            onPress={handleManualSearch}
-            size="small"
-            style={styles.actionButton}
-          />
-        </View> */}
-
-        {isSearching ? (
-          <LoadingOverlay message="Buscando..." />
-        ) : showResults ? (
-          filteredEvents.length > 0 ? (
-            <FlatList
-              data={filteredEvents}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item, index }) => (
-                <Animated.View
-                  entering={FadeInDown.delay(index * 100).springify()}
+        ) : eventFound ? (
+          <Pressable onPress={() => router.push(`/events/${eventFound.id}`)}>
+            <View style={styles.card}>
+              <ImageBackground
+                source={{ uri: eventFound.coverImage }}
+                style={styles.image}
+                imageStyle={{
+                  borderTopLeftRadius: 16,
+                  borderTopRightRadius: 16,
+                }}
+              >
+                <BlurView
+                  intensity={50}
+                  tint={colorScheme}
+                  style={styles.blurOverlay}
                 >
-                  <Pressable
-                    onPress={() => router.push(`/events/${item.id}`)}
-                    android_ripple={{ color: colors.primary }}
-                    style={({ pressed }) => ({
-                      transform: [{ scale: pressed ? 0.97 : 1 }],
-                    })}
-                  >
-                    <EventCard event={item} />
-                  </Pressable>
-                </Animated.View>
-              )}
-              contentContainerStyle={{ paddingBottom: 40 }}
-              showsVerticalScrollIndicator={false}
-            />
-          ) : (
-            renderEmptyState()
-          )
+                  <Text style={styles.eventTitle}>{eventFound.title}</Text>
+
+                  <View style={styles.row}>
+                    <CalendarDays size={16} color="#fff" />
+                    <Text style={styles.meta}>
+                      {new Date(eventFound.startDate).toLocaleDateString(
+                        'pt-BR'
+                      )}{' '}
+                      até{' '}
+                      {new Date(eventFound.endDate).toLocaleDateString('pt-BR')}
+                    </Text>
+                  </View>
+                  {eventFound.location && (
+                    <View style={styles.row}>
+                      <MapPin size={16} color="#fff" />
+                      <Text style={styles.meta}>{eventFound.location}</Text>
+                    </View>
+                  )}
+                </BlurView>
+              </ImageBackground>
+
+              <View style={styles.cardFooter}>
+                <Text style={styles.buttonText}>Toque para acessar</Text>
+              </View>
+            </View>
+          </Pressable>
         ) : (
-          renderEmptyState()
+          <Text style={[styles.notFoundText, { color: colors.textSecondary }]}>
+            Nenhum evento correspondente foi encontrado.
+          </Text>
         )}
       </View>
     </LinearGradient>
@@ -254,86 +137,83 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    height: 110,
-    paddingHorizontal: 20,
+    height: 100,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  icon: {
-    width: 70,
-    height: 70,
-    position: 'absolute',
-    left: 20,
-    top: 37,
+    paddingHorizontal: 20,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     fontFamily: 'Inter-Bold',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
-  inputRow: {
-    flexDirection: 'row',
+  loadingContainer: {
+    marginTop: 60,
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  searchInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    minHeight: 42,
-  },
-  searchIcon: {
-    marginRight: 10,
-    marginLeft: 5,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    height: 42,
-  },
-  actionButton: {
-    marginLeft: 10,
-    height: 42,
-    paddingHorizontal: 12,
-    backgroundColor: '#b18aff',
-    borderRadius: 10,
-  },
-  emptyContainer: {
-    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 25,
-    marginTop: 30,
   },
-  emptyTitle: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 20,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    fontFamily: 'Inter-Regular',
+  loadingText: {
     fontSize: 16,
-    marginBottom: 8,
     textAlign: 'center',
-  },
-  emptySubtitle2: {
+    marginTop: 10,
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    marginBottom: 24,
-    textAlign: 'center',
   },
-  createButton: {
-    width: 220,
+  notFoundText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 50,
+    fontFamily: 'Inter-Regular',
+  },
+  card: {
+    backgroundColor: '#1f1f25',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 5 },
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  image: {
+    height: 180,
+    justifyContent: 'flex-end',
+  },
+  blurOverlay: {
+    padding: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  eventTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  meta: {
+    color: 'white',
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+  },
+  cardFooter: {
+    backgroundColor: '#b18aff',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 15,
+    fontFamily: 'Inter-SemiBold',
   },
 });

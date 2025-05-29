@@ -106,10 +106,7 @@ export default function PhotoGallery({
               <View style={styles.actionsContainer}>
                 <TouchableOpacity
                   onPress={() => handleShareImage(photo.uri)}
-                  style={[
-                    styles.actionButton,
-                    { backgroundColor: colors.primary },
-                  ]}
+                  style={[styles.actionButton, { backgroundColor: '#25D366' }]}
                 >
                   <Share2 size={14} color="white" />
                   <Text style={styles.actionText}>Compartilhar</Text>
@@ -193,7 +190,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 4,
     paddingHorizontal: 14,
-    borderRadius: 10,
+    borderRadius: 6,
   },
   actionText: {
     color: 'white',
