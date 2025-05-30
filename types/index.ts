@@ -1,4 +1,4 @@
-export type PermissionLevel = 'Adm' | 'Parcial';
+export type PermissionLevel = 'Admin' | 'Admin parcial';
 
 export type Event = {
   id: string;

@@ -219,12 +219,6 @@ export default function AddActivityPhotoScreen() {
             </Text>
 
             <View style={styles.pickerButtonsContainer}>
-              {/* <Button
-                title="Abrir câmera"
-                onPress={handleTakePhoto}
-                icon={<Camera size={18} color="white" />}
-                style={styles.pickerButton}
-              /> */}
               <Button
                 title="Escolher foto"
                 onPress={handlePickImage}
@@ -237,7 +231,7 @@ export default function AddActivityPhotoScreen() {
         )}
 
         {selectedImage && (
-          <View style={{ marginTop: 16, width: '100%' }}>
+          <View style={{ marginTop: 2, width: '100%' }}>
             <Text
               style={{
                 fontFamily: 'Inter-Medium',
@@ -266,7 +260,7 @@ export default function AddActivityPhotoScreen() {
                 fontFamily: 'Inter-Regular',
                 fontSize: 14,
                 color: colors.text,
-                backgroundColor: colors.backgroundAlt,
+                backgroundColor: colors.background,
                 textAlignVertical: 'top',
               }}
             />
@@ -380,9 +374,10 @@ const styles = StyleSheet.create({
   },
   buttonsContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     width: '100%',
     marginTop: 16,
+    paddingHorizontal: 14,
   },
   cancelButton: {
     flex: 0.48,

@@ -46,14 +46,6 @@ export default function ProgramItem({ program, eventId }: ProgramItemProps) {
     return date.toLocaleDateString('pt-BR', options);
   };
 
-  // const handleAddActivity = () => {
-  //   router.push(`/events/${eventId}/program/${program.id}/add-activity`);
-  // };
-
-  // const handleAddPhoto = () => {
-  //   router.push(`/events/${eventId}/program/${program.id}/add-photo`);
-  // };
-
   const handleProgramPress = () => {
     router.push(`/events/${eventId}/program/${program.id}`);
   };
@@ -96,35 +88,10 @@ export default function ProgramItem({ program, eventId }: ProgramItemProps) {
                 ? 'Nenhuma foto adicionada'
                 : `${getPhotoCount()} - foto${getPhotoCount() > 1 ? 's' : ''}`}
             </Text>
+            <View style={styles.chevronContainer}>
+              <ChevronRight size={24} color={colors.primary} />
+            </View>
           </View>
-        </View>
-
-        {/* <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
-            onPress={handleAddActivity}
-          >
-            <Plus size={16} color="white" />
-            <Text style={styles.actionText}>Add Atividade</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              {
-                backgroundColor:
-                  program.photos.length >= 3 ? colors.border : colors.secondary,
-              },
-            ]}
-            onPress={handleAddPhoto}
-            disabled={program.photos.length >= 3}
-          >9
-            <Plus size={16} color="white" />
-            <Text style={styles.actionText}>Add Photo</Text>
-          </TouchableOpacity>
-        </View> */}
-        <View style={styles.chevronContainer}>
-          <ChevronRight size={24} color={colors.primary} />
         </View>
       </Card>
     </Pressable>
@@ -190,7 +157,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   chevronContainer: {
-    justifyContent: 'center',
+    flex: 1,
+    justifyContent: 'flex-end',
     alignItems: 'flex-end',
     paddingLeft: 12,
   },

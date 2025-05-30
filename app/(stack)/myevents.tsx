@@ -51,7 +51,7 @@ export default function MyEventsScreen() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [permissionEmail, setPermissionEmail] = useState('');
   const [permissionLevel, setPermissionLevel] =
-    useState<PermissionLevel>('Parcial');
+    useState<PermissionLevel>('Admin parcial');
 
   const filteredEvents = state.events.filter(
     (event) =>
@@ -164,7 +164,7 @@ export default function MyEventsScreen() {
     const subAdmin = item.subAdmins?.find(
       (admin) => admin.email.toLowerCase() === userEmail
     );
-    const isAdm = subAdmin?.level === 'Adm';
+    const isAdm = subAdmin?.level === 'Admin';
 
     return (
       <AnimatedPressable
@@ -180,7 +180,7 @@ export default function MyEventsScreen() {
               resizeMode="cover"
             />
             <View style={styles.overlay}>
-              {isCreator && <RoleBadge role="Criador" />}
+              {isCreator && <RoleBadge role="Super Admin" />}
               {subAdmin && !isCreator && (
                 <RoleBadge role={isAdm ? 'Admin' : 'Adm parcial'} />
               )}
@@ -321,24 +321,47 @@ const PermissionModal = ({
       <Animated.View
         entering={FadeIn.duration(300)}
         exiting={FadeOut.duration(200)}
-        style={[styles.modalContent, { backgroundColor: colors.background }]}
+        style={[
+          styles.modalContent,
+          {
+            backgroundColor: colors.background,
+            borderWidth: 1,
+            borderColor: colors.primary2,
+          },
+        ]}
       >
-        <Text style={styles.modalTitle}>🔐 Permissões</Text>
-        <Text style={styles.modalText}>
-          <Text style={styles.bold}>Adm (Total):</Text> adiciona dias e fotos,
-          gerencia o evento. <Text style={styles.bold}>Não pode deletar</Text> o
-          evento principal.
+        <Text
+          style={[styles.modalTitle, , { color: colors.text2, marginTop: 12 }]}
+        >
+          🔐 Permissões
         </Text>
-        <Text style={[styles.modalText, { marginTop: 12 }]}>
-          <Text style={styles.bold}>Parcial:</Text> pode adicionar conteúdos,
-          mas <Text style={styles.bold}>só deletar o que criou</Text>.
+        <Text
+          style={[styles.modalText, { color: colors.text2, marginTop: 12 }]}
+        >
+          <Text style={[styles.roleHighlight, { color: colors.primary }]}>
+            Super admin:
+          </Text>{' '}
+          Controle total sobre todos os recursos. Pode criar, editar, gerencia
+          permissões de todos os outros usuários. Só não pode excluir o evento
+          principal. Permissão exclusiva para o criador do evento.
+        </Text>
+
+        <Text
+          style={[styles.modalText, { color: colors.text2, marginTop: 12 }]}
+        >
+          <Text style={[styles.roleHighlight, { color: colors.primary }]}>
+            Admin parcial:
+          </Text>{' '}
+          Possuir algumas restrições, mas ainda pode adicionar programas,
+          atividades e fotos. Qualquer ação de deletar só será possível para as
+          atividades que criou.
         </Text>
 
         <Text style={[styles.modalSubtitle, { color: colors.text }]}>
           👥 Adicionar Permissão
         </Text>
         <TextInput
-          placeholder="Email do usuário"
+          placeholder="Digite o Email que deseja cadastrar"
           value={permissionEmail}
           onChangeText={setPermissionEmail}
           placeholderTextColor={colors.textSecondary}
@@ -353,42 +376,45 @@ const PermissionModal = ({
             },
           ]}
         />
-
-        <Text style={styles.modalLabel}>Tipo de permissão</Text>
+        <Text style={[styles.modalLabel, { color: colors.text }]}>
+          Selecione o tipo de permissão
+        </Text>
         <View style={styles.toggleRow}>
-          {(['Adm', 'Parcial'] as PermissionLevel[]).map((level) => (
-            <Pressable
-              key={level}
-              onPress={() => setPermissionLevel(level)}
-              style={[
-                styles.toggleBtn,
-                {
-                  backgroundColor:
-                    permissionLevel === level
-                      ? colors.primary
-                      : colors.backGroundSecondary,
-                  borderColor:
-                    permissionLevel === level ? colors.primary : colors.border,
-                },
-              ]}
-            >
-              <Text
-                style={{
-                  color: permissionLevel === level ? 'white' : colors.text,
-                  fontWeight: '600',
-                }}
+          {(['Super Admin', 'Admin parcial'] as PermissionLevel[]).map(
+            (level) => (
+              <Pressable
+                key={level}
+                onPress={() => setPermissionLevel(level)}
+                style={[
+                  styles.toggleBtn,
+                  {
+                    backgroundColor:
+                      permissionLevel === level
+                        ? '#25D366'
+                        : colors.backGroundSecondary,
+                    borderColor:
+                      permissionLevel === level ? '#25D366' : colors.border,
+                  },
+                ]}
               >
-                {level}
-              </Text>
-            </Pressable>
-          ))}
+                <Text
+                  style={{
+                    color: permissionLevel === level ? 'white' : colors.text,
+                    fontWeight: '600',
+                  }}
+                >
+                  {level}
+                </Text>
+              </Pressable>
+            )
+          )}
         </View>
-
         <View style={styles.buttonRow}>
           <Button
             title="Cancelar"
+            variant="cancel"
             onPress={onClose}
-            style={{ backgroundColor: '#d9534f', flex: 1 }}
+            style={{ flex: 1 }}
             textStyle={{ color: 'white' }}
           />
           <Button
@@ -596,7 +622,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '100%',
     maxWidth: 400,
-    borderRadius: 20,
+    borderRadius: 12,
     padding: 14,
   },
   modalTitle: {
@@ -623,9 +649,10 @@ const styles = StyleSheet.create({
   },
   modalLabel: {
     fontSize: 14,
-    marginBottom: 8,
+    marginBottom: 16,
     marginTop: 12,
     fontFamily: 'Inter_500Medium',
+    textAlign: 'center',
   },
   input: {
     fontSize: 15,
@@ -638,8 +665,9 @@ const styles = StyleSheet.create({
   },
   toggleRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
+    gap: 16,
+    marginBottom: 16,
+    paddingHorizontal: 40,
   },
   toggleBtn: {
     flex: 1,
@@ -651,7 +679,8 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 16,
+    marginTop: 60,
+    marginBottom: 20,
   },
 
   // QR Modal Styles
@@ -678,5 +707,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
     backgroundColor: '#333',
     width: '100%',
+  },
+  roleHighlight: {
+    fontSize: 17, // Aumenta o tamanho apenas do título da permissão
+    fontWeight: 'bold',
   },
 });

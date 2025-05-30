@@ -3,12 +3,12 @@ import { View, Text, StyleSheet } from 'react-native';
 import { User, Star, Shield, Wrench } from 'lucide-react-native';
 
 interface RoleBadgeProps {
-  role: 'Criador' | 'Admin' | 'Adm parcial';
+  role: 'Super Admin' | 'Admin' | 'Adm parcial';
 }
 
 const RoleBadge = ({ role }: RoleBadgeProps) => {
   const config = {
-    Criador: {
+    'Super Admin': {
       color: '#892091',
       icon: <Star size={12} color="#fff" />,
     },

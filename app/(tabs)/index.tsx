@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -19,44 +19,62 @@ import { useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  runOnJS,
+} from 'react-native-reanimated';
+
 export default function HomeScreen() {
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
   const router = useRouter();
   const [exitModalVisible, setExitModalVisible] = useState(false);
 
-  const gradientColors =
-    colorScheme === 'dark'
-      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
-      : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
+  const opacity = useSharedValue(0);
+  const scale = useSharedValue(0.96);
 
-  // Intercepta botão físico voltar
+  useEffect(() => {
+    opacity.value = withTiming(1, { duration: 400 });
+    scale.value = withTiming(1, { duration: 400 });
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
         setExitModalVisible(true);
         return true;
       };
-
       BackHandler.addEventListener('hardwareBackPress', onBackPress);
-
       return () => {
         BackHandler.removeEventListener('hardwareBackPress', onBackPress);
       };
     }, [])
   );
 
-  const confirmExit = () => {
-    BackHandler.exitApp();
-  };
+  const confirmExit = () => BackHandler.exitApp();
+  const cancelExit = () => setExitModalVisible(false);
 
-  const cancelExit = () => {
-    setExitModalVisible(false);
+  const handleNavigateWithFade = (path: Parameters<typeof router.push>[0]) => {
+    opacity.value = withTiming(0, { duration: 300 }, () => {
+      runOnJS(router.push)(path);
+    });
+    scale.value = withTiming(0.96, { duration: 300 });
   };
 
   return (
     <LinearGradient
-      colors={gradientColors}
+      colors={
+        colorScheme === 'dark'
+          ? ['#0b0b0f', '#1b0033', '#3e1d73']
+          : ['#ffffff', '#f0f0ff', '#e9e6ff']
+      }
       locations={[0, 0.7, 1]}
       style={styles.container}
     >
@@ -67,70 +85,69 @@ export default function HomeScreen() {
       />
 
       <SafeAreaView style={styles.safeArea}>
-        <View
-          style={[
-            styles.content,
-            {
-              paddingTop:
-                Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
-            },
-          ]}
-        >
-          <Image
-            source={require('@/assets/images/search.png')}
-            style={styles.illustration}
-            resizeMode="contain"
-          />
+        <Animated.View style={[styles.animatedWrapper, animatedStyle]}>
+          <View
+            style={[
+              styles.content,
+              {
+                paddingTop:
+                  Platform.OS === 'android'
+                    ? RNStatusBar.currentHeight ?? 40
+                    : 0,
+              },
+            ]}
+          >
+            <Image
+              source={require('@/assets/images/search.png')}
+              style={styles.illustration}
+              resizeMode="contain"
+            />
 
-          <Text style={[styles.title, { color: colors.text }]}>
-            O que deseja fazer?
-          </Text>
+            <Text style={[styles.title, { color: colors.text }]}>
+              O que deseja fazer?
+            </Text>
 
-          <View style={styles.buttons}>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() =>
-                router.push({
-                  pathname: '/(newevents)/event-form',
-                  params: { mode: 'create' },
-                })
-              }
-              activeOpacity={0.85}
-            >
-              <Text style={styles.buttonText}>Criar um evento novo</Text>
-            </TouchableOpacity>
+            <View style={styles.buttons}>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() =>
+                  handleNavigateWithFade('/(newevents)/event-form?mode=create')
+                }
+              >
+                <Text style={styles.buttonText}>Criar um evento novo</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => router.push('/(stack)/myevents')}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.buttonText}>Abrir meus eventos</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => handleNavigateWithFade('/(stack)/myevents')}
+              >
+                <Text style={styles.buttonText}>Abrir meus eventos</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => router.push('/(newevents)/qr-scanner')}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.buttonText}>
-                Visualizar um convite recebido
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() =>
+                  handleNavigateWithFade('/(newevents)/qr-scanner')
+                }
+              >
+                <Text style={styles.buttonText}>
+                  Visualizar um convite recebido
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
 
-        <View style={styles.lottieWrapper}>
-          <LottieView
-            source={require('../../assets/images/date.json')}
-            autoPlay
-            loop={true}
-            style={{ width: 100, height: 100 }}
-          />
-        </View>
+          <View style={styles.lottieWrapper}>
+            <LottieView
+              source={require('../../assets/images/date.json')}
+              autoPlay
+              loop
+              style={{ width: 100, height: 100 }}
+            />
+          </View>
+        </Animated.View>
       </SafeAreaView>
 
-      {/* Modal de confirmação */}
       <Modal
         visible={exitModalVisible}
         transparent
@@ -165,6 +182,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
+  animatedWrapper: { flex: 1 },
   content: {
     flex: 1,
     justifyContent: 'center',
@@ -211,7 +229,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
   },
-
   modalCard: {
     width: '100%',
     maxWidth: 320,
@@ -224,7 +241,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-
   modalTitle: {
     fontSize: 18,
     fontFamily: 'Inter-Bold',
@@ -232,7 +248,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#111',
   },
-
   modalMessage: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
@@ -240,13 +255,11 @@ const styles = StyleSheet.create({
     color: '#555',
     marginBottom: 24,
   },
-
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
   },
-
   cancelButton: {
     flex: 1,
     backgroundColor: '#aaa',
@@ -254,13 +267,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-
   cancelText: {
     fontFamily: 'Inter-SemiBold',
     color: '#333',
     fontSize: 14,
   },
-
   exitButton: {
     flex: 1,
     backgroundColor: '#e63946',
@@ -268,7 +279,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-
   exitText: {
     fontFamily: 'Inter-SemiBold',
     color: '#fff',

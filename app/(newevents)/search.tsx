@@ -35,13 +35,22 @@ export default function FoundEventScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Se eventos forem carregados, desativa o loading imediatamente
     if (state.events.length > 0) {
       setIsLoading(false);
+      return;
     }
+
+    // Caso contrário, espera até 10 segundos antes de desligar o loading
+    const timeout = setTimeout(() => {
+      setIsLoading(false);
+    }, 10000);
+
+    return () => clearTimeout(timeout);
   }, [state.events]);
 
   const eventFound = useMemo(() => {
-    if (!accessCode || !title) return null;
+    if (!accessCode || !title || state.events.length === 0) return null;
     return state.events.find(
       (event) =>
         event.title.toLowerCase().trim() === title.toLowerCase().trim() &&

@@ -33,6 +33,7 @@ import Button from '@/components/ui/Button';
 import LoadingOverlay from '@/components/LoadingOverlay';
 import { Event } from '@/types';
 import { getAuth } from 'firebase/auth';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -52,15 +53,23 @@ export default function EventDetailScreen() {
   const isCreator = event?.createdBy?.toLowerCase() === userEmail;
   const isAdm = event?.subAdmins?.some(
     (admin) =>
-      (admin.email.toLowerCase() === userEmail && admin.level === 'Adm') ||
-      admin.level === 'Parcial'
+      (admin.email.toLowerCase() === userEmail && admin.level === 'Admin') ||
+      admin.level === 'Admin parcial'
   );
   const hasAdminPermission = isCreator || isAdm;
   const hasAdminPermissionDelete = isCreator;
 
   if (!event) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <LinearGradient
+        colors={
+          colorScheme === 'dark'
+            ? ['#0b0b0f', '#1b0033', '#3e1d73']
+            : ['#ffffff', '#f0f0ff', '#e9e6ff']
+        }
+        style={styles.container}
+        locations={[0.2, 0.2, 0]}
+      >
         <Stack.Screen
           options={{
             headerShown: true,
@@ -76,14 +85,9 @@ export default function EventDetailScreen() {
           O evento não existe ou foi deletado.
         </Text>
         <Button title="Voltar" onPress={() => router.back()} />
-      </View>
+      </LinearGradient>
     );
   }
-
-  const qrPayload = JSON.stringify({
-    eventTitle: event.title,
-    accessCode: event.accessCode,
-  });
 
   const handleEditEvent = () => {
     router.push({
@@ -142,19 +146,15 @@ export default function EventDetailScreen() {
     }
   };
 
-  const formatDateRange = (start: Date, end: Date) => {
-    const options: Intl.DateTimeFormatOptions = {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    };
-    const s = start.toLocaleDateString('pt-BR', options);
-    const e = end.toLocaleDateString('pt-BR', options);
-    return s === e ? s : `${s} - ${e}`;
-  };
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <LinearGradient
+      colors={
+        colorScheme === 'dark'
+          ? ['#0b0b0f', '#1b0033', '#3e1d73']
+          : ['#ffffff', '#f0f0ff', '#e9e6ff']
+      }
+      style={styles.container}
+    >
       <Stack.Screen
         options={{
           headerShown: true,
@@ -232,7 +232,10 @@ export default function EventDetailScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.programsSection}>
           {event.programs.length === 0 ? (
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
@@ -257,6 +260,7 @@ export default function EventDetailScreen() {
 
       {isAddingProgram && <LoadingOverlay message="Adicionando dia..." />}
 
+      {/* Date Picker Modal */}
       {Platform.OS === 'ios' && showDatePicker && (
         <Modal visible={showDatePicker} transparent animationType="fade">
           <View style={styles.modalOverlay}>
@@ -305,7 +309,7 @@ export default function EventDetailScreen() {
           locale="pt-BR"
         />
       )}
-    </View>
+    </LinearGradient>
   );
 }
 

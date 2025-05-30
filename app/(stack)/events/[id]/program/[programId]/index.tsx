@@ -8,14 +8,16 @@ import {
   Alert,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
+import { getAuth } from 'firebase/auth';
 import { useEvents } from '@/context/EventsContext';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import { ArrowLeft, Calendar, Plus, Trash2 } from 'lucide-react-native';
 import Button from '@/components/ui/Button';
 import ActivityItem from '@/components/ActivityItem';
-import PhotoGallery from '@/components/PhotoGallery';
 import { Event, Program } from '@/types';
+import Animated from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ProgramDetailScreen() {
   const { id, programId, activityId } = useLocalSearchParams<{
@@ -24,7 +26,7 @@ export default function ProgramDetailScreen() {
     activityId: string;
   }>();
 
-  const { state, deleteProgram, deletePhoto } = useEvents();
+  const { state, deleteProgram } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -32,6 +34,14 @@ export default function ProgramDetailScreen() {
   const program = event?.programs.find((p) => p.id === programId) as
     | Program
     | undefined;
+
+  const authUser = getAuth().currentUser;
+  const userEmail = authUser?.email?.toLowerCase() ?? '';
+  const isCreator = event?.createdBy?.toLowerCase() === userEmail;
+  const isSubAdmin = event?.subAdmins?.some(
+    (admin) => admin.email.toLowerCase() === userEmail
+  );
+  const hasPermission = isCreator || isSubAdmin;
 
   if (!event || !program) {
     return (
@@ -49,36 +59,31 @@ export default function ProgramDetailScreen() {
         />
         <View style={styles.notFoundContainer}>
           <Text style={[styles.notFoundText, { color: colors.text }]}>
-            The program you're looking for doesn't exist or has been deleted.
+            O programa não foi encontrado.
           </Text>
-          <Button
-            title="Go Back"
-            onPress={() => router.back()}
-            style={styles.goBackButton}
-          />
+          <Button title="Voltar" onPress={() => router.back()} />
         </View>
       </View>
     );
   }
 
   const formatDate = (date: Date) => {
-    const options: Intl.DateTimeFormatOptions = {
+    return new Date(date).toLocaleDateString('pt-BR', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-    };
-    return date.toLocaleDateString('en-US', options);
+    });
   };
 
   const handleDeleteProgram = () => {
     Alert.alert(
-      'Delete Program',
-      'Are you sure you want to delete this program? This action cannot be undone.',
+      'Excluir Programação',
+      'Tem certeza que deseja excluir esta programação? Essa ação não pode ser desfeita.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Excluir',
           style: 'destructive',
           onPress: () => {
             deleteProgram(event.id, program.id);
@@ -96,76 +101,56 @@ export default function ProgramDetailScreen() {
     });
   };
 
-  const handleAddPhoto = () => {
-    router.push({
-      pathname:
-        '/(stack)/events/[id]/program/[programId]/activity/[activityId]/add-photo',
-      params: {
-        id: event.id,
-        programId: program.id,
-        activityId: activityId, // certifique-se que activityId está acessível
-      },
-    });
-  };
-
-  const handlePhotoDelete = (photoId: string) => {
-    Alert.alert('Delete Photo', 'Are you sure you want to remove this photo?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          if (activityId) {
-            deletePhoto(event.id, program.id, activityId);
-          } else {
-            Alert.alert('Error', 'Activity ID not found.');
-          }
-        },
-      },
-    ]);
-  };
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <LinearGradient
+      colors={
+        colorScheme === 'dark'
+          ? ['#0b0b0f', '#1b0033', '#3e1d73']
+          : ['#ffffff', '#f0f0ff', '#e9e6ff']
+      }
+      style={styles.container}
+    >
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTitle: 'Detalhes da programação',
+          headerTitle: 'Detalhes da Programação',
           headerTitleStyle: {
             fontFamily: 'Inter-Bold',
             fontSize: 18,
+            color: colors.text,
           },
+          headerTransparent: true,
           headerLeft: () => (
             <TouchableOpacity
-              onPress={() => router.back()}
               style={styles.headerButton}
+              onPress={() => router.back()}
             >
               <ArrowLeft size={24} color={colors.text} />
             </TouchableOpacity>
           ),
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={handleDeleteProgram}
-              style={styles.headerButton}
-            >
-              <Trash2 size={20} color={colors.error} />
-            </TouchableOpacity>
-          ),
+          headerRight: () =>
+            hasPermission ? (
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={handleDeleteProgram}
+              >
+                <Trash2 size={20} color={colors.error} />
+              </TouchableOpacity>
+            ) : null,
         }}
       />
 
       <ScrollView
-        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.header, { backgroundColor: colors.background }]}>
+        <View style={styles.card}>
           <View style={styles.dateContainer}>
             <Calendar size={20} color={colors.primary} />
             <Text style={[styles.dateText, { color: colors.text }]}>
               {formatDate(program.date)}
             </Text>
           </View>
-
           <Text style={[styles.eventTitle, { color: colors.text }]}>
             {event.title}
           </Text>
@@ -176,13 +161,14 @@ export default function ProgramDetailScreen() {
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Atividades
             </Text>
-
-            <Button
-              title="Add Atividade"
-              size="small"
-              icon={<Plus size={16} color="white" />}
-              onPress={handleAddActivity}
-            />
+            {hasPermission && (
+              <Button
+                title="Adicionar"
+                size="small"
+                icon={<Plus size={16} color="#fff" />}
+                onPress={handleAddActivity}
+              />
+            )}
           </View>
 
           {program.activities.length === 0 ? (
@@ -195,29 +181,27 @@ export default function ProgramDetailScreen() {
               <Text
                 style={[styles.emptySubtext, { color: colors.textSecondary }]}
               >
-                Adicione uma atividade e comece os registros diários
+                Adicione uma atividade para começar
               </Text>
             </View>
           ) : (
-            [...program.activities]
-              .sort((a, b) => {
-                const [aHours, aMinutes] = a.time.split(':').map(Number);
-                const [bHours, bMinutes] = b.time.split(':').map(Number);
-                return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
-              })
+            program.activities
+              .sort((a, b) => a.time.localeCompare(b.time))
               .map((activity) => (
-                <View key={activity.id}>
+                <Animated.View key={activity.id} style={styles.activityCard}>
                   <ActivityItem
                     activity={activity}
                     eventId={event.id}
                     programId={program.id}
+                    createdBy={event.createdBy}
+                    subAdmins={event.subAdmins}
                   />
-                </View>
+                </Animated.View>
               ))
           )}
         </View>
       </ScrollView>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -225,17 +209,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
-  },
   scrollContent: {
+    paddingHorizontal: 16,
     paddingBottom: 32,
+    paddingTop: 70,
   },
   headerButton: {
-    padding: 8,
+    padding: 12,
   },
-  header: {
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
     padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
   },
   dateContainer: {
     flexDirection: 'row',
@@ -244,7 +234,7 @@ const styles = StyleSheet.create({
   },
   dateText: {
     marginLeft: 8,
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: 'Inter-Medium',
   },
   eventTitle: {
@@ -252,42 +242,39 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
   },
   section: {
-    padding: 16,
+    marginTop: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 18,
     fontFamily: 'Inter-Bold',
   },
   emptyContainer: {
-    padding: 24,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderRadius: 10,
+    borderRadius: 12,
+    padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyText: {
     fontSize: 16,
     fontFamily: 'Inter-Medium',
-    marginBottom: 16,
+    marginBottom: 8,
     textAlign: 'center',
   },
-
   emptySubtext: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
-    marginBottom: 16,
   },
-
-  addButton: {
-    width: 160,
+  activityCard: {
+    marginBottom: 12,
   },
   notFoundContainer: {
     flex: 1,
@@ -300,8 +287,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Medium',
     textAlign: 'center',
     marginBottom: 24,
-  },
-  goBackButton: {
-    width: 120,
   },
 });

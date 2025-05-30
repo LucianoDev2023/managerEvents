@@ -8,32 +8,40 @@ import {
   Platform,
 } from 'react-native';
 import Card from './ui/Card';
-import {
-  ChevronRight,
-  Clock,
-  Edit,
-  CreditCard as Edit2,
-  LucideCamera,
-  Plus,
-} from 'lucide-react-native';
+import { ChevronRight, Clock, Edit, LucideCamera } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
-import { Activity } from '@/types';
+import { Activity, SubAdmin } from '@/types';
 import { router } from 'expo-router';
+import { getAuth } from 'firebase/auth';
 
 interface ActivityItemProps {
   activity: Activity;
   eventId: string;
   programId: string;
+  createdBy: string;
+  subAdmins?: SubAdmin[];
 }
 
 export default function ActivityItem({
   activity,
   eventId,
   programId,
+  createdBy,
+  subAdmins = [],
 }: ActivityItemProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+
+  const authUser = getAuth().currentUser;
+  const userEmail = authUser?.email?.toLowerCase();
+
+  const isCreator = createdBy.toLowerCase() === userEmail;
+  const isSubAdmin = subAdmins.some(
+    (admin) => admin.email.toLowerCase() === userEmail
+  );
+
+  const hasPermission = isCreator || isSubAdmin;
 
   const handleEditActivity = (e: any) => {
     e.stopPropagation();
@@ -73,20 +81,24 @@ export default function ActivityItem({
             </Text>
           </View>
 
-          <View style={styles.buttonGroup}>
-            <TouchableOpacity
-              onPress={handleAddPhoto}
-              style={styles.iconButton}
-            >
-              <LucideCamera size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleEditActivity}
-              style={styles.iconButton}
-            >
-              <Edit size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
+          {hasPermission && (
+            <View style={styles.buttonGroup}>
+              <TouchableOpacity
+                onPress={handleAddPhoto}
+                style={styles.iconButton}
+              >
+                <Text style={{ color: colors.textSecondary }}>Adicionar</Text>
+                <LucideCamera size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleEditActivity}
+                style={styles.iconButton}
+              >
+                <Text style={{ color: colors.textSecondary }}>Editar</Text>
+                <Edit size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         <Text style={[styles.title, { color: colors.text }]}>
@@ -94,13 +106,13 @@ export default function ActivityItem({
         </Text>
 
         {activity.description && (
-          <Text style={[styles.description, { color: colors.textSecondary }]}>
-            {activity.description}
-          </Text>
+          <View style={styles.setaCard}>
+            <Text style={[styles.description, { color: colors.textSecondary }]}>
+              {activity.description}
+            </Text>
+            <ChevronRight size={24} color={colors.primary} />
+          </View>
         )}
-        <View style={styles.chevronContainer}>
-          <ChevronRight size={24} color={colors.primary} />
-        </View>
       </Card>
     </Pressable>
   );
@@ -108,9 +120,10 @@ export default function ActivityItem({
 
 const styles = StyleSheet.create({
   card: {
-    padding: 16,
+    padding: 10,
+    paddingLeft: 18,
     margin: 8,
-    marginHorizontal: 16,
+    marginHorizontal: 10,
   },
   header: {
     flexDirection: 'row',
@@ -132,6 +145,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconButton: {
+    alignItems: 'center',
     padding: 4,
     marginLeft: 8,
   },
@@ -145,13 +159,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     lineHeight: 20,
   },
-  chevronContainer: {
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    paddingLeft: 12,
-  },
   cardWrapper: {
     borderRadius: 10,
     overflow: 'hidden',
+  },
+  setaCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 });
