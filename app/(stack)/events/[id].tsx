@@ -29,7 +29,7 @@ import {
 import ProgramItem from '@/components/ProgramItem';
 import Button from '@/components/ui/Button';
 import LoadingOverlay from '@/components/LoadingOverlay';
-import { Event } from '@/types';
+import { Event, Guest } from '@/types';
 import { getAuth } from 'firebase/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -38,16 +38,12 @@ export default function EventDetailScreen() {
   const { state, deleteEvent, addProgram } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
-
   const [isAddingProgram, setIsAddingProgram] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-
   const event = state.events.find((e) => e.id === id) as Event | undefined;
-
   const authUser = getAuth().currentUser;
   const userEmail = authUser?.email?.toLowerCase();
-
   const isCreator = event?.createdBy?.toLowerCase() === userEmail;
   const isAdm = event?.subAdmins?.some(
     (admin) =>
@@ -57,6 +53,10 @@ export default function EventDetailScreen() {
   );
   const hasAdminPermission = isCreator || isAdm;
   const hasAdminPermissionDelete = isCreator;
+  const confirmed =
+    event?.confirmedGuests?.filter((g) => g.mode === 'confirmado') || [];
+  const interested =
+    event?.confirmedGuests?.filter((g) => g.mode === 'acompanhando') || [];
 
   if (!event) {
     return (
@@ -255,6 +255,65 @@ export default function EventDetailScreen() {
               ))
           )}
         </View>
+        {(confirmed.length > 0 || interested.length > 0) && (
+          <View style={{ marginTop: 24, paddingHorizontal: 16 }}>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: colors.text, marginBottom: 8 },
+              ]}
+            >
+              Presenças Confirmadas
+            </Text>
+            {confirmed.length === 0 ? (
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontFamily: 'Inter-Regular',
+                }}
+              >
+                Nenhuma presença confirmada ainda.
+              </Text>
+            ) : (
+              confirmed.map((guest, idx) => (
+                <Text
+                  key={idx}
+                  style={{ color: colors.text, fontFamily: 'Inter-Regular' }}
+                >
+                  • {guest.name} ({guest.email})
+                </Text>
+              ))
+            )}
+
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: colors.text, marginVertical: 8 },
+              ]}
+            >
+              Acompanhando Evento
+            </Text>
+            {interested.length === 0 ? (
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontFamily: 'Inter-Regular',
+                }}
+              >
+                Nenhum convidado acompanhando o evento.
+              </Text>
+            ) : (
+              interested.map((guest, idx) => (
+                <Text
+                  key={idx}
+                  style={{ color: colors.text, fontFamily: 'Inter-Regular' }}
+                >
+                  • {guest.name} ({guest.email})
+                </Text>
+              ))
+            )}
+          </View>
+        )}
       </ScrollView>
 
       {isAddingProgram && <LoadingOverlay message="Adicionando dia..." />}

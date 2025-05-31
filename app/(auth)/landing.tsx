@@ -3,20 +3,19 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   ScrollView,
   Platform,
   StatusBar as RNStatusBar,
+  Pressable,
 } from 'react-native';
 import { useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-
 import LottieView from 'lottie-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+
 import Colors from '@/constants/Colors';
-import Button from '@/components/ui/Button';
 
 export default function LandingScreen() {
   const colorScheme = useColorScheme() ?? 'dark';
@@ -40,73 +39,69 @@ export default function LandingScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Título */}
-        <Animated.View entering={FadeInDown.delay(100)}>
-          <Text style={[styles.title, { color: colors.primary }]}>
-            SysEvent
-          </Text>
+        <Animated.View
+          entering={FadeInDown.delay(100)}
+          style={styles.centeredBlock}
+        >
+          <Text style={[styles.title, { color: colors.primary }]}>PLANNIX</Text>
           <Text style={[styles.subtitle, { color: colors.text }]}>
-            Organize eventos, convide pessoas e controle tudo na palma da mão.
+            Organize seus eventos, convide amigos e controle tudo na palma da
+            mão.
           </Text>
         </Animated.View>
 
-        {/* Animação / Banner */}
         <Animated.View
           entering={FadeInDown.delay(200)}
           style={styles.lottieBox}
         >
           <LottieView
-            source={require('@/assets/images/date.json')}
+            source={require('@/assets/images/start.json')}
             autoPlay
             loop
-            style={{ width: 280, height: 280 }}
+            style={styles.lottie}
           />
         </Animated.View>
 
-        {/* Funcionalidades */}
         <Animated.View
           entering={FadeInDown.delay(300)}
           style={styles.featureList}
         >
-          <Text style={[styles.featureItem, { color: colors.text }]}>
-            ✅ Crie eventos com capa, local e data
-          </Text>
-          <Text style={[styles.featureItem, { color: colors.text }]}>
-            ✅ Adicione programações e atividades
-          </Text>
-          <Text style={[styles.featureItem, { color: colors.text }]}>
-            ✅ Adicine fotos da atividade e descrição
-          </Text>
-          <Text style={[styles.featureItem, { color: colors.text }]}>
-            ✅ Compartilhe via QR Code e WhatsApp
-          </Text>
-          <Text style={[styles.featureItem, { color: colors.text }]}>
-            ✅ Dê permissões para outros usuários
-          </Text>
-          <Text style={[styles.featureItem, { color: colors.text }]}>
-            ✅ Visualize no mapa e siga eventos
-          </Text>
+          {[
+            '✅ Criação e organização completa de eventos',
+            '✅ Programações e atividades personalizadas',
+            '✅ Galeria de fotos e descrições detalhadas',
+            '✅ Compartilhamento por QR Code e WhatsApp',
+            '✅ Controle de permissões para colaboradores',
+            '✅ Visualização no mapa com a localização real',
+            '✅ Seu evento. No seu ritmo. Com o seu controle',
+          ].map((item, index) => (
+            <Text
+              key={index}
+              style={[styles.featureItem, { color: colors.text }]}
+            >
+              {item}
+            </Text>
+          ))}
         </Animated.View>
 
-        {/* Imagem destaque (mock) */}
-        {/* <Animated.View entering={FadeInDown.delay(400)} style={styles.preview}>
-          <Image
-            source={require('@/assets/images/loginpage.png')}
-            style={styles.previewImage}
-          />
-        </Animated.View> */}
-
-        {/* Botão CTA */}
         <Animated.View
-          entering={FadeInDown.delay(500)}
-          style={{ width: '100%' }}
+          entering={FadeInDown.delay(400)}
+          style={styles.lottieButtonContainer}
         >
-          <Button
-            title="Comece agora mesmo"
+          <Pressable
             onPress={() => router.push('/(auth)/login')}
-            style={[styles.ctaBtn, { backgroundColor: colors.primary }]}
-            textStyle={styles.ctaText}
-          />
+            style={styles.pressable}
+          >
+            <LottieView
+              source={require('@/assets/images/action.json')}
+              autoPlay
+              loop
+              style={styles.lottie1}
+            />
+            <View style={styles.textOverlay}>
+              <Text style={styles.overlayText}>Comece agora</Text>
+            </View>
+          </Pressable>
         </Animated.View>
       </ScrollView>
     </LinearGradient>
@@ -120,29 +115,44 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 50,
+    paddingBottom: 40,
+  },
+  centeredBlock: {
+    alignItems: 'center',
+    marginBottom: 16,
   },
   title: {
     fontSize: 36,
     fontFamily: 'Inter_700Bold',
+    fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 8,
+    marginTop: 40,
+    marginBottom: 40,
   },
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
     fontFamily: 'Inter_400Regular',
-    marginBottom: 20,
     paddingHorizontal: 12,
   },
   lottieBox: {
-    marginBottom: 24,
+    marginVertical: 16,
+    alignItems: 'center',
+  },
+  lottie: {
+    width: 280,
+    height: 180,
+  },
+  lottie1: {
+    width: 280,
+    height: 70,
   },
   featureList: {
-    alignItems: 'flex-start',
     width: '100%',
-    paddingHorizontal: 12,
+    paddingHorizontal: 6,
     marginBottom: 24,
   },
   featureItem: {
@@ -150,25 +160,26 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     marginBottom: 6,
   },
-  preview: {
-    width: '100%',
+  lottieButtonContainer: {
     alignItems: 'center',
-    marginBottom: 28,
+    justifyContent: 'center',
+    marginTop: 12,
   },
-  previewImage: {
-    width: '100%',
-    height: 220,
-    borderRadius: 20,
-    resizeMode: 'contain',
+  pressable: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  ctaBtn: {
-    paddingVertical: 12,
-    borderRadius: 14,
+  textOverlay: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  ctaText: {
-    fontSize: 16,
+  overlayText: {
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#fff',
+    color: 'white',
+    textAlign: 'center',
     fontFamily: 'Inter_600SemiBold',
+    marginBottom: 8,
   },
 });

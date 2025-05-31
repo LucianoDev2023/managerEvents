@@ -1,5 +1,13 @@
 export type PermissionLevel = 'Super Admin' | 'Admin parcial';
 
+export type GuestStatus = 'confirmed' | 'interested';
+
+export type Guest = {
+  name: string;
+  email: string;
+  mode: 'confirmado' | 'acompanhando';
+};
+
 export type Event = {
   id: string;
   title: string;
@@ -13,6 +21,7 @@ export type Event = {
   createdBy: string;
   subAdmins?: SubAdmin[];
   programs: Program[];
+  confirmedGuests?: Guest[]; // ✅ nova propriedade
 };
 
 export type SubAdmin = {

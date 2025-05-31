@@ -21,10 +21,10 @@ export default function WelcomeScreen() {
   const scheme = useColorScheme() ?? 'dark';
   const theme = Colors[scheme];
 
-  const gradientColors =
+  const gradientColors: [string, string, ...string[]] =
     scheme === 'dark'
-      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
-      : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
+      ? ['#0b0b0f', '#1b0033', '#3e1d73']
+      : ['#ffffff', '#f0f0ff', '#e9e6ff'];
 
   useEffect(() => {
     const timeout = setTimeout(() => {

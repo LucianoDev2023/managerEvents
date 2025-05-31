@@ -4,6 +4,7 @@ import { Event, Program, Activity, Photo } from '@/types';
 import { db, storage } from '@/config/firebase';
 import {
   collection,
+  getDoc,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -14,12 +15,7 @@ import {
   Timestamp,
   where,
 } from 'firebase/firestore';
-import {
-  ref,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject,
-} from 'firebase/storage';
+
 import { getAuth } from 'firebase/auth';
 
 // --- Types ---
@@ -82,6 +78,7 @@ type EventsContextType = {
   deleteEvent: (eventId: string) => Promise<void>;
   addProgram: (eventId: string, date: Date) => Promise<void>;
   deleteProgram: (eventId: string, programId: string) => Promise<void>;
+  confirmAttendance: (eventId: string, userEmail: string) => Promise<void>;
   addActivity: (
     eventId: string,
     programId: string,
@@ -209,7 +206,8 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
           coverImage: eventData.coverImage || '',
           userId: eventData.userId,
           createdBy: eventData.createdBy ?? '',
-          subAdmins: eventData.subAdmins ?? [], // ✅ Adicionado aqui
+          subAdmins: eventData.subAdmins ?? [],
+          confirmedGuests: eventData.confirmedGuests ?? [], // ✅ Adicionado aqui
           programs,
         });
       }
@@ -278,6 +276,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       coverImage: event.coverImage || '',
       userId: event.userId,
       subAdmins: event.subAdmins ?? [], // ✅ Aqui também
+      confirmedGuests: event.confirmedGuests ?? [],
     });
 
     dispatch({ type: 'UPDATE_EVENT', payload: event });
@@ -374,6 +373,21 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const confirmAttendance = async (eventId: string, userEmail: string) => {
+    const eventRef = doc(db, 'events', eventId);
+    const eventSnap = await getDoc(eventRef);
+
+    if (!eventSnap.exists()) throw new Error('Evento não encontrado');
+
+    const data = eventSnap.data();
+    const confirmedGuests: string[] = data.confirmedGuests || [];
+
+    if (!confirmedGuests.includes(userEmail)) {
+      confirmedGuests.push(userEmail);
+      await updateDoc(eventRef, { confirmedGuests });
+    }
+  };
+
   return (
     <EventsContext.Provider
       value={{
@@ -389,6 +403,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         deleteActivity,
         addPhoto,
         deletePhoto,
+        confirmAttendance,
       }}
     >
       {children}
