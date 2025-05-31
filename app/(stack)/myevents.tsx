@@ -1,5 +1,5 @@
 // app/(tabs)/my-events.tsx
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -32,17 +32,27 @@ import Colors from '@/constants/Colors';
 import Button from '@/components/ui/Button';
 import RoleBadge from '@/components/ui/RoleBadge';
 import type { Event, PermissionLevel } from '@/types/index';
+import LottieView from 'lottie-react-native';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function MyEventsScreen() {
   const router = useRouter();
-  const { from } = useLocalSearchParams<{ from?: string }>();
   const { state, updateEvent } = useEvents();
   const auth = getAuth();
   const userEmail = auth.currentUser?.email?.toLowerCase();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Se os eventos já foram carregados (mesmo que vazio), remover loading
+    const timeout = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000); // tempo mínimo para suavizar
+
+    return () => clearTimeout(timeout);
+  }, [state.events]);
 
   const [qrVisible, setQrVisible] = useState(false);
   const [qrPayload, setQrPayload] = useState('');
@@ -258,6 +268,33 @@ export default function MyEventsScreen() {
       </AnimatedPressable>
     );
   };
+
+  if (isLoading) {
+    return (
+      <LinearGradient colors={gradientColors} style={styles.gradient}>
+        <SafeAreaView style={styles.container}>
+          <StatusBar
+            translucent
+            backgroundColor="transparent"
+            style={colorScheme === 'dark' ? 'light' : 'dark'}
+          />
+          <View
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+          >
+            <LottieView
+              source={require('@/assets/images/loading.json')}
+              autoPlay
+              loop
+              style={{ width: 150, height: 150 }}
+            />
+            <Text style={{ color: colors.text, marginTop: 16, fontSize: 16 }}>
+              Carregando eventos...
+            </Text>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
 
   return (
     <LinearGradient
