@@ -23,7 +23,7 @@ export default function RootLayout() {
 
     if (!authLoading) {
       if (!user && !inAuthGroup) {
-        router.replace('/login'); // redireciona para login se não autenticado
+        router.replace('/landing'); // redireciona para login se não autenticado
       }
     }
   }, [authLoading, user, segments]);

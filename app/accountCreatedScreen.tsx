@@ -24,7 +24,7 @@ export default function AccountCreatedScreen() {
   useEffect(() => {
     if (!authLoading) {
       if (!user) {
-        router.replace('/login');
+        router.replace('/(auth)/landing');
       } else if (!cameFromRegister) {
         router.replace('/welcome');
       }
