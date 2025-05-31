@@ -14,10 +14,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
 import { useColorScheme } from 'react-native';
 import Colors from '@/constants/Colors';
-import { Pencil, Trash2 } from 'lucide-react-native';
+import { MapPin, Pencil, Trash2 } from 'lucide-react-native';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'react-native';
 
 export default function PermissionConfirmationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -98,19 +99,41 @@ export default function PermissionConfirmationScreen() {
       locations={[0, 0.7, 1]}
     >
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View
-          style={[
-            styles.eventCard,
-            { backgroundColor: colors.backGroundSecondary },
-          ]}
+        <LinearGradient
+          colors={gradientColors}
+          locations={[0, 0.9, 1]}
+          style={styles.gradient}
         >
-          <Text style={[styles.eventTitle, { color: colors.text }]}>
-            {event.title}
-          </Text>
-          <Text style={[styles.eventSubtitle, { color: colors.textSecondary }]}>
-            {event.location}
-          </Text>
-        </View>
+          <Pressable
+            onPress={() => {}}
+            style={[
+              styles.card,
+              { backgroundColor: colors.backGroundSecondary },
+            ]}
+          >
+            {event.coverImage && (
+              <Image source={{ uri: event.coverImage }} style={styles.image} />
+            )}
+            <View style={styles.info}>
+              <Text style={[styles.title, { color: colors.text }]}>
+                {event.title}
+              </Text>
+              <Text style={[styles.location, { color: colors.textSecondary }]}>
+                <MapPin size={12} color={colors.textSecondary} />{' '}
+                {event.location}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() =>
+                Alert.alert(
+                  'Excluir evento?',
+                  'Função de exclusão não implementada.'
+                )
+              }
+              style={styles.deleteBtn}
+            ></Pressable>
+          </Pressable>
+        </LinearGradient>
 
         {/* Card das Permissões */}
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -236,8 +259,7 @@ const styles = StyleSheet.create({
   container: { padding: 16 },
   eventCard: {
     padding: 20,
-    marginBottom: 10,
-    marginTop: 10,
+    marginTop: 20,
     borderWidth: 1,
     borderBottomColor: '#333',
     borderTopColor: '#333',
@@ -252,8 +274,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: 10,
+    borderColor: '#444',
   },
   email: { fontSize: 16, fontWeight: '600' },
   level: { fontSize: 13, fontStyle: 'italic', textTransform: 'capitalize' },
@@ -291,5 +313,28 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 16,
     marginBottom: 20,
+  },
+  image: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    marginRight: 12,
+    marginLeft: 4,
+  },
+  info: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  location: {
+    fontSize: 13,
+    marginTop: 4,
+    fontFamily: 'Inter_400Regular',
+  },
+  deleteBtn: {
+    padding: 8,
   },
 });

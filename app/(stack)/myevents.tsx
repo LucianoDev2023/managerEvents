@@ -20,7 +20,14 @@ import { getAuth } from 'firebase/auth';
 import { useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MapPin, Share2, QrCode, KeyRound } from 'lucide-react-native';
+import {
+  MapPin,
+  Share2,
+  QrCode,
+  KeyRound,
+  HeartOff,
+  Heart,
+} from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import ViewShot from 'react-native-view-shot';
 import * as FileSystem from 'expo-file-system';
@@ -33,10 +40,18 @@ import Button from '@/components/ui/Button';
 import RoleBadge from '@/components/ui/RoleBadge';
 import type { Event, PermissionLevel } from '@/types/index';
 import LottieView from 'lottie-react-native';
+import { useFollowedEvents } from '@/hooks/useFollowedEvents';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function MyEventsScreen() {
+  const {
+    toggleFollowEvent,
+    isFollowing,
+    followedEvents,
+    removeFollowedEvent,
+  } = useFollowedEvents();
+
   const router = useRouter();
   const { state, updateEvent } = useEvents();
   const auth = getAuth();
@@ -224,6 +239,35 @@ export default function MyEventsScreen() {
           </View>
 
           <View style={styles.buttonsRow}>
+            <Pressable
+              onPress={() => {
+                toggleFollowEvent(item); // 👈 envia o objeto inteiro
+                if (isFollowing(item.id)) {
+                  Alert.alert('Atenção', 'Evento deixará de ser seguido.');
+                }
+              }}
+              style={[
+                styles.mapBtn,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: isFollowing(item.id)
+                    ? '#ccc'
+                    : 'transparent',
+                },
+              ]}
+            >
+              {isFollowing(item.id) ? (
+                <HeartOff size={16} color={colors.primary} />
+              ) : (
+                <Heart size={16} color={colors.primary} />
+              )}
+              <Text
+                style={[styles.mapBtnText, { color: colors.textSecondary }]}
+              >
+                {isFollowing(item.id) ? 'Seguindo' : 'Seguir'}
+              </Text>
+            </Pressable>
+
             <Pressable
               onPress={() => handleOpenInMaps(item.location)}
               style={[styles.mapBtn, { borderColor: colors.border }]}

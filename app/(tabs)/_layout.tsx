@@ -5,6 +5,7 @@ import { useColorScheme } from 'react-native';
 import {
   Calendar,
   Camera,
+  HeartPulse,
   Home,
   SquarePlus as PlusSquare,
   User,
@@ -53,15 +54,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
         }}
       />
-      {/* <Tabs.Screen
-        name="add"
-        options={{
-          title: 'Aicionar evento',
-          tabBarIcon: ({ color, size }) => (
-            <PlusSquare size={size} color={color} />
-          ),
-        }}
-      /> */}
+
       <Tabs.Screen
         name="calendar"
         options={{
@@ -71,14 +64,15 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* <Tabs.Screen
-        name="qr-scanner"
+      <Tabs.Screen
+        name="seguidos"
         options={{
-          title: 'QR Code',
-          tabBarIcon: ({ color, size }) => <Camera size={size} color={color} />,
-          headerShown: true,
+          title: 'Seguidos',
+          tabBarIcon: ({ color, size }) => (
+            <HeartPulse size={size} color={color} />
+          ),
         }}
-      /> */}
+      />
       <Tabs.Screen
         name="profile"
         options={{
