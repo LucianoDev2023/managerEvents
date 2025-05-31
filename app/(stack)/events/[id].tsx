@@ -23,11 +23,9 @@ import {
   Plus,
   Trash2,
   Edit,
-  LucideQrCode,
   CalendarDays,
   MapPin,
 } from 'lucide-react-native';
-import ViewShot from 'react-native-view-shot';
 import ProgramItem from '@/components/ProgramItem';
 import Button from '@/components/ui/Button';
 import LoadingOverlay from '@/components/LoadingOverlay';
@@ -53,7 +51,8 @@ export default function EventDetailScreen() {
   const isCreator = event?.createdBy?.toLowerCase() === userEmail;
   const isAdm = event?.subAdmins?.some(
     (admin) =>
-      (admin.email.toLowerCase() === userEmail && admin.level === 'Admin') ||
+      (admin.email.toLowerCase() === userEmail &&
+        admin.level === 'Super Admin') ||
       admin.level === 'Admin parcial'
   );
   const hasAdminPermission = isCreator || isAdm;

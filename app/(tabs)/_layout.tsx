@@ -11,12 +11,13 @@ import {
 } from 'lucide-react-native';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
   return (
     <Tabs
       screenOptions={{
+        animation: 'none',
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {

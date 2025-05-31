@@ -35,7 +35,7 @@ export default function Card({ children, style, elevation = 1 }: CardProps) {
       style={[
         styles.card,
         {
-          backgroundColor: colors.card,
+          backgroundColor: colors.background,
           borderColor: colors.border,
         },
         getShadow(),

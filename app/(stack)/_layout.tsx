@@ -1,11 +1,34 @@
 import React from 'react';
-import { Stack } from 'expo-router';
-import { useColorScheme, View, StyleSheet } from 'react-native';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import {
+  useColorScheme,
+  View,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
 import Colors from '@/constants/Colors';
+import { ArrowLeft } from 'lucide-react-native';
 
 export default function StackLayout() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { from } = useLocalSearchParams<{ from?: string }>();
+
+  const handleGoBack = () => {
+    if (from === 'profile') {
+      router.push('/(tabs)/profile');
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  };
+
+  const renderHeaderLeft = () => (
+    <TouchableOpacity onPress={handleGoBack} style={{ marginLeft: 16 }}>
+      <ArrowLeft size={24} color={colors.primary} />
+    </TouchableOpacity>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -28,13 +51,10 @@ export default function StackLayout() {
           },
         }}
       >
-        {/* Todas as telas devem estar dentro do componente Stack */}
         <Stack.Screen
           name="events/[id]/edit_event"
           options={{
             title: '',
-            // Para título dinâmico:
-            // headerTitle: ({ route }) => route.params?.eventTitle || 'Editar Evento'
           }}
         />
 
@@ -43,17 +63,16 @@ export default function StackLayout() {
           options={{
             title: 'Lista de eventos',
             headerShown: true,
-            // Para título dinâmico:
-            // headerTitle: ({ route }) => route.params?.eventTitle || 'Editar Evento'
+            headerLeft: renderHeaderLeft,
           }}
         />
+
         <Stack.Screen
           name="permission-confirmation/[id]"
           options={{
             title: 'Administrar permissões',
             headerShown: true,
-            // Para título dinâmico:
-            // headerTitle: ({ route }) => route.params?.eventTitle || 'Editar Evento'
+            headerLeft: renderHeaderLeft,
           }}
         />
       </Stack>

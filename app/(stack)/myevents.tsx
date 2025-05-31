@@ -15,7 +15,7 @@ import {
   BackHandler,
   Linking,
 } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import { useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -37,6 +37,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function MyEventsScreen() {
   const router = useRouter();
+  const { from } = useLocalSearchParams<{ from?: string }>();
   const { state, updateEvent } = useEvents();
   const auth = getAuth();
   const userEmail = auth.currentUser?.email?.toLowerCase();
@@ -59,10 +60,10 @@ export default function MyEventsScreen() {
       event.subAdmins?.some((admin) => admin.email.toLowerCase() === userEmail)
   );
 
-  const gradientColors =
+  const gradientColors: [string, string, ...string[]] =
     colorScheme === 'dark'
-      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
-      : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
+      ? ['#0b0b0f', '#1b0033', '#3e1d73']
+      : ['#ffffff', '#f0f0ff', '#e9e6ff'];
 
   // Event handlers
   const handleNavigate = (id: string) => {
@@ -110,27 +111,39 @@ export default function MyEventsScreen() {
       return;
     }
 
+    const selectedEvent = state.events.find(
+      (event) => event.id === selectedEventId
+    );
+    if (!selectedEvent) return;
+
+    const creatorEmail = selectedEvent.createdBy?.toLowerCase();
+    const enteredEmail = permissionEmail.trim().toLowerCase();
+
+    if (enteredEmail === creatorEmail) {
+      Alert.alert(
+        'Email inválido',
+        'O email inserido é o mesmo do criador do evento. Não é necessário conceder permissão.'
+      );
+      return;
+    }
+
+    const existingAdmin = selectedEvent.subAdmins?.find(
+      (admin) => admin.email.toLowerCase() === enteredEmail
+    );
+
+    if (existingAdmin) {
+      Alert.alert('Atenção', 'Este usuário já tem permissão para este evento.');
+      return;
+    }
+
     const updatedEvents = state.events.map((event) => {
       if (event.id === selectedEventId) {
-        const existingAdmin = event.subAdmins?.find(
-          (admin) =>
-            admin.email.toLowerCase() === permissionEmail.trim().toLowerCase()
-        );
-
-        if (existingAdmin) {
-          Alert.alert(
-            'Atenção',
-            'Este usuário já tem permissão para este evento.'
-          );
-          return event;
-        }
-
         return {
           ...event,
           subAdmins: [
             ...(event.subAdmins ?? []),
             {
-              email: permissionEmail.trim().toLowerCase(),
+              email: enteredEmail,
               level: permissionLevel,
             },
           ],
@@ -164,7 +177,7 @@ export default function MyEventsScreen() {
     const subAdmin = item.subAdmins?.find(
       (admin) => admin.email.toLowerCase() === userEmail
     );
-    const isAdm = subAdmin?.level === 'Admin';
+    const isAdm = subAdmin?.level === 'Super Admin';
 
     return (
       <AnimatedPressable
@@ -182,7 +195,7 @@ export default function MyEventsScreen() {
             <View style={styles.overlay}>
               {isCreator && <RoleBadge role="Super Admin" />}
               {subAdmin && !isCreator && (
-                <RoleBadge role={isAdm ? 'Admin' : 'Adm parcial'} />
+                <RoleBadge role={isAdm ? 'Super Admin' : 'Adm parcial'} />
               )}
               <Text style={styles.overlayTitle} numberOfLines={1}>
                 {item.title}
@@ -259,7 +272,7 @@ export default function MyEventsScreen() {
       />
 
       <SafeAreaView style={styles.container}>
-        <Text style={[styles.title, { color: colors.text }]}>Meus Eventos</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Eventos</Text>
 
         <FlatList
           data={filteredEvents}
@@ -277,6 +290,7 @@ export default function MyEventsScreen() {
           visible={modalVisible}
           onClose={() => setModalVisible(false)}
           colors={colors}
+          gradientColors={gradientColors} // 👈 adicionado
           permissionEmail={permissionEmail}
           setPermissionEmail={setPermissionEmail}
           permissionLevel={permissionLevel}
@@ -296,11 +310,12 @@ export default function MyEventsScreen() {
   );
 }
 
-// Extracted Modal Components for better organization
+// ✅ Correção aplicada também ao componente `PermissionModal`
 const PermissionModal = ({
   visible,
   onClose,
   colors,
+  gradientColors,
   permissionEmail,
   setPermissionEmail,
   permissionLevel,
@@ -310,6 +325,7 @@ const PermissionModal = ({
   visible: boolean;
   onClose: () => void;
   colors: typeof Colors.dark | typeof Colors.light;
+  gradientColors: [string, string, ...string[]]; // <- AQUI ESTÁ O FIX
   permissionEmail: string;
   setPermissionEmail: (email: string) => void;
   permissionLevel: PermissionLevel;
@@ -319,69 +335,58 @@ const PermissionModal = ({
   <Modal visible={visible} transparent animationType="fade">
     <View style={styles.modalOverlay}>
       <Animated.View
-        entering={FadeIn.duration(300)}
-        exiting={FadeOut.duration(200)}
-        style={[
-          styles.modalContent,
-          {
-            backgroundColor: colors.background,
-            borderWidth: 1,
-            borderColor: colors.primary2,
-          },
-        ]}
+        entering={FadeIn}
+        exiting={FadeOut}
+        style={styles.animatedContainer}
       >
-        <Text
-          style={[styles.modalTitle, , { color: colors.text2, marginTop: 12 }]}
+        <LinearGradient
+          colors={gradientColors}
+          locations={[0, 0.7, 1]}
+          style={[styles.modalContent, { borderColor: colors.primary2 }]}
         >
-          🔐 Permissões
-        </Text>
-        <Text
-          style={[styles.modalText, { color: colors.text2, marginTop: 12 }]}
-        >
-          <Text style={[styles.roleHighlight, { color: colors.primary }]}>
-            Super admin:
-          </Text>{' '}
-          Controle total sobre todos os recursos. Pode criar, editar, gerencia
-          permissões de todos os outros usuários. Só não pode excluir o evento
-          principal. Permissão exclusiva para o criador do evento.
-        </Text>
+          <Text style={[styles.modalTitle, { color: colors.primary }]}>
+            🔐 Permissões
+          </Text>
 
-        <Text
-          style={[styles.modalText, { color: colors.text2, marginTop: 12 }]}
-        >
-          <Text style={[styles.roleHighlight, { color: colors.primary }]}>
-            Admin parcial:
-          </Text>{' '}
-          Possuir algumas restrições, mas ainda pode adicionar programas,
-          atividades e fotos. Qualquer ação de deletar só será possível para as
-          atividades que criou.
-        </Text>
+          <Text style={[styles.modalText, { color: colors.text }]}>
+            <Text style={styles.roleHighlight}>Super admin:</Text> Controle
+            total sobre todos os recursos. Pode criar, editar, gerenciar
+            permissões de todos os outros usuários. Não pode excluir o evento
+            principal. Permissão exclusiva do criador.
+          </Text>
 
-        <Text style={[styles.modalSubtitle, { color: colors.text }]}>
-          👥 Adicionar Permissão
-        </Text>
-        <TextInput
-          placeholder="Digite o Email que deseja cadastrar"
-          value={permissionEmail}
-          onChangeText={setPermissionEmail}
-          placeholderTextColor={colors.textSecondary}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          style={[
-            styles.input,
-            {
-              backgroundColor: colors.backGroundSecondary,
-              borderColor: colors.border,
-              color: colors.text,
-            },
-          ]}
-        />
-        <Text style={[styles.modalLabel, { color: colors.text }]}>
-          Selecione o tipo de permissão
-        </Text>
-        <View style={styles.toggleRow}>
-          {(['Super Admin', 'Admin parcial'] as PermissionLevel[]).map(
-            (level) => (
+          <Text style={[styles.modalText, { color: colors.text }]}>
+            <Text style={styles.roleHighlight}>Admin parcial:</Text> Com algumas
+            restrições, pode adicionar programas, atividades e fotos. Só pode
+            deletar o que criou.
+          </Text>
+
+          <Text style={[styles.modalSubtitle, { color: colors.text }]}>
+            👥 Adicionar Permissão
+          </Text>
+
+          <TextInput
+            placeholder="Digite o Email"
+            value={permissionEmail}
+            onChangeText={setPermissionEmail}
+            placeholderTextColor={colors.textSecondary}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.backGroundSecondary,
+                borderColor: colors.border,
+                color: colors.text,
+              },
+            ]}
+          />
+
+          <Text style={[styles.modalLabel, { color: colors.text }]}>
+            Tipo de permissão
+          </Text>
+          <View style={styles.toggleRow}>
+            {(['Super Admin', 'Admin parcial'] as const).map((level) => (
               <Pressable
                 key={level}
                 onPress={() => setPermissionLevel(level)}
@@ -390,40 +395,43 @@ const PermissionModal = ({
                   {
                     backgroundColor:
                       permissionLevel === level
-                        ? '#25D366'
-                        : colors.backGroundSecondary,
+                        ? colors.primary
+                        : 'transparent',
                     borderColor:
-                      permissionLevel === level ? '#25D366' : colors.border,
+                      permissionLevel === level
+                        ? colors.primary
+                        : colors.border,
                   },
                 ]}
               >
                 <Text
                   style={{
-                    color: permissionLevel === level ? 'white' : colors.text,
+                    color: permissionLevel === level ? '#fff' : colors.text,
                     fontWeight: '600',
                   }}
                 >
                   {level}
                 </Text>
               </Pressable>
-            )
-          )}
-        </View>
-        <View style={styles.buttonRow}>
-          <Button
-            title="Cancelar"
-            variant="cancel"
-            onPress={onClose}
-            style={{ flex: 1 }}
-            textStyle={{ color: 'white' }}
-          />
-          <Button
-            title="Salvar"
-            onPress={onSave}
-            style={{ backgroundColor: colors.primary, flex: 1 }}
-            textStyle={{ color: 'white' }}
-          />
-        </View>
+            ))}
+          </View>
+
+          <View style={styles.buttonRow}>
+            <Button
+              title="Cancelar"
+              variant="cancel"
+              onPress={onClose}
+              style={{ flex: 1, marginRight: 8 }}
+              textStyle={{ color: 'white' }}
+            />
+            <Button
+              title="Salvar"
+              onPress={onSave}
+              style={{ backgroundColor: colors.primary, flex: 1 }}
+              textStyle={{ color: '#fff' }}
+            />
+          </View>
+        </LinearGradient>
       </Animated.View>
     </View>
   </Modal>
@@ -557,6 +565,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#ddd',
     fontFamily: 'Inter_400Regular',
+  },
+  animatedContainer: {
+    width: '90%',
   },
 
   // Button Styles

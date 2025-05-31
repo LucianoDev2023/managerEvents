@@ -37,11 +37,13 @@ export default function RootLayout() {
   }
 
   return (
-    <RegistrationFlowProvider>
-      <EventsProvider>
-        <Slot />
-      </EventsProvider>
-    </RegistrationFlowProvider>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <RegistrationFlowProvider>
+        <EventsProvider>
+          <Slot />
+        </EventsProvider>
+      </RegistrationFlowProvider>
+    </View>
   );
 }
 

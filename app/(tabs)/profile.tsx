@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,27 +11,29 @@ import {
   Modal,
 } from 'react-native';
 import { useColorScheme } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { signOut } from 'firebase/auth';
+import CustomDropdown from '@/components/ui/CustomDropdown';
+import { Bell } from 'lucide-react-native';
+import { BackHandler } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import Colors from '@/constants/Colors';
 import { useEvents } from '@/context/EventsContext';
 import Button from '@/components/ui/Button';
-import Card from '@/components/ui/Card';
 
 import {
   Settings,
-  Moon,
-  Sun,
   LogOut,
   Trash2,
   CircleHelp as HelpCircle,
-  Bell,
 } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { auth } from '@/config/firebase';
 import { useAuthListener } from '@/hooks/useAuthListener';
+import LottieView from 'lottie-react-native';
 
 export default function ProfileScreen() {
   const { user, authLoading } = useAuthListener();
@@ -44,10 +46,15 @@ export default function ProfileScreen() {
   const colors = Colors[colorScheme];
   const textColor = colorScheme === 'dark' ? '#fff' : '#1a1a1a';
   const textSecondary = colorScheme === 'dark' ? '#aaa' : '#555';
+  const backgroundColor = colorScheme === 'dark' ? '#0b0b0f' : '#e9e6ff';
+  const [isLoadingEvents, setIsLoadingEvents] = useState(true);
+  const scheme = useColorScheme() ?? 'dark';
+  const theme = Colors[scheme];
+
   const gradientColors: [string, string, ...string[]] =
     colorScheme === 'dark'
-      ? ['#0b0b0f', '#1b0033', '#3e1d73']
-      : ['#ffffff', '#f0f0ff', '#e9e6ff'];
+      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
+      : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -55,13 +62,38 @@ export default function ProfileScreen() {
     }
   }, [authLoading, user]);
 
-  if (authLoading) {
-    return (
-      <View style={[styles.gradient, styles.center]}>
-        <ActivityIndicator size="large" color="#6e56cf" />
-      </View>
-    );
-  }
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setIsLoadingEvents(false);
+    }, 10000); // 10 segundos
+
+    if (state.events.length > 0) {
+      setIsLoadingEvents(false); // já carregou
+      clearTimeout(timeout);
+    }
+
+    return () => clearTimeout(timeout);
+  }, [state.events]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (supportVisible) {
+          setSupportVisible(false); // Fecha o modal se estiver aberto
+          return true; // Impede o comportamento padrão
+        }
+
+        router.back(); // Voltar para a tela anterior
+        return true;
+      };
+
+      BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => {
+        BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+      };
+    }, [supportVisible])
+  );
 
   const userEmail = user?.email?.toLowerCase();
   const userEvents = state.events.filter(
@@ -110,21 +142,28 @@ export default function ProfileScreen() {
     ]);
   };
 
-  const handleClearData = () => {
-    Alert.alert(
-      'Limpar tudo?',
-      'Isso excluirá todos os eventos e programas permanentemente.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir tudo',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert('Dados apagados', 'Todos os eventos foram removidos.');
-          },
-        },
-      ]
-    );
+  // const handleClearData = () => {
+  //   Alert.alert(
+  //     'Limpar tudo?',
+  //     'Isso excluirá todos os eventos e programas permanentemente.',
+  //     [
+  //       { text: 'Cancelar', style: 'cancel' },
+  //       {
+  //         text: 'Excluir tudo',
+  //         style: 'destructive',
+  //         onPress: () => {
+  //           Alert.alert('Dados apagados', 'Todos os eventos foram removidos.');
+  //         },
+  //       },
+  //     ]
+  //   );
+  // };
+
+  const handleGoToPermissions = (eventId: string) => {
+    router.push({
+      pathname: '/(stack)/permission-confirmation/[id]',
+      params: { id: eventId },
+    });
   };
 
   const displayName = user?.displayName ?? 'Usuário';
@@ -132,165 +171,254 @@ export default function ProfileScreen() {
   const pluralize = (count: number, singular: string, plural: string) =>
     count <= 1 ? singular : plural;
 
-  return (
-    <LinearGradient
-      colors={gradientColors}
-      style={[styles.gradient, { backgroundColor: gradientColors[0] }]}
-      locations={[0, 0.7, 1]}
-    >
-      <StatusBar
-        translucent
-        backgroundColor="transparent"
-        style={colorScheme === 'dark' ? 'light' : 'dark'}
-      />
-      <ScrollView
-        contentContainerStyle={[
-          styles.contentContainer,
-          {
-            paddingTop:
-              Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
-          },
-        ]}
+  if (isLoadingEvents) {
+    return (
+      <LinearGradient
+        colors={gradientColors}
+        locations={[0, 0.7, 1]}
+        style={styles.container}
       >
-        <View style={styles.profileHeader}>
-          <Text style={[styles.profileName, { color: textColor }]}>
-            {displayName}
-          </Text>
-          <Text style={[styles.profileEmail, { color: textColor }]}>
-            {userEmail}
-          </Text>
-        </View>
-
-        <View style={styles.statsGrid}>
-          <View style={[styles.statCard, { backgroundColor: colors.primary }]}>
-            <Text style={styles.statNumber}>{totalEvents}</Text>
-            <Text style={styles.statLabel}>
-              {pluralize(totalEvents, 'Evento', 'Eventos')}
+        <StatusBar
+          translucent
+          backgroundColor="transparent"
+          style={scheme === 'dark' ? 'light' : 'dark'}
+        />
+        <View
+          style={[
+            styles.content,
+            {
+              paddingTop:
+                Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
+            },
+          ]}
+        >
+          <View style={[styles.gradient, styles.center]}>
+            <Text style={[styles.statLabel, { color: theme.text }]}>
+              Atualizando perfil...
             </Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: colors.primary2 }]}>
-            <Text style={styles.statNumber}>{totalPrograms}</Text>
-            <Text style={styles.statLabel}>
-              {pluralize(totalPrograms, 'Programa', 'Programas')}
-            </Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: colors.primary2 }]}>
-            <Text style={styles.statNumber}>{totalActivities}</Text>
-            <Text style={styles.statLabel}>
-              {pluralize(totalActivities, 'Atividade', 'Atividades')}
-            </Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: colors.primary }]}>
-            <Text style={styles.statNumber}>{totalPhotos}</Text>
-            <Text style={styles.statLabel}>
-              {pluralize(totalPhotos, 'Foto', 'Fotos')}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={[styles.sectionTitle, { color: textColor }]}>
-          Controle
-        </Text>
-        <View style={styles.card}>
-          <Button
-            title="Meus eventos"
-            icon={<Settings size={24} color={textColor} />}
-            onPress={() => router.push('/(stack)/myevents')}
-            variant="ghost"
-            fullWidth
-            style={styles.menuButton}
-            textStyle={{ color: textColor }}
-          />
-          <Button
-            title="Notificações"
-            icon={<Bell size={20} color={textColor} />}
-            onPress={() => {}}
-            variant="ghost"
-            fullWidth
-            style={styles.menuButton}
-            textStyle={{ color: textColor }}
-          />
-        </View>
-
-        <Text style={[styles.sectionTitle, { color: textColor }]}>Suporte</Text>
-        <View style={styles.card}>
-          <Button
-            title="Ajuda e Suporte"
-            icon={<HelpCircle size={20} color={textColor} />}
-            onPress={() => setSupportVisible(true)}
-            variant="ghost"
-            fullWidth
-            style={styles.menuButton}
-            textStyle={{ color: textColor }}
-          />
-        </View>
-
-        <Text style={[styles.sectionTitle, { color: textColor }]}>Conta</Text>
-        <View style={styles.card}>
-          <Button
-            title="Limpar Tudo"
-            icon={<Trash2 size={20} color="#f44336" />}
-            onPress={handleClearData}
-            variant="ghost"
-            fullWidth
-            style={styles.menuButton}
-            textStyle={{ color: '#f44336' }}
-          />
-          <Button
-            title="Sair da Conta"
-            icon={<LogOut size={20} color="#f44336" />}
-            onPress={handleLogout}
-            variant="ghost"
-            fullWidth
-            style={styles.menuButton}
-            textStyle={{ color: '#f44336' }}
-          />
-        </View>
-
-        <Text style={[styles.versionText, { color: textSecondary }]}>
-          Versão 1.0.0
-        </Text>
-      </ScrollView>
-
-      <Modal visible={supportVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.modalContent,
-              { backgroundColor: colors.background },
-            ]}
-          >
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Ajuda e Suporte
-            </Text>
-            <Text style={{ color: colors.text, marginBottom: 20 }}>
-              Em caso de dúvidas, entre em contato:
-            </Text>
-            <Text
-              selectable
-              style={{
-                color: colors.primary,
-                fontWeight: 'bold',
-                fontSize: 16,
-              }}
-            >
-              planejejasuporte@gmail.com
-            </Text>
-            <Button
-              title="Fechar"
-              onPress={() => setSupportVisible(false)}
-              style={{ backgroundColor: colors.primary, marginTop: 24 }}
-              textStyle={{ color: '#fff' }}
+            <LottieView
+              source={require('../../assets/images/loading.json')}
+              autoPlay
+              loop
+              style={styles.lottie}
             />
           </View>
         </View>
-      </Modal>
-    </LinearGradient>
+      </LinearGradient>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: backgroundColor }}>
+      <Animated.View
+        entering={FadeIn.duration(50)}
+        exiting={FadeOut.duration(50)}
+        style={{
+          flex: 1,
+          backgroundColor: gradientColors[0], // Cor de fundo igual ao início do gradiente
+        }}
+      >
+        <LinearGradient
+          colors={gradientColors}
+          style={[styles.gradient, { backgroundColor: gradientColors[0] }]}
+          locations={[0, 0.7, 1]}
+        >
+          <StatusBar
+            translucent
+            backgroundColor="transparent"
+            style={colorScheme === 'dark' ? 'light' : 'dark'}
+          />
+          <ScrollView
+            contentContainerStyle={[
+              styles.contentContainer,
+              {
+                paddingTop:
+                  Platform.OS === 'android'
+                    ? RNStatusBar.currentHeight ?? 40
+                    : 0,
+              },
+            ]}
+          >
+            <View style={styles.profileHeader}>
+              <Text style={[styles.profileName, { color: textColor }]}>
+                {displayName}
+              </Text>
+              <Text style={[styles.profileEmail, { color: textColor }]}>
+                {userEmail}
+              </Text>
+            </View>
+
+            <View style={styles.statsGrid}>
+              <View
+                style={[styles.statCard, { backgroundColor: colors.primary }]}
+              >
+                <Text style={styles.statNumber}>{totalEvents}</Text>
+                <Text style={styles.statLabel}>
+                  {pluralize(totalEvents, 'Evento', 'Eventos')}
+                </Text>
+              </View>
+              <View
+                style={[styles.statCard, { backgroundColor: colors.primary2 }]}
+              >
+                <Text style={styles.statNumber}>{totalPrograms}</Text>
+                <Text style={styles.statLabel}>
+                  {pluralize(totalPrograms, 'Programa', 'Programas')}
+                </Text>
+              </View>
+              <View
+                style={[styles.statCard, { backgroundColor: colors.primary2 }]}
+              >
+                <Text style={styles.statNumber}>{totalActivities}</Text>
+                <Text style={styles.statLabel}>
+                  {pluralize(totalActivities, 'Atividade', 'Atividades')}
+                </Text>
+              </View>
+              <View
+                style={[styles.statCard, { backgroundColor: colors.primary }]}
+              >
+                <Text style={styles.statNumber}>{totalPhotos}</Text>
+                <Text style={styles.statLabel}>
+                  {pluralize(totalPhotos, 'Foto', 'Fotos')}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[styles.sectionTitle, { color: textColor }]}>
+              Controle
+            </Text>
+            <View style={styles.card}>
+              <Button
+                title="Lista de eventos"
+                icon={<Settings size={20} color={textColor} />}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(stack)/myevents',
+                  })
+                }
+                variant="ghost"
+                fullWidth
+                style={styles.menuButton}
+                textStyle={{ color: textColor }}
+              />
+              <Text style={[styles.sectionTitle, { color: textColor }]}>
+                Eventos com Permissões
+              </Text>
+              <View style={styles.dropdownContainer}>
+                <CustomDropdown
+                  items={state.events.filter(
+                    (event) => event.createdBy?.toLowerCase() === userEmail
+                  )}
+                  placeholder="-- Escolha um evento --"
+                  onSelect={(event) => handleGoToPermissions(event.id)}
+                  getItemLabel={(event) => event.title}
+                  icon={<Bell size={20} color={textColor} />}
+                  backgroundColor={colors.backGroundSecondary}
+                  borderColor={colors.border}
+                  textColor={textColor}
+                />
+              </View>
+            </View>
+
+            <Text style={[styles.sectionTitle, { color: textColor }]}>
+              Suporte
+            </Text>
+            <View style={styles.card}>
+              <Button
+                title="Ajuda e Suporte"
+                icon={<HelpCircle size={20} color={textColor} />}
+                onPress={() => setSupportVisible(true)}
+                variant="ghost"
+                fullWidth
+                style={styles.menuButton}
+                textStyle={{ color: textColor }}
+              />
+            </View>
+
+            <Text style={[styles.sectionTitle, { color: textColor }]}>
+              Conta
+            </Text>
+            <View style={styles.card}>
+              {/* <Button
+                title="Limpar Tudo"
+                icon={<Trash2 size={20} color="#f44336" />}
+                onPress={handleClearData}
+                variant="ghost"
+                fullWidth
+                style={styles.menuButton}
+                textStyle={{ color: '#f44336' }}
+              /> */}
+              <Button
+                title="Sair da Conta"
+                icon={<LogOut size={20} color="#f44336" />}
+                onPress={handleLogout}
+                variant="ghost"
+                fullWidth
+                style={styles.menuButton}
+                textStyle={{ color: '#f44336' }}
+              />
+            </View>
+
+            <Text style={[styles.versionText, { color: textSecondary }]}>
+              Versão 1.0.0
+            </Text>
+          </ScrollView>
+
+          <Modal visible={supportVisible} transparent animationType="slide">
+            <View style={styles.modalOverlay}>
+              <LinearGradient
+                colors={gradientColors}
+                style={styles.modalContent}
+                locations={[0, 0.7, 1]}
+              >
+                <Text style={[styles.titleHelp, { color: colors.primary }]}>
+                  Ajuda e Suporte
+                </Text>
+
+                <View style={styles.modalBody}>
+                  <Text style={[styles.testHelp, { color: colors.text }]}>
+                    🔹 <Text style={styles.bold}>Controle</Text>: acesse todos
+                    os eventos aos quais você está vinculado, seja como
+                    proprietário ou por permissão.
+                  </Text>
+                  <Text style={[styles.testHelp, { color: colors.text }]}>
+                    🔹 <Text style={styles.bold}>Eventos com permissões</Text>:
+                    visualize todos os eventos criados por você e gerencie as
+                    permissões de outros usuários.
+                  </Text>
+                  <Text style={[styles.testHelp, { color: colors.text }]}>
+                    💬 Em caso de dúvidas ou necessidade de suporte, entre em
+                    contato com nossa equipe.
+                  </Text>
+                  <Text selectable style={styles.supportEmail}>
+                    📩 planejejasuporte@gmail.com
+                  </Text>
+                  <Button
+                    title="Fechar"
+                    onPress={() => setSupportVisible(false)}
+                    style={styles.closeButton}
+                    textStyle={{ color: '#fff' }}
+                  />
+                </View>
+              </LinearGradient>
+            </View>
+          </Modal>
+        </LinearGradient>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: { flex: 1, backgroundColor: '#0b0b0f' },
+  container: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  gradient: { flex: 1 },
   center: { justifyContent: 'center', alignItems: 'center' },
   contentContainer: { paddingHorizontal: 16, paddingBottom: 20 },
   profileHeader: { alignItems: 'flex-start', marginBottom: 20 },
@@ -318,12 +446,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     marginBottom: 4,
   },
-  statLabel: { color: 'white', fontSize: 14, fontFamily: 'Inter-Medium' },
+  statLabel: { color: 'white', fontSize: 16, fontFamily: 'Inter-Medium' },
   sectionTitle: {
     fontSize: 18,
     fontFamily: 'Inter-Bold',
+    margin: 0,
     marginTop: 8,
     marginBottom: 12,
+    padding: 0,
   },
   menuButton: { justifyContent: 'flex-start', paddingVertical: 12 },
   versionText: {
@@ -336,7 +466,6 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: 'transparent',
     borderRadius: 12,
-    padding: 12,
     elevation: 0,
     shadowColor: 'transparent',
   },
@@ -345,12 +474,61 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderWidth: 1,
+    borderColor: '#444',
   },
   modalContent: {
     width: '85%',
     padding: 20,
     borderRadius: 12,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#444',
   },
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
+  dropdownContainer: {
+    marginBottom: 24,
+  },
+  testHelp: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'left',
+    fontFamily: 'Inter_400Regular',
+  },
+  titleHelp: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 16,
+    fontFamily: 'Inter_700Bold',
+  },
+  suporte: {
+    marginTop: 24,
+    marginBottom: 10,
+  },
+  lottie: {
+    width: 150,
+    height: 150,
+  },
+  modalBody: {
+    width: '100%',
+    marginTop: 16,
+  },
+
+  bold: {
+    fontWeight: 'bold',
+    color: '#7c3aed',
+  },
+  supportEmail: {
+    marginTop: 20,
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#facc15',
+  },
+  closeButton: {
+    backgroundColor: '#7c3aed',
+    marginTop: 20,
+    width: '100%',
+  },
 });

@@ -17,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import Colors from '@/constants/Colors';
 import { BlurView } from 'expo-blur';
 import { MapPin, CalendarDays } from 'lucide-react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 export default function FoundEventScreen() {
   const { accessCode, title } = useLocalSearchParams<{
@@ -60,84 +61,90 @@ export default function FoundEventScreen() {
   }, [accessCode, title, state.events]);
 
   return (
-    <LinearGradient
-      colors={gradientColors}
-      locations={[0, 0.7, 1]}
-      style={styles.container}
-    >
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop:
-              Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
-          },
-        ]}
+    <Animated.View entering={FadeIn} exiting={FadeOut} style={{ flex: 1 }}>
+      <LinearGradient
+        colors={gradientColors}
+        locations={[0, 0.7, 1]}
+        style={styles.container}
       >
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Evento Encontrado
-        </Text>
-      </View>
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
 
-      <View style={styles.content}>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.text }]}>
-              Buscando evento...
-            </Text>
-          </View>
-        ) : eventFound ? (
-          <Pressable onPress={() => router.push(`/events/${eventFound.id}`)}>
-            <View style={styles.card}>
-              <ImageBackground
-                source={{ uri: eventFound.coverImage }}
-                style={styles.image}
-                imageStyle={{
-                  borderTopLeftRadius: 16,
-                  borderTopRightRadius: 16,
-                }}
-              >
-                <BlurView
-                  intensity={50}
-                  tint={colorScheme}
-                  style={styles.blurOverlay}
-                >
-                  <Text style={styles.eventTitle}>{eventFound.title}</Text>
-
-                  <View style={styles.row}>
-                    <CalendarDays size={16} color="#fff" />
-                    <Text style={styles.meta}>
-                      {new Date(eventFound.startDate).toLocaleDateString(
-                        'pt-BR'
-                      )}{' '}
-                      até{' '}
-                      {new Date(eventFound.endDate).toLocaleDateString('pt-BR')}
-                    </Text>
-                  </View>
-                  {eventFound.location && (
-                    <View style={styles.row}>
-                      <MapPin size={16} color="#fff" />
-                      <Text style={styles.meta}>{eventFound.location}</Text>
-                    </View>
-                  )}
-                </BlurView>
-              </ImageBackground>
-
-              <View style={styles.cardFooter}>
-                <Text style={styles.buttonText}>Toque para acessar</Text>
-              </View>
-            </View>
-          </Pressable>
-        ) : (
-          <Text style={[styles.notFoundText, { color: colors.textSecondary }]}>
-            Nenhum evento correspondente foi encontrado.
+        <View
+          style={[
+            styles.header,
+            {
+              paddingTop:
+                Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
+            },
+          ]}
+        >
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Evento Encontrado
           </Text>
-        )}
-      </View>
-    </LinearGradient>
+        </View>
+
+        <View style={styles.content}>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={[styles.loadingText, { color: colors.text }]}>
+                Buscando evento...
+              </Text>
+            </View>
+          ) : eventFound ? (
+            <Pressable onPress={() => router.push(`/events/${eventFound.id}`)}>
+              <View style={styles.card}>
+                <ImageBackground
+                  source={{ uri: eventFound.coverImage }}
+                  style={styles.image}
+                  imageStyle={{
+                    borderTopLeftRadius: 16,
+                    borderTopRightRadius: 16,
+                  }}
+                >
+                  <BlurView
+                    intensity={50}
+                    tint={colorScheme}
+                    style={styles.blurOverlay}
+                  >
+                    <Text style={styles.eventTitle}>{eventFound.title}</Text>
+
+                    <View style={styles.row}>
+                      <CalendarDays size={16} color="#fff" />
+                      <Text style={styles.meta}>
+                        {new Date(eventFound.startDate).toLocaleDateString(
+                          'pt-BR'
+                        )}{' '}
+                        até{' '}
+                        {new Date(eventFound.endDate).toLocaleDateString(
+                          'pt-BR'
+                        )}
+                      </Text>
+                    </View>
+                    {eventFound.location && (
+                      <View style={styles.row}>
+                        <MapPin size={16} color="#fff" />
+                        <Text style={styles.meta}>{eventFound.location}</Text>
+                      </View>
+                    )}
+                  </BlurView>
+                </ImageBackground>
+
+                <View style={styles.cardFooter}>
+                  <Text style={styles.buttonText}>Toque para acessar</Text>
+                </View>
+              </View>
+            </Pressable>
+          ) : (
+            <Text
+              style={[styles.notFoundText, { color: colors.textSecondary }]}
+            >
+              Nenhum evento correspondente foi encontrado.
+            </Text>
+          )}
+        </View>
+      </LinearGradient>
+    </Animated.View>
   );
 }
 
