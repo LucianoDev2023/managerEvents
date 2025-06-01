@@ -54,6 +54,7 @@ export type Photo = {
   timestamp: Date;
   publicId?: string;
   description?: string;
+  comentarios?: string;
 };
 
 export type FormValues = {

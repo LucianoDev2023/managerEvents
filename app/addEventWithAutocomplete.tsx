@@ -10,7 +10,6 @@ import {
 import MapView, { Marker } from 'react-native-maps';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import Constants from 'expo-constants';
-import Colors from '@/constants/Colors';
 import Button from '@/components/ui/Button';
 
 const { width, height } = Dimensions.get('window');

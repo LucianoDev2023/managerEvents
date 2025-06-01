@@ -28,6 +28,16 @@
         "ACCESS_COARSE_LOCATION"
       ],
       "package": "com.luciano_dev_2025.gerenciadordeeventos",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": {
+            "scheme": "myapp",
+            "host": "*"
+          },
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyD_UKirzoq-kOOBaxo63sct1QbH-46zvTs"

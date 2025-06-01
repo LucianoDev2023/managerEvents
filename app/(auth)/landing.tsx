@@ -28,7 +28,7 @@ const mockups = [
   require('@/assets/kup/mockup5.png'),
 ];
 
-const MOCKUP_WIDTH = 240;
+const MOCKUP_WIDTH = 180;
 
 export default function LandingScreen() {
   const colorScheme = useColorScheme() ?? 'dark';
@@ -198,16 +198,15 @@ const styles = StyleSheet.create({
   },
   lottie: {
     width: 300,
-    height: 200,
+    height: 150,
   },
   mockupGallery: {
-    marginVertical: 12,
+    // marginVertical: 12,
     width: '100%',
   },
   sectionTitle: {
     fontSize: 16,
     fontFamily: 'Inter_600SemiBold',
-    marginBottom: 10,
     textAlign: 'center',
   },
   mockupScroll: {

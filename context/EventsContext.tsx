@@ -275,8 +275,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       endDate: Timestamp.fromDate(event.endDate),
       coverImage: event.coverImage || '',
       userId: event.userId,
-      subAdmins: event.subAdmins ?? [], // ✅ Aqui também
-      confirmedGuests: event.confirmedGuests ?? [],
+      subAdmins: event.subAdmins ?? [],
     });
 
     dispatch({ type: 'UPDATE_EVENT', payload: event });
@@ -343,20 +342,24 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     uri: string,
     description: string
   ) => {
-    console.log('Salvando no Firestore com descrição:', description);
-    await addDoc(collection(db, 'photos'), {
+    const photoRef = collection(
+      db,
+      'events',
       eventId,
+      'programs',
       programId,
+      'activities',
       activityId,
+      'photos'
+    );
+
+    await addDoc(photoRef, {
       publicId,
       uri,
       description: description.trim().slice(0, 100),
       timestamp: Timestamp.now(),
     });
-
-    await fetchEvents();
   };
-
   const deletePhoto = async (
     eventId: string,
     programId: string,

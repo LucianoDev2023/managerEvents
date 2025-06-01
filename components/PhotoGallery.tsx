@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// Refatorado para tema escuro e layout moderno dos comentários
+import React, { useState } from 'react';
 import {
   View,
   Image,
@@ -19,38 +20,20 @@ import * as Sharing from 'expo-sharing';
 import { useColorScheme } from 'react-native';
 import Colors from '@/constants/Colors';
 import { getAuth } from 'firebase/auth';
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  query,
-  orderBy,
-  serverTimestamp,
-  DocumentData,
-} from 'firebase/firestore';
-import { db } from '@/config/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Photo } from '@/types';
-
-interface Comment {
-  id: string;
-  text: string;
-  createdAt: any;
-  email: string;
-}
+import { usePhotoComments } from '@/hooks/usePhotoComments';
 
 interface PhotoGalleryProps {
   photos: Photo[];
   editable?: boolean;
   onDeletePhoto?: (photo: { id: string; publicId: string }) => void;
-  eventId?: string;
-  programId?: string;
-  activityId?: string;
   deletingPhotoId?: string | null;
   isCreator: boolean;
+  eventId: string;
+  programId: string;
+  activityId: string;
 }
 
 const { width } = Dimensions.get('window');
@@ -61,23 +44,19 @@ export default function PhotoGallery({
   photos,
   editable = false,
   onDeletePhoto,
+  deletingPhotoId,
+  isCreator,
   eventId,
   programId,
   activityId,
-  deletingPhotoId,
-  isCreator,
 }: PhotoGalleryProps) {
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
   const auth = getAuth();
   const userEmail = auth.currentUser?.email ?? '';
 
-  const [isViewerVisible, setIsViewerVisible] = useState<boolean>(false);
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [newComment, setNewComment] = useState<string>('');
-  const [photoComments, setPhotoComments] = useState<Record<string, Comment[]>>(
-    {}
-  );
+  const [isViewerVisible, setIsViewerVisible] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   const handleShareImage = async (imageUrl: string) => {
     try {
@@ -89,103 +68,9 @@ export default function PhotoGallery({
     }
   };
 
-  const handleAddComment = async (photoId: string) => {
-    console.log('Salvando comentário e1:', {
-      eventId,
-      programId,
-      activityId,
-      photoId: photos[currentIndex].id,
-    });
-
-    if (!newComment.trim()) return;
-
-    const commentRef = collection(
-      db,
-      'events',
-      eventId!,
-      'programs',
-      programId!,
-      'activities',
-      activityId!,
-      'photos',
-      photoId,
-      'comments'
-    );
-    console.log('Salvando comentário 2:', {
-      eventId,
-      programId,
-      activityId,
-      photoId,
-      text: newComment.trim(),
-      email: userEmail.toLowerCase(),
-    });
-
-    const docRef = await addDoc(commentRef, {
-      text: newComment.trim(),
-      createdAt: serverTimestamp(),
-      email: userEmail.toLowerCase(),
-    });
-    console.log('Comentário salvo em3:', docRef.path);
-
-    setNewComment('');
-  };
-
-  const handleDeleteComment = async (photoId: string, commentId: string) => {
-    const ref = doc(
-      db,
-      'events',
-      eventId!,
-      'programs',
-      programId!,
-      'activities',
-      activityId!,
-      'photos',
-      photoId,
-      'comments',
-      commentId
-    );
-    await deleteDoc(ref);
-  };
-
-  useEffect(() => {
-    if (!eventId || !programId || !activityId) return;
-
-    const unsubscribes = photos.map((photo) => {
-      const commentsRef = collection(
-        db,
-        'events',
-        eventId,
-        'programs',
-        programId,
-        'activities',
-        activityId,
-        'photos',
-        photo.id,
-        'comments'
-      );
-
-      const q = query(commentsRef, orderBy('createdAt', 'desc'));
-      return onSnapshot(q, (snapshot) => {
-        const data = snapshot.docs.map((doc) => {
-          const d = doc.data();
-          return {
-            id: doc.id,
-            text: d.text,
-            email: d.email,
-            createdAt: d.createdAt,
-          } satisfies Comment;
-        });
-
-        setPhotoComments((prev) => ({ ...prev, [photo.id]: data }));
-      });
-    });
-
-    return () => unsubscribes.forEach((unsub) => unsub());
-  }, [photos, eventId, programId, activityId]);
-
   if (photos.length === 0) {
     return (
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#0f0f0f' }}>
         <View style={[styles.emptyContainer, { borderColor: colors.border }]}>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
             Nenhuma foto adicionada
@@ -196,49 +81,73 @@ export default function PhotoGallery({
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={styles.container}>
-        {photos.map((photo, index) => (
-          <View key={photo.id} style={{ width: '100%' }}>
-            <Animated.View
-              entering={FadeIn.duration(300)}
-              exiting={FadeOut.duration(300)}
-              style={styles.photoBlock}
-            >
-              <TouchableOpacity
-                onPress={() => {
-                  setCurrentIndex(index);
-                  setIsViewerVisible(true);
-                }}
-              >
-                <View style={styles.photoWrapper}>
-                  <Image
-                    source={{ uri: photo.uri }}
-                    style={styles.photo}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.descriptionContainer}>
-                    <MessageSquare size={16} color="#555" style={styles.icon} />
-                    <Text style={styles.descriptionText}>
-                      {photo.description}
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0f0f0f' }}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          { backgroundColor: '#0f0f0f' },
+        ]}
+      >
+        {photos.map((photo, index) => {
+          const {
+            comments,
+            newComment,
+            setNewComment,
+            addComment,
+            deleteComment,
+          } = usePhotoComments(
+            eventId,
+            programId,
+            activityId,
+            photo.id,
+            userEmail
+          );
 
-              <View style={styles.actionsContainer}>
+          return (
+            <View key={photo.id} style={{ width: '100%' }}>
+              <Animated.View
+                entering={FadeIn.duration(300)}
+                exiting={FadeOut.duration(300)}
+                style={styles.photoBlock}
+              >
                 <TouchableOpacity
-                  onPress={() => handleShareImage(photo.uri)}
-                  style={[styles.actionButton, { backgroundColor: '#25D366' }]}
+                  onPress={() => {
+                    setCurrentIndex(index);
+                    setIsViewerVisible(true);
+                  }}
                 >
-                  <Share2 size={14} color="white" />
-                  <Text style={styles.actionText}>Compartilhar</Text>
+                  <View style={styles.photoWrapper}>
+                    <Image
+                      source={{ uri: photo.uri }}
+                      style={styles.photo}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.descriptionContainer}>
+                      <MessageSquare
+                        size={16}
+                        color="#555"
+                        style={styles.icon}
+                      />
+                      <Text style={styles.descriptionText}>
+                        {photo.description}
+                      </Text>
+                    </View>
+                  </View>
                 </TouchableOpacity>
 
-                {editable &&
-                  onDeletePhoto &&
-                  typeof photo.publicId === 'string' &&
-                  isCreator && (
+                <View style={styles.actionsContainer}>
+                  <TouchableOpacity
+                    onPress={() => handleShareImage(photo.uri)}
+                    style={[
+                      styles.actionButton,
+                      { backgroundColor: '#25D366' },
+                    ]}
+                  >
+                    <Share2 size={14} color="white" />
+                    <Text style={styles.actionText}>Compartilhar</Text>
+                  </TouchableOpacity>
+
+                  {editable && onDeletePhoto && isCreator && (
                     <TouchableOpacity
                       disabled={deletingPhotoId === photo.id}
                       onPress={() => {
@@ -271,61 +180,65 @@ export default function PhotoGallery({
                       <Text style={styles.actionText}>Excluir</Text>
                     </TouchableOpacity>
                   )}
-              </View>
-            </Animated.View>
-
-            {/* Comentários */}
-            <View style={styles.commentSection}>
-              <Text
-                style={[styles.commentHeader, { color: colors.textSecondary }]}
-              >
-                Comentários
-              </Text>
-
-              <View style={styles.inputRow}>
-                <TextInput
-                  value={newComment}
-                  onChangeText={setNewComment}
-                  placeholder="Escreva seu comentário..."
-                  placeholderTextColor="#999"
-                  maxLength={150}
-                  style={styles.input}
-                />
-                <TouchableOpacity
-                  onPress={() => handleAddComment(photo.id)}
-                  style={styles.sendButton}
-                >
-                  <Text style={styles.sendText}>Enviar</Text>
-                </TouchableOpacity>
-              </View>
-
-              {(photoComments[photo.id] || []).map((comment) => (
-                <View key={comment.id} style={styles.commentBox}>
-                  <View style={styles.commentHeaderRow}>
-                    <Text style={styles.commentText}>{comment.text}</Text>
-                    {comment.email === userEmail.toLowerCase() && (
-                      <TouchableOpacity
-                        onPress={() =>
-                          handleDeleteComment(photo.id, comment.id)
-                        }
-                      >
-                        <Text style={styles.deleteText}>Excluir</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  <Text style={styles.commentTime}>
-                    {comment.createdAt?.toDate
-                      ? formatDistanceToNow(comment.createdAt.toDate(), {
-                          addSuffix: true,
-                          locale: ptBR,
-                        })
-                      : 'Enviando...'}
-                  </Text>
                 </View>
-              ))}
+              </Animated.View>
+
+              <View style={styles.commentSection}>
+                <Text
+                  style={[
+                    styles.commentHeader,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  Comentários
+                </Text>
+
+                <View style={styles.inputRow}>
+                  <TextInput
+                    value={newComment}
+                    onChangeText={setNewComment}
+                    placeholder="Escreva seu comentário..."
+                    placeholderTextColor="#999"
+                    maxLength={150}
+                    style={styles.input}
+                  />
+                  <TouchableOpacity
+                    onPress={addComment}
+                    style={styles.sendButton}
+                  >
+                    <Text style={styles.sendText}>Enviar</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {comments.map((comment) => (
+                  <View key={comment.id} style={styles.commentBox}>
+                    <Text style={styles.commentAuthor}>
+                      {comment.email.split('@')[0]}
+                    </Text>
+                    <Text style={styles.commentText}>{comment.text}</Text>
+                    <View style={styles.commentFooterRow}>
+                      <Text style={styles.commentTime}>
+                        {comment.createdAt?.toDate
+                          ? formatDistanceToNow(comment.createdAt.toDate(), {
+                              addSuffix: true,
+                              locale: ptBR,
+                            })
+                          : 'Enviando...'}
+                      </Text>
+                      {comment.email === userEmail.toLowerCase() && (
+                        <TouchableOpacity
+                          onPress={() => deleteComment(comment.id)}
+                        >
+                          <Text style={styles.commentActionText}>Excluir</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
 
         <ImageViewing
           images={photos.map((p) => ({ uri: p.uri }))}
@@ -340,8 +253,7 @@ export default function PhotoGallery({
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
-    padding: 4,
+    padding: 12,
     paddingBottom: 40,
   },
   photoBlock: {
@@ -445,7 +357,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     fontSize: 14,
     fontFamily: 'Inter_400Regular',
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#1c1c1e',
+    color: '#fff',
   },
   sendButton: {
     marginLeft: 8,
@@ -460,29 +373,40 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
   },
   commentBox: {
-    backgroundColor: '#eee',
-    padding: 8,
-    borderRadius: 8,
-    marginBottom: 10,
+    backgroundColor: '#161b22',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#262c34',
   },
-  commentHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  commentAuthor: {
+    color: '#8b949e',
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    marginBottom: 6,
   },
   commentText: {
-    fontSize: 14,
+    color: '#c9d1d9',
+    fontSize: 15,
     fontFamily: 'Inter_400Regular',
-    flex: 1,
+    lineHeight: 22,
+    marginBottom: 6,
   },
-  deleteText: {
-    color: 'red',
-    fontSize: 12,
-    marginLeft: 10,
+  commentFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   commentTime: {
-    fontSize: 11,
-    color: '#555',
+    fontSize: 12,
+    color: '#7a7a7a',
     fontFamily: 'Inter_300Light',
-    marginTop: 4,
+  },
+  commentActionText: {
+    fontSize: 13,
+    color: '#f87171',
+    fontFamily: 'Inter_500Medium',
   },
 });
