@@ -184,7 +184,7 @@ export default function ProgramDetailScreen() {
               <Text
                 style={[styles.emptySubtext, { color: colors.textSecondary }]}
               >
-                Adicione uma atividade para começar
+                Adicione as atividades e suas fotos
               </Text>
             </View>
           ) : (
@@ -265,6 +265,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginHorizontal: 20,
     marginTop: 10,
+    borderRadius: 12,
   },
   emptyText: {
     fontSize: 16,

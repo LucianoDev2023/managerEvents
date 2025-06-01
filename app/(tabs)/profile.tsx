@@ -301,7 +301,7 @@ export default function ProfileScreen() {
                 textStyle={{ color: textColor }}
               />
               <Text style={[styles.sectionTitle, { color: textColor }]}>
-                Eventos com Permissões
+                Administrar Permissões
               </Text>
               <View style={styles.dropdownContainer}>
                 <CustomDropdown

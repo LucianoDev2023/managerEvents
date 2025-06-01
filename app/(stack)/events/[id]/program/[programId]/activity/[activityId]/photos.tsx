@@ -102,7 +102,7 @@ export default function ActivityPhotosScreen() {
           }}
         />
 
-        <ScrollView contentContainerStyle={{ padding: 16 }}>
+        <ScrollView contentContainerStyle={{ padding: 2 }}>
           {photos.length > 0 ? (
             <View style={{ position: 'relative', flex: 1 }}>
               <PhotoGallery
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    marginTop: 60,
+    marginTop: 10,
   },
   emptyText: {
     fontSize: 16,
