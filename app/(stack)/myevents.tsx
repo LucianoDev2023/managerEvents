@@ -222,13 +222,14 @@ export default function MyEventsScreen() {
               {subAdmin && !isCreator && (
                 <RoleBadge role={isAdm ? 'Super Admin' : 'Adm parcial'} />
               )}
+
               <Text style={styles.overlayTitle} numberOfLines={1}>
                 {item.title}
               </Text>
               <Text style={styles.overlayLocation} numberOfLines={1}>
                 {item.location}
               </Text>
-              <View>
+              <View style={styles.eventCard}>
                 <Text style={styles.overlayDesc} numberOfLines={2}>
                   {`${new Date(item.startDate).toLocaleDateString(
                     'pt-BR'
@@ -239,35 +240,6 @@ export default function MyEventsScreen() {
           </View>
 
           <View style={styles.buttonsRow}>
-            <Pressable
-              onPress={() => {
-                toggleFollowEvent(item); // 👈 envia o objeto inteiro
-                if (isFollowing(item.id)) {
-                  Alert.alert('Atenção', 'Evento deixará de ser seguido.');
-                }
-              }}
-              style={[
-                styles.mapBtn,
-                {
-                  borderColor: colors.border,
-                  backgroundColor: isFollowing(item.id)
-                    ? '#ccc'
-                    : 'transparent',
-                },
-              ]}
-            >
-              {isFollowing(item.id) ? (
-                <HeartOff size={16} color={colors.primary} />
-              ) : (
-                <Heart size={16} color={colors.primary} />
-              )}
-              <Text
-                style={[styles.mapBtnText, { color: colors.textSecondary }]}
-              >
-                {isFollowing(item.id) ? 'Seguindo' : 'Seguir'}
-              </Text>
-            </Pressable>
-
             <Pressable
               onPress={() => handleOpenInMaps(item.location)}
               style={[styles.mapBtn, { borderColor: colors.border }]}
@@ -297,7 +269,7 @@ export default function MyEventsScreen() {
               <QrCode size={16} color="white" />
             </Pressable>
 
-            {(isCreator || isAdm) && (
+            {isCreator || isAdm ? (
               <Button
                 title="Permissão"
                 size="small"
@@ -306,6 +278,44 @@ export default function MyEventsScreen() {
                 style={styles.permissionBtn}
                 textStyle={styles.permissionText}
               />
+            ) : (
+              <Pressable
+                onPress={() => {
+                  toggleFollowEvent(item);
+                  if (isFollowing(item.id)) {
+                    Alert.alert('Atenção', 'Evento deixará de ser seguido.');
+                  }
+                }}
+                style={[styles.permissionBtn]}
+              >
+                {isFollowing(item.id) ? (
+                  <View style={styles.btnseguir}>
+                    <Heart size={16} color={colors.primary} />
+
+                    <Text
+                      style={[
+                        styles.mapBtnText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {isFollowing(item.id) ? 'Seguindo' : 'Seguir'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.btnseguir}>
+                    <Heart size={16} color={colors.primary} />
+
+                    <Text
+                      style={[
+                        styles.mapBtnText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {isFollowing(item.id) ? 'Seguindo' : 'Seguir'}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
             )}
           </View>
         </Animated.View>
@@ -475,13 +485,9 @@ const PermissionModal = ({
                   styles.toggleBtn,
                   {
                     backgroundColor:
-                      permissionLevel === level
-                        ? colors.primary
-                        : 'transparent',
+                      permissionLevel === level ? '#471C7A' : 'transparent',
                     borderColor:
-                      permissionLevel === level
-                        ? colors.primary
-                        : colors.border,
+                      permissionLevel === level ? '#471C7A' : colors.border,
                   },
                 ]}
               >
@@ -583,11 +589,12 @@ const styles = StyleSheet.create({
   gradient: { flex: 1 },
   container: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 6,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    paddingLeft: 8,
     marginVertical: 16,
     fontFamily: 'Inter_700Bold',
   },
@@ -607,9 +614,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 1,
+    borderBottomWidth: 1,
     borderColor: '#555',
-    padding: 6,
+    padding: 4,
   },
   imageWrapper: {
     width: '100%',
@@ -655,7 +662,8 @@ const styles = StyleSheet.create({
   buttonsRow: {
     flexDirection: 'row',
     marginTop: 12,
-    gap: 8,
+    marginBottom: 6,
+    gap: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -665,7 +673,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 4,
-    paddingHorizontal: 12,
+    // paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 1,
   },
@@ -681,7 +689,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-evenly',
     paddingVertical: 6,
-    paddingHorizontal: 12,
     borderRadius: 10,
     fontSize: 13,
     fontFamily: 'Inter_500Medium',
@@ -759,7 +766,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
     marginBottom: 16,
-    paddingHorizontal: 40,
   },
   toggleBtn: {
     flex: 1,
@@ -770,7 +776,7 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 20,
     marginTop: 60,
     marginBottom: 20,
   },
@@ -803,5 +809,19 @@ const styles = StyleSheet.create({
   roleHighlight: {
     fontSize: 17, // Aumenta o tamanho apenas do título da permissão
     fontWeight: 'bold',
+  },
+  eventCard: {
+    flexDirection: 'column',
+  },
+  btnseguir: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+    // paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#444',
   },
 });

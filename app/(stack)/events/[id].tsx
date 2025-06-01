@@ -43,16 +43,20 @@ export default function EventDetailScreen() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const event = state.events.find((e) => e.id === id) as Event | undefined;
   const authUser = getAuth().currentUser;
-  const userEmail = authUser?.email?.toLowerCase();
+  const userEmail = authUser?.email?.toLowerCase() ?? '';
   const isCreator = event?.createdBy?.toLowerCase() === userEmail;
-  const isAdm = event?.subAdmins?.some(
+  const isSubAdmin = event?.subAdmins?.some(
     (admin) =>
-      (admin.email.toLowerCase() === userEmail &&
-        admin.level === 'Super Admin') ||
-      admin.level === 'Admin parcial'
+      admin.email.toLowerCase() === userEmail &&
+      (admin.level.toLowerCase() === 'super admin' ||
+        admin.level.toLowerCase() === 'admin parcial')
   );
-  const hasAdminPermission = isCreator || isAdm;
-  const hasAdminPermissionDelete = isCreator;
+  const hasPermission = isCreator || isSubAdmin;
+  console.log('userEmail:', userEmail);
+  console.log('createdBy:', event?.createdBy);
+  console.log('userId:', event?.userId);
+  console.log('subAdmins:', event?.subAdmins);
+
   const confirmed =
     event?.confirmedGuests?.filter((g) => g.mode === 'confirmado') || [];
   const interested =
@@ -173,7 +177,7 @@ export default function EventDetailScreen() {
             </TouchableOpacity>
           ),
           headerRight: () =>
-            hasAdminPermissionDelete ? (
+            hasPermission ? (
               <View style={styles.headerActions}>
                 <TouchableOpacity
                   onPress={handleEditEvent}
@@ -185,7 +189,7 @@ export default function EventDetailScreen() {
                   onPress={handleDeleteEvent}
                   style={styles.headerButton}
                 >
-                  <Trash2 size={20} color={colors.error} />
+                  {isCreator && <Trash2 size={20} color={colors.error} />}
                 </TouchableOpacity>
               </View>
             ) : null,
@@ -221,7 +225,7 @@ export default function EventDetailScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           Programação diária
         </Text>
-        {hasAdminPermission && (
+        {hasPermission && (
           <Button
             title="Add Dia"
             icon={<Plus size={16} color="white" />}
@@ -255,7 +259,8 @@ export default function EventDetailScreen() {
               ))
           )}
         </View>
-        {(confirmed.length > 0 || interested.length > 0) && (
+
+        {isCreator && (confirmed.length > 0 || interested.length > 0) && (
           <View style={{ marginTop: 24, paddingHorizontal: 16 }}>
             <Text
               style={[

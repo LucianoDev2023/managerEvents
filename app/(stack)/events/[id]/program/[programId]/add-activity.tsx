@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Alert,
   Platform,
+  ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
@@ -44,38 +46,25 @@ export default function AddActivityScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateFormValue = (key: keyof ActivityFormValues, value: string) => {
-    setFormValues({
-      ...formValues,
-      [key]: value,
-    });
-    // Clear error when user types
+    setFormValues({ ...formValues, [key]: value });
+
     if (errors[key]) {
-      setErrors({
-        ...errors,
-        [key]: '',
-      });
+      setErrors({ ...errors, [key]: '' });
     }
   };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formValues.title.trim()) {
-      newErrors.title = 'Nome requerido';
-    }
-
-    if (!formValues.time.trim()) {
-      newErrors.time = 'Horário requerido';
-    }
+    if (!formValues.title.trim()) newErrors.title = 'Nome requerido';
+    if (!formValues.time.trim()) newErrors.time = 'Horário requerido';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = () => {
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsSubmitting(true);
 
@@ -93,7 +82,7 @@ export default function AddActivityScreen() {
         [{ text: 'OK', onPress: () => router.back() }]
       );
     } catch (error) {
-      Alert.alert('Error', 'Falhou, tente novamente!.');
+      Alert.alert('Erro', 'Falhou, tente novamente!');
     } finally {
       setIsSubmitting(false);
     }
@@ -104,15 +93,12 @@ export default function AddActivityScreen() {
 
     if (selectedTime) {
       setPickerTime(selectedTime);
-
-      // Formata para 24h
       const hours = selectedTime.getHours();
       const minutes = selectedTime.getMinutes();
-      const formattedHours = hours < 10 ? `0${hours}` : `${hours}`;
-      const formattedMinutes = minutes < 10 ? `0${minutes}` : `${minutes}`;
-      const timeString = `${formattedHours}:${formattedMinutes}`;
-
-      updateFormValue('time', timeString);
+      const formattedTime = `${hours < 10 ? `0${hours}` : hours}:${
+        minutes < 10 ? `0${minutes}` : minutes
+      }`;
+      updateFormValue('time', formattedTime);
     }
   };
 
@@ -174,7 +160,7 @@ export default function AddActivityScreen() {
             mode="time"
             display="default"
             onChange={onTimeChange}
-            is24Hour={true} // <-- adiciona isso
+            is24Hour={true}
           />
         )}
 
@@ -210,6 +196,15 @@ export default function AddActivityScreen() {
           />
         </View>
       </ScrollView>
+
+      {isSubmitting && (
+        <Modal transparent animationType="fade">
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Salvando atividade...</Text>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -269,5 +264,17 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     flex: 0.48,
+  },
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#fff',
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
   },
 });

@@ -39,7 +39,10 @@ export default function ProgramDetailScreen() {
   const userEmail = authUser?.email?.toLowerCase() ?? '';
   const isCreator = event?.createdBy?.toLowerCase() === userEmail;
   const isSubAdmin = event?.subAdmins?.some(
-    (admin) => admin.email.toLowerCase() === userEmail
+    (admin) =>
+      admin.email.toLowerCase() === userEmail &&
+      (admin.level.toLowerCase() === 'super admin' ||
+        admin.level.toLowerCase() === 'admin parcial')
   );
   const hasPermission = isCreator || isSubAdmin;
 
@@ -210,9 +213,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
     paddingBottom: 32,
-    paddingTop: 70,
+    paddingTop: 100,
   },
   headerButton: {
     padding: 12,
@@ -220,7 +222,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     padding: 16,
-    borderRadius: 16,
+
     marginBottom: 16,
     shadowColor: '#000',
     shadowOpacity: 0.1,
@@ -249,6 +251,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    paddingHorizontal: 20,
   },
   sectionTitle: {
     fontSize: 18,
@@ -257,10 +260,11 @@ const styles = StyleSheet.create({
   emptyContainer: {
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderRadius: 12,
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    marginHorizontal: 20,
+    marginTop: 10,
   },
   emptyText: {
     fontSize: 16,

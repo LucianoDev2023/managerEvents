@@ -29,6 +29,7 @@ export default function FoundEventScreen() {
     title?: string;
   }>();
   const { state, updateEvent } = useEvents();
+
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
@@ -66,6 +67,18 @@ export default function FoundEventScreen() {
           accessCode.toLowerCase().trim()
     );
   }, [accessCode, title, state.events]);
+
+  const isCreator = useMemo(() => {
+    if (!eventFound || !user?.uid) return false;
+    const authUser = getAuth().currentUser;
+    const userEmail = authUser?.email?.toLowerCase();
+
+    return eventFound.createdBy === userEmail;
+  }, [eventFound, user?.uid]);
+
+  console.log('Criador:', eventFound?.createdBy);
+  console.log('Usuário atual:', userEmail);
+  console.log('É criador?', isCreator);
 
   useEffect(() => {
     if (!eventFound) return;
@@ -110,12 +123,28 @@ export default function FoundEventScreen() {
       >
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
         {showConfetti && (
-          <LottieView
-            source={require('@/assets/images/confetti.json')}
-            autoPlay
-            loop={false}
-            style={StyleSheet.absoluteFill}
-          />
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 999,
+              elevation: 999,
+              backgroundColor: 'rgba(0, 0, 0, 0.8)', // fundo escuro semi-transparente
+              justifyContent: 'center',
+              alignItems: 'center',
+              pointerEvents: 'none', // permite interação com o conteúdo atrás
+            }}
+          >
+            <LottieView
+              source={require('@/assets/images/confetti.json')}
+              autoPlay
+              loop={false}
+              style={{ width: '100%', height: '100%' }}
+            />
+          </View>
         )}
 
         <View
@@ -143,7 +172,21 @@ export default function FoundEventScreen() {
           ) : eventFound ? (
             <>
               <Pressable
-                onPress={() => router.push(`/events/${eventFound.id}`)}
+                disabled={presenceStatus === 'none'}
+                style={[
+                  styles.card,
+                  presenceStatus === 'none' && { opacity: 0.5 },
+                ]}
+                onPress={() => {
+                  if (presenceStatus === 'none') {
+                    Alert.alert(
+                      'Confirmação necessária',
+                      'Por favor, confirme sua presença ou acompanhe o evento antes de acessar os detalhes.'
+                    );
+                    return;
+                  }
+                  router.push(`/events/${eventFound.id}`);
+                }}
               >
                 <View style={styles.card}>
                   <ImageBackground
@@ -186,43 +229,119 @@ export default function FoundEventScreen() {
                 </View>
               </Pressable>
 
-              <View style={{ marginTop: 24, alignItems: 'center' }}>
-                <Text style={{ color: colors.textSecondary, marginBottom: 8 }}>
-                  Status:{' '}
-                  {presenceStatus === 'confirmed'
-                    ? 'Presença confirmada ✅'
-                    : presenceStatus === 'interested'
-                    ? 'Acompanhando 👀'
-                    : 'Nenhuma resposta'}
-                </Text>
+              {!isCreator && (
+                <View style={{ marginTop: 32, paddingHorizontal: 20 }}>
+                  {/* CARD do convite */}
+                  <View
+                    style={{
+                      backgroundColor:
+                        colorScheme === 'dark' ? '#1f1f25' : '#f4f4fb',
+                      borderRadius: 16,
+                      padding: 20,
+                      shadowColor: '#000',
+                      shadowOpacity: 0.15,
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowRadius: 6,
+                      elevation: 4,
+                    }}
+                  >
+                    <View style={{ gap: 25 }}>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontFamily: 'Inter-Medium',
+                          color: colors.text,
+                          textAlign: 'left',
+                          lineHeight: 20,
+                        }}
+                      >
+                        Você foi convidado para este evento especial! 🥳
+                        {'\n'}
+                        {'\n'}
+                        Escolha abaixo como deseja participar. Sua escolha pode
+                        ser alterada mais tarde no seu perfil.
+                      </Text>
 
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <Pressable
-                    style={[
-                      styles.statusButton,
-                      presenceStatus === 'confirmed' &&
-                        styles.statusButtonActive,
-                    ]}
-                    onPress={() => handlePresence('confirmado')}
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontFamily: 'Inter-Regular',
+                          color: colors.textSecondary,
+                          textAlign: 'left',
+                        }}
+                      >
+                        Sua resposta atual:{' '}
+                        <Text
+                          style={{
+                            fontFamily: 'Inter-Bold',
+                            color: colors.text,
+                          }}
+                        >
+                          {presenceStatus === 'confirmed'
+                            ? 'Presença confirmada ✅'
+                            : presenceStatus === 'interested'
+                            ? 'Acompanhando evento 👀'
+                            : 'Nenhuma resposta registrada'}
+                        </Text>
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Botões fora do card */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 12,
+                      marginTop: 20,
+                    }}
                   >
-                    <Text style={styles.statusButtonText}>
-                      Confirmar presença
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.statusButton,
-                      presenceStatus === 'interested' &&
-                        styles.statusButtonSecondary,
-                    ]}
-                    onPress={() => handlePresence('acompanhando')}
-                  >
-                    <Text style={styles.statusButtonText}>
-                      Acompanhar evento
-                    </Text>
-                  </Pressable>
+                    <View
+                      style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}
+                    >
+                      {/* Botão: Confirmar presença */}
+                      <Pressable
+                        onPress={() => handlePresence('confirmado')}
+                        style={[
+                          styles.statusButton,
+                          presenceStatus === 'confirmed' &&
+                            styles.statusButtonActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusButtonText,
+                            presenceStatus === 'confirmed' &&
+                              styles.statusButtonTextActive,
+                          ]}
+                        >
+                          Confirmar presença
+                        </Text>
+                      </Pressable>
+
+                      {/* Botão: Acompanhar evento */}
+                      <Pressable
+                        onPress={() => handlePresence('acompanhando')}
+                        style={[
+                          styles.statusButton,
+                          presenceStatus === 'interested' &&
+                            styles.statusButtonActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusButtonText,
+                            presenceStatus === 'interested' &&
+                              styles.statusButtonTextActive,
+                          ]}
+                        >
+                          Acompanhar evento
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
                 </View>
-              </View>
+              )}
             </>
           ) : (
             <Text
@@ -297,17 +416,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
   },
   statusButton: {
-    backgroundColor: '#6e56cf',
+    backgroundColor: 'rgba(143, 103, 254, 0.1)',
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 24,
   },
-  statusButtonActive: { backgroundColor: '#4c3cad' },
-  statusButtonSecondary: { backgroundColor: '#3e1d73' },
+  statusButtonActive: { backgroundColor: '#5838AD' },
+  statusButtonSecondary: { backgroundColor: '#444' },
   statusButtonText: {
     color: 'white',
     fontWeight: '600',
     fontSize: 14,
     fontFamily: 'Inter-Medium',
+  },
+
+  statusButtonTextActive: {
+    color: '#fff',
   },
 });

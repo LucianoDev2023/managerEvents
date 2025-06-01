@@ -7,7 +7,9 @@ import {
   Dimensions,
   Text,
   Alert,
+  ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Photo } from '@/types';
 import { Trash2, Share2, MessageSquare } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
@@ -25,6 +27,7 @@ interface PhotoGalleryProps {
   programId?: string;
   activityId?: string;
   deletingPhotoId?: string | null;
+  isCreator: boolean;
 }
 
 const { width } = Dimensions.get('window');
@@ -36,6 +39,7 @@ export default function PhotoGallery({
   onDeletePhoto,
   editable = false,
   deletingPhotoId,
+  isCreator,
 }: PhotoGalleryProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -60,19 +64,20 @@ export default function PhotoGallery({
 
   if (photos.length === 0) {
     return (
-      <View style={[styles.emptyContainer, { borderColor: colors.border }]}>
-        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-          No photos added yet
-        </Text>
-      </View>
+      <SafeAreaView style={{ flex: 1 }}>
+        <View style={[styles.emptyContainer, { borderColor: colors.border }]}>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            No photos added yet
+          </Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {photos.map((photo, index) => {
-        console.log('Descrição:', photo.description);
-        return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.container}>
+        {photos.map((photo, index) => (
           <View key={photo.id} style={{ width: '100%' }}>
             <Animated.View
               entering={FadeIn.duration(300)}
@@ -89,12 +94,7 @@ export default function PhotoGallery({
                     ]}
                     resizeMode="cover"
                   />
-                  <View
-                    style={[
-                      styles.descriptionContainer,
-                      { flexDirection: 'row' },
-                    ]}
-                  >
+                  <View style={styles.descriptionContainer}>
                     <MessageSquare size={16} color="#555" style={styles.icon} />
                     <Text style={styles.descriptionText}>
                       {photo.description}
@@ -114,7 +114,8 @@ export default function PhotoGallery({
 
                 {editable &&
                   onDeletePhoto &&
-                  typeof photo.publicId === 'string' && (
+                  typeof photo.publicId === 'string' &&
+                  isCreator && (
                     <TouchableOpacity
                       disabled={deletingPhotoId === photo.id}
                       onPress={() => {
@@ -143,8 +144,12 @@ export default function PhotoGallery({
                         },
                       ]}
                     >
-                      <Trash2 size={14} color="white" />
-                      <Text style={styles.actionText}>Excluir</Text>
+                      <View
+                        style={{ flexDirection: 'row', alignItems: 'center' }}
+                      >
+                        <Trash2 size={14} color="white" />
+                        <Text style={styles.actionText}>Excluir</Text>
+                      </View>
                     </TouchableOpacity>
                   )}
               </View>
@@ -152,16 +157,16 @@ export default function PhotoGallery({
 
             {index < photos.length - 1 && <View style={styles.divider} />}
           </View>
-        );
-      })}
+        ))}
 
-      <ImageViewing
-        images={photos.map((p) => ({ uri: p.uri }))}
-        imageIndex={currentIndex}
-        visible={isViewerVisible}
-        onRequestClose={() => setIsViewerVisible(false)}
-      />
-    </View>
+        <ImageViewing
+          images={photos.map((p) => ({ uri: p.uri }))}
+          imageIndex={currentIndex}
+          visible={isViewerVisible}
+          onRequestClose={() => setIsViewerVisible(false)}
+        />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -169,6 +174,7 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     padding: 10,
+    paddingBottom: 40,
   },
   photoBlock: {
     marginBottom: 20,
@@ -221,10 +227,10 @@ const styles = StyleSheet.create({
   },
   photoWrapper: {
     borderWidth: 2,
-    borderColor: '#999', // ou use colors.border para tema dinâmico
+    borderColor: '#999',
     borderRadius: 10,
     padding: 5,
-    backgroundColor: 'transparent', // opcional para borda mais visível
+    backgroundColor: 'transparent',
   },
   descriptionContainer: {
     width: ITEM_WIDTH,
@@ -240,9 +246,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2, // para Android
+    elevation: 2,
   },
-
   descriptionText: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
@@ -251,7 +256,6 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'left',
   },
-
   icon: {
     marginTop: 2,
   },
