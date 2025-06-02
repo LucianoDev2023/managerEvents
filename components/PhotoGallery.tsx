@@ -28,12 +28,13 @@ import { usePhotoComments } from '@/hooks/usePhotoComments';
 interface PhotoGalleryProps {
   photos: Photo[];
   editable?: boolean;
-  onDeletePhoto?: (photo: { id: string; publicId: string }) => void;
+  onDeletePhoto?: (photo: { id: string; publicId: string }) => Promise<void>;
   deletingPhotoId?: string | null;
   isCreator: boolean;
   eventId: string;
   programId: string;
   activityId: string;
+  refetchEventById: (eventId: string) => Promise<void>; // ✅ adicionado
 }
 
 const { width } = Dimensions.get('window');
@@ -49,6 +50,7 @@ export default function PhotoGallery({
   eventId,
   programId,
   activityId,
+  refetchEventById, // ✅
 }: PhotoGalleryProps) {
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
@@ -144,7 +146,7 @@ export default function PhotoGallery({
                     ]}
                   >
                     <Share2 size={14} color="white" />
-                    <Text style={styles.actionText}>Compartilhar</Text>
+                    {/* <Text style={styles.actionText}>Compartilhar</Text> */}
                   </TouchableOpacity>
 
                   {editable && onDeletePhoto && isCreator && (
@@ -159,11 +161,20 @@ export default function PhotoGallery({
                             {
                               text: 'Excluir',
                               style: 'destructive',
-                              onPress: () =>
-                                onDeletePhoto({
-                                  id: photo.id,
-                                  publicId: photo.publicId!,
-                                }),
+                              onPress: async () => {
+                                try {
+                                  await onDeletePhoto({
+                                    id: photo.id,
+                                    publicId: photo.publicId!,
+                                  });
+                                  await refetchEventById(eventId);
+                                } catch (error) {
+                                  Alert.alert(
+                                    'Erro',
+                                    'Não foi possível excluir a foto.'
+                                  );
+                                }
+                              },
                             },
                           ]
                         );
@@ -177,7 +188,7 @@ export default function PhotoGallery({
                       ]}
                     >
                       <Trash2 size={14} color="white" />
-                      <Text style={styles.actionText}>Excluir</Text>
+                      {/* <Text style={styles.actionText}>Excluir</Text> */}
                     </TouchableOpacity>
                   )}
                 </View>
@@ -253,12 +264,15 @@ export default function PhotoGallery({
 
 const styles = StyleSheet.create({
   container: {
-    padding: 12,
+    flex: 1,
+    padding: 6,
     paddingBottom: 40,
   },
   photoBlock: {
-    marginBottom: 20,
     alignItems: 'center',
+    padding: 10,
+    borderTopWidth: 1,
+    borderColor: '#454545',
   },
   photo: {
     width: ITEM_WIDTH,
@@ -269,13 +283,15 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 0,
   },
   actionsContainer: {
+    width: '100%',
+    justifyContent: 'flex-end',
     flexDirection: 'row',
     marginTop: 10,
-    gap: 12,
+    marginRight: 12,
+    gap: 6,
   },
   actionButton: {
     flexDirection: 'row',
-    textAlign: 'left',
     paddingVertical: 4,
     paddingHorizontal: 14,
     borderRadius: 6,
@@ -300,17 +316,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   photoWrapper: {
-    borderWidth: 2,
-    borderColor: '#999',
     borderRadius: 10,
-    padding: 5,
-    backgroundColor: 'transparent',
   },
   descriptionContainer: {
     width: ITEM_WIDTH,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#666',
     borderBottomLeftRadius: 14,
     borderBottomRightRadius: 14,
     paddingHorizontal: 12,
@@ -335,7 +347,6 @@ const styles = StyleSheet.create({
   },
   commentSection: {
     width: '100%',
-    marginTop: 10,
     paddingHorizontal: 10,
   },
   commentHeader: {
@@ -351,7 +362,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#333',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,

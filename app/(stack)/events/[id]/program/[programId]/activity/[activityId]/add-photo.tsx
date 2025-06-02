@@ -10,7 +10,7 @@ import {
   TextInput,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { useEvents } from '@/context/EventsContext';
+
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import {
@@ -23,6 +23,7 @@ import Button from '@/components/ui/Button';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToCloudinary } from '@/lib/uploadImageToCloudinary';
 import LoadingOverlay from '@/components/LoadingOverlay';
+import { useEvents } from '@/context/EventsContext';
 
 export default function AddActivityPhotoScreen() {
   const { id, programId, activityId } = useLocalSearchParams<{
@@ -31,7 +32,7 @@ export default function AddActivityPhotoScreen() {
     activityId: string;
   }>();
 
-  const { state, addPhoto } = useEvents();
+  const { state, addPhoto, refetchEventById } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = useMemo(() => Colors[colorScheme], [colorScheme]);
   const [description, setDescription] = useState('');
@@ -123,9 +124,7 @@ export default function AddActivityPhotoScreen() {
       );
       const { uri, publicId } = await uploadImageToCloudinary(selectedImage);
       await addPhoto(id, programId, activityId, publicId, uri, description);
-      console.log('Descrição recebida no EventsContext:', description);
-      console.log('Função dentro do add photo');
-      console.log(id, programId, activityId, publicId, uri, description);
+      await refetchEventById(id);
 
       Alert.alert(
         'Sucesso',
@@ -237,7 +236,6 @@ export default function AddActivityPhotoScreen() {
                 fontFamily: 'Inter-Medium',
                 fontSize: 14,
                 color: colors.text,
-                marginBottom: 6,
               }}
             ></Text>
             <TextInput

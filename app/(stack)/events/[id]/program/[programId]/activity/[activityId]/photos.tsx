@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { useEvents } from '@/context/EventsContext';
+
 import PhotoGallery from '@/components/PhotoGallery';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
@@ -16,6 +16,7 @@ import LoadingOverlay from '@/components/LoadingOverlay';
 import { getAuth } from 'firebase/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEvents } from '@/context/EventsContext';
 
 export default function ActivityPhotosScreen() {
   const { id, programId, activityId } = useLocalSearchParams<{
@@ -24,10 +25,20 @@ export default function ActivityPhotosScreen() {
     activityId: string;
   }>();
 
-  const { state, deletePhoto } = useEvents();
+  const { state, deletePhoto, refetchEventById } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUpdatedEvent = async () => {
+      setIsLoading(true);
+      await refetchEventById(id);
+      setIsLoading(false);
+    };
+    fetchUpdatedEvent();
+  }, [id]);
 
   const event = state.events.find((e) => e.id === id);
   const program = event?.programs.find((p) => p.id === programId);
@@ -37,6 +48,11 @@ export default function ActivityPhotosScreen() {
   const authUser = getAuth().currentUser;
   const userEmail = authUser?.email?.toLowerCase() ?? '';
   const isCreator = event?.createdBy?.toLowerCase() === userEmail;
+  console.log('activity.photos para debugar:', activity?.photos);
+
+  if (isLoading) {
+    return <LoadingOverlay message="Carregando fotos atualizadas..." />;
+  }
 
   if (!event || !program || !activity) {
     return (
@@ -60,16 +76,11 @@ export default function ActivityPhotosScreen() {
     );
   }
 
-  const handleDeletePhoto = async ({
-    id,
-    publicId,
-  }: {
-    id: string;
-    publicId: string;
-  }) => {
-    setDeletingPhotoId(id);
+  const handleDeletePhoto = async (photo: { id: string; publicId: string }) => {
+    setDeletingPhotoId(photo.id);
     try {
-      await deletePhoto(event.id, program.id, id);
+      await deletePhoto(event.id, program.id, photo.id);
+      await refetchEventById(event.id); // atualiza a lista após exclusão
     } finally {
       setDeletingPhotoId(null);
     }
@@ -102,7 +113,9 @@ export default function ActivityPhotosScreen() {
           }}
         />
 
-        <ScrollView contentContainerStyle={{ padding: 2 }}>
+        <ScrollView
+          contentContainerStyle={{ padding: 2, alignItems: 'flex-start' }}
+        >
           {photos.length > 0 ? (
             <View style={{ position: 'relative', flex: 1 }}>
               <PhotoGallery
@@ -111,11 +124,11 @@ export default function ActivityPhotosScreen() {
                 programId={program.id}
                 activityId={activity.id}
                 editable
+                isCreator={isCreator}
                 onDeletePhoto={handleDeletePhoto}
                 deletingPhotoId={deletingPhotoId}
-                isCreator={isCreator}
+                refetchEventById={() => refetchEventById(event.id)}
               />
-
               {deletingPhotoId && <LoadingOverlay message="Excluindo..." />}
             </View>
           ) : (
@@ -128,7 +141,7 @@ export default function ActivityPhotosScreen() {
                 onPress={() =>
                   router.push({
                     pathname:
-                      '/events/[id]/program/[programId]/activity/[activityId]/add-photo',
+                      '/(stack)/events/[id]/program/[programId]/activity/[activityId]/add-photo',
                     params: {
                       id: event.id,
                       programId: program.id,

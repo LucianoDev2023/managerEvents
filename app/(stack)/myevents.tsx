@@ -33,14 +33,13 @@ import ViewShot from 'react-native-view-shot';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-
-import { useEvents } from '@/context/EventsContext';
 import Colors from '@/constants/Colors';
 import Button from '@/components/ui/Button';
 import RoleBadge from '@/components/ui/RoleBadge';
 import type { Event, PermissionLevel } from '@/types/index';
 import LottieView from 'lottie-react-native';
 import { useFollowedEvents } from '@/hooks/useFollowedEvents';
+import { useEvents } from '@/context/EventsContext';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 

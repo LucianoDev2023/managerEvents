@@ -75,6 +75,22 @@ export default function StackLayout() {
             headerLeft: renderHeaderLeft,
           }}
         />
+        <Stack.Screen
+          name="events/[id]/program/[programId]/activity/[activityId]/photos"
+          options={{
+            headerTitle: 'Fotos',
+            headerShown: true,
+            headerTitleStyle: { fontFamily: 'Inter-Bold', fontSize: 18 },
+            headerLeft: () => (
+              <TouchableOpacity
+                onPress={() => router.back()}
+                style={{ padding: 8 }}
+              >
+                <ArrowLeft size={24} color={colors.text} />
+              </TouchableOpacity>
+            ),
+          }}
+        />
       </Stack>
     </View>
   );

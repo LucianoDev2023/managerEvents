@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,15 +20,18 @@ import Animated from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ProgramDetailScreen() {
-  const { id, programId, activityId } = useLocalSearchParams<{
+  const { id, programId } = useLocalSearchParams<{
     id: string;
     programId: string;
-    activityId: string;
   }>();
 
-  const { state, deleteProgram } = useEvents();
+  const { state, deleteProgram, refetchEventById } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+
+  useEffect(() => {
+    if (id) refetchEventById(id);
+  }, [id]);
 
   const event = state.events.find((e) => e.id === id) as Event | undefined;
   const program = event?.programs.find((p) => p.id === programId) as
@@ -209,20 +212,12 @@ export default function ProgramDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-    paddingTop: 100,
-  },
-  headerButton: {
-    padding: 12,
-  },
+  container: { flex: 1 },
+  scrollContent: { paddingBottom: 32, paddingTop: 100 },
+  headerButton: { padding: 12 },
   card: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     padding: 16,
-
     marginBottom: 16,
     shadowColor: '#000',
     shadowOpacity: 0.1,
@@ -243,9 +238,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: 'Inter-Bold',
   },
-  section: {
-    marginTop: 16,
-  },
+  section: { marginTop: 16 },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

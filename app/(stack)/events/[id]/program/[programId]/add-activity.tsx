@@ -11,13 +11,13 @@ import {
   Modal,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { useEvents } from '@/context/EventsContext';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import { ArrowLeft, Clock } from 'lucide-react-native';
 import TextInput from '@/components/ui/TextInput';
 import Button from '@/components/ui/Button';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useEvents } from '@/context/EventsContext';
 
 interface ActivityFormValues {
   time: string;
@@ -30,7 +30,7 @@ export default function AddActivityScreen() {
     id: string;
     programId: string;
   }>();
-  const { addActivity } = useEvents();
+  const { addActivity, refetchEventById } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -63,18 +63,21 @@ export default function AddActivityScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
 
     setIsSubmitting(true);
 
     try {
-      addActivity(id, programId, {
+      await addActivity(id, programId, {
         programId,
         time: formValues.time,
         title: formValues.title,
         description: formValues.description,
       });
+
+      // 🔁 Recarrega o evento para garantir que atividades sejam atualizadas
+      await refetchEventById(id);
 
       Alert.alert(
         'Atividade adicionada',

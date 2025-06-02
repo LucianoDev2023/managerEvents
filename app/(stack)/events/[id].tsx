@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -34,14 +34,23 @@ import { getAuth } from 'firebase/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function EventDetailScreen() {
+  const { state, deleteEvent, addProgram, refetchEventById } = useEvents();
+
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state, deleteEvent, addProgram } = useEvents();
+  const event = state.events.find((e) => e.id === id) as Event | undefined;
+  console.log('print do evento:', event),
+    useEffect(() => {
+      if (id) {
+        refetchEventById(id);
+      }
+    }, [id]);
+
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const [isAddingProgram, setIsAddingProgram] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const event = state.events.find((e) => e.id === id) as Event | undefined;
+
   const authUser = getAuth().currentUser;
   const userEmail = authUser?.email?.toLowerCase() ?? '';
   const isCreator = event?.createdBy?.toLowerCase() === userEmail;
@@ -52,10 +61,8 @@ export default function EventDetailScreen() {
         admin.level.toLowerCase() === 'admin parcial')
   );
   const hasPermission = isCreator || isSubAdmin;
-  console.log('userEmail:', userEmail);
-  console.log('createdBy:', event?.createdBy);
-  console.log('userId:', event?.userId);
-  console.log('subAdmins:', event?.subAdmins);
+  console.log('event:', event);
+  console.log('event.programs:', event?.programs);
 
   const confirmed =
     event?.confirmedGuests?.filter((g) => g.mode === 'confirmado') || [];
