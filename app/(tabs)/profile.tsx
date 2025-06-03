@@ -215,7 +215,7 @@ export default function ProfileScreen() {
         exiting={FadeOut.duration(50)}
         style={{
           flex: 1,
-          backgroundColor: gradientColors[0], // Cor de fundo igual ao início do gradiente
+          backgroundColor: gradientColors[0],
         }}
       >
         <LinearGradient

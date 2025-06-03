@@ -1,4 +1,3 @@
-// Refatorado para tema escuro e layout moderno dos comentários
 import React, { useState } from 'react';
 import {
   View,
@@ -10,6 +9,7 @@ import {
   Alert,
   ScrollView,
   TextInput,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Trash2, Share2, MessageSquare } from 'lucide-react-native';
@@ -34,7 +34,7 @@ interface PhotoGalleryProps {
   eventId: string;
   programId: string;
   activityId: string;
-  refetchEventById: (eventId: string) => Promise<void>; // ✅ adicionado
+  refetchEventById: (eventId: string) => Promise<void>;
 }
 
 const { width } = Dimensions.get('window');
@@ -50,16 +50,15 @@ export default function PhotoGallery({
   eventId,
   programId,
   activityId,
-  refetchEventById, // ✅
+  refetchEventById,
 }: PhotoGalleryProps) {
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
   const auth = getAuth();
-  const userEmail = auth.currentUser?.email ?? '';
+  const currentUser = auth.currentUser;
 
   const [isViewerVisible, setIsViewerVisible] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-
   const handleShareImage = async (imageUrl: string) => {
     try {
       const downloadPath = FileSystem.documentDirectory + 'shared-image.jpg';
@@ -72,7 +71,7 @@ export default function PhotoGallery({
 
   if (photos.length === 0) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0f0f0f' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={[styles.emptyContainer, { borderColor: colors.border }]}>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
             Nenhuma foto adicionada
@@ -83,13 +82,8 @@ export default function PhotoGallery({
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0f0f0f' }}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.container,
-          { backgroundColor: '#0f0f0f' },
-        ]}
-      >
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView contentContainerStyle={[styles.container]}>
         {photos.map((photo, index) => {
           const {
             comments,
@@ -97,22 +91,39 @@ export default function PhotoGallery({
             setNewComment,
             addComment,
             deleteComment,
-          } = usePhotoComments(
+            canDeleteComment,
+            isAddingComment,
+            isDeletingCommentIds,
+          } = usePhotoComments({
             eventId,
             programId,
             activityId,
-            photo.id,
-            userEmail
-          );
+            photoId: photo.id,
+            currentUser: {
+              uid: currentUser?.uid ?? '',
+              email: currentUser?.email ?? '',
+              isSuperAdmin: isCreator,
+            },
+            eventCreatorId: photo.createdBy ?? '',
+          });
 
           return (
-            <View key={photo.id} style={{ width: '100%' }}>
+            <View
+              key={photo.id}
+              style={{
+                width: '100%',
+                marginBottom: 20,
+                padding: 4,
+                borderBottomWidth: 1,
+                borderBottomColor: '#454545',
+              }}
+            >
               <Animated.View
                 entering={FadeIn.duration(300)}
                 exiting={FadeOut.duration(300)}
                 style={styles.photoBlock}
               >
-                <TouchableOpacity
+                <TouchableWithoutFeedback
                   onPress={() => {
                     setCurrentIndex(index);
                     setIsViewerVisible(true);
@@ -135,7 +146,7 @@ export default function PhotoGallery({
                       </Text>
                     </View>
                   </View>
-                </TouchableOpacity>
+                </TouchableWithoutFeedback>
 
                 <View style={styles.actionsContainer}>
                   <TouchableOpacity
@@ -146,7 +157,6 @@ export default function PhotoGallery({
                     ]}
                   >
                     <Share2 size={14} color="white" />
-                    {/* <Text style={styles.actionText}>Compartilhar</Text> */}
                   </TouchableOpacity>
 
                   {editable && onDeletePhoto && isCreator && (
@@ -155,7 +165,7 @@ export default function PhotoGallery({
                       onPress={() => {
                         Alert.alert(
                           'Confirmar exclusão',
-                          'Deseja realmente excluir esta foto?',
+                          'Deseja excluir esta foto?',
                           [
                             { text: 'Cancelar', style: 'cancel' },
                             {
@@ -188,7 +198,6 @@ export default function PhotoGallery({
                       ]}
                     >
                       <Trash2 size={14} color="white" />
-                      {/* <Text style={styles.actionText}>Excluir</Text> */}
                     </TouchableOpacity>
                   )}
                 </View>
@@ -208,44 +217,65 @@ export default function PhotoGallery({
                   <TextInput
                     value={newComment}
                     onChangeText={setNewComment}
+                    editable={!isAddingComment}
                     placeholder="Escreva seu comentário..."
                     placeholderTextColor="#999"
                     maxLength={150}
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      { backgroundColor: colors.backgroundComents },
+                    ]}
                   />
                   <TouchableOpacity
                     onPress={addComment}
-                    style={styles.sendButton}
+                    disabled={isAddingComment}
+                    style={[
+                      styles.sendButton,
+                      { opacity: isAddingComment ? 0.5 : 1 },
+                    ]}
                   >
-                    <Text style={styles.sendText}>Enviar</Text>
+                    <Text style={styles.sendText}>
+                      {isAddingComment ? 'Enviando...' : 'Enviar'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
 
-                {comments.map((comment) => (
-                  <View key={comment.id} style={styles.commentBox}>
-                    <Text style={styles.commentAuthor}>
-                      {comment.email.split('@')[0]}
-                    </Text>
-                    <Text style={styles.commentText}>{comment.text}</Text>
-                    <View style={styles.commentFooterRow}>
-                      <Text style={styles.commentTime}>
-                        {comment.createdAt?.toDate
-                          ? formatDistanceToNow(comment.createdAt.toDate(), {
-                              addSuffix: true,
-                              locale: ptBR,
-                            })
-                          : 'Enviando...'}
+                {comments
+                  .filter((comment) => comment.createdAt?.toDate) // Só mostra após Firestore salvar
+                  .map((comment) => (
+                    <View
+                      key={comment.id}
+                      style={[
+                        styles.commentBox,
+                        { backgroundColor: colors.backgroundComents },
+                      ]}
+                    >
+                      <Text style={styles.commentAuthor}>
+                        {comment.email.split('@')[0]}
                       </Text>
-                      {comment.email === userEmail.toLowerCase() && (
-                        <TouchableOpacity
-                          onPress={() => deleteComment(comment.id)}
-                        >
-                          <Text style={styles.commentActionText}>Excluir</Text>
-                        </TouchableOpacity>
-                      )}
+                      <Text style={styles.commentText}>{comment.text}</Text>
+                      <View style={styles.commentFooterRow}>
+                        <Text style={styles.commentTime}>
+                          {formatDistanceToNow(comment.createdAt.toDate(), {
+                            addSuffix: true,
+                            locale: ptBR,
+                          })}
+                        </Text>
+                        {canDeleteComment(comment) && (
+                          <TouchableOpacity
+                            onPress={() => deleteComment(comment)}
+                            disabled={isDeletingCommentIds.includes(comment.id)}
+                          >
+                            <Text style={styles.commentActionText}>
+                              {isDeletingCommentIds.includes(comment.id)
+                                ? 'Excluindo...'
+                                : 'Excluir'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  ))}
               </View>
             </View>
           );
@@ -265,29 +295,26 @@ export default function PhotoGallery({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 6,
-    paddingBottom: 40,
+    paddingTop: 0,
+    paddingBottom: 8,
   },
   photoBlock: {
     alignItems: 'center',
-    padding: 10,
-    borderTopWidth: 1,
-    borderColor: '#454545',
+    padding: 0,
+    marginTop: 0,
   },
   photo: {
     width: ITEM_WIDTH,
     height: ITEM_HEIGHT,
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
   },
   actionsContainer: {
     width: '100%',
-    justifyContent: 'flex-end',
     flexDirection: 'row',
+    justifyContent: 'flex-end',
     marginTop: 10,
-    marginRight: 12,
+    marginRight: 32,
     gap: 6,
   },
   actionButton: {
@@ -296,26 +323,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 6,
   },
-  actionText: {
-    color: 'white',
-    fontFamily: 'Inter-Medium',
-    fontSize: 10,
-    marginLeft: 6,
-  },
-  emptyContainer: {
-    margin: 16,
-    padding: 24,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-  },
   photoWrapper: {
+    marginTop: 0,
+    padding: 0,
     borderRadius: 10,
   },
   descriptionContainer: {
@@ -328,11 +338,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   descriptionText: {
     fontSize: 14,
@@ -340,7 +345,6 @@ const styles = StyleSheet.create({
     color: '#333',
     lineHeight: 20,
     flex: 1,
-    textAlign: 'left',
   },
   icon: {
     marginTop: 2,
@@ -368,7 +372,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     fontSize: 14,
     fontFamily: 'Inter_400Regular',
-    backgroundColor: '#1c1c1e',
     color: '#fff',
   },
   sendButton: {
@@ -384,13 +387,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
   },
   commentBox: {
-    backgroundColor: '#161b22',
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 10,
     marginBottom: 2,
     borderBottomWidth: 1,
     borderBottomColor: '#262c34',
+    borderWidth: 1,
+    borderColor: '#3333',
   },
   commentAuthor: {
     color: '#8b949e',
@@ -419,5 +423,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#f87171',
     fontFamily: 'Inter_500Medium',
+  },
+  emptyContainer: {
+    margin: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
   },
 });

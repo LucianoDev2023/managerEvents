@@ -10,6 +10,10 @@ import {
   ImageBackground,
   Platform,
   Image,
+  Linking,
+  Pressable,
+  Animated,
+  ActivityIndicator,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -32,6 +36,8 @@ import LoadingOverlay from '@/components/LoadingOverlay';
 import { Event, Guest } from '@/types';
 import { getAuth } from 'firebase/auth';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FadeInDown } from 'react-native-reanimated';
+import LottieView from 'lottie-react-native';
 
 export default function EventDetailScreen() {
   const { state, deleteEvent, addProgram, refetchEventById } = useEvents();
@@ -40,8 +46,14 @@ export default function EventDetailScreen() {
   const event = state.events.find((e) => e.id === id) as Event | undefined;
   console.log('print do evento:', event),
     useEffect(() => {
+      const fetchData = async () => {
+        setIsLoading(true);
+        await refetchEventById(id);
+        setIsLoading(false);
+      };
+
       if (id) {
-        refetchEventById(id);
+        fetchData();
       }
     }, [id]);
 
@@ -50,6 +62,7 @@ export default function EventDetailScreen() {
   const [isAddingProgram, setIsAddingProgram] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [isLoading, setIsLoading] = useState(true);
 
   const authUser = getAuth().currentUser;
   const userEmail = authUser?.email?.toLowerCase() ?? '';
@@ -156,6 +169,15 @@ export default function EventDetailScreen() {
     }
   };
 
+  const handleOpenInMaps = (location: string) => {
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+      location
+    )}`;
+    Linking.openURL(mapsUrl).catch(() =>
+      Alert.alert('Erro', 'Não foi possível abrir o mapa.')
+    );
+  };
+
   return (
     <LinearGradient
       colors={
@@ -217,10 +239,26 @@ export default function EventDetailScreen() {
                 {new Date(event.endDate).toLocaleDateString('pt-BR')}
               </Text>
             </View>
-            <View style={styles.row}>
-              <MapPin size={16} color="#fff" />
-              <Text style={styles.meta}>{event.location}</Text>
-            </View>
+
+            <TouchableOpacity
+              onPress={() => handleOpenInMaps(event.location)}
+              style={[styles.mapBtn, { borderColor: colors.border }]}
+            >
+              <View style={styles.animaps}>
+                <LottieView
+                  source={require('@/assets/images/animaps.json')}
+                  autoPlay
+                  loop
+                  style={styles.lottieIcon}
+                />
+              </View>
+              <Text
+                style={[styles.mapBtnText, { color: colors.textSecondary }]}
+              >
+                {event.location}
+              </Text>
+            </TouchableOpacity>
+
             {event.description && (
               <Text style={styles.overlayDescription}>{event.description}</Text>
             )}
@@ -246,26 +284,39 @@ export default function EventDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.programsSection}>
-          {event.programs.length === 0 ? (
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Nenhum dia adicionado ainda.
-            </Text>
-          ) : (
-            event.programs
-              .sort(
-                (a, b) =>
-                  new Date(a.date).getTime() - new Date(b.date).getTime()
-              )
-              .map((program) => (
-                <ProgramItem
-                  key={program.id}
-                  program={program}
-                  eventId={event.id}
-                />
-              ))
-          )}
-        </View>
+        {isLoading || event.programs.length === 0 ? (
+          <View style={styles.centeredContent}>
+            {isLoading ? (
+              <>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text
+                  style={[
+                    styles.emptyText,
+                    { color: colors.textSecondary, marginTop: 12 },
+                  ]}
+                >
+                  Carregando programação...
+                </Text>
+              </>
+            ) : (
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                Nenhum dia adicionado ainda.
+              </Text>
+            )}
+          </View>
+        ) : (
+          event.programs
+            .sort(
+              (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+            )
+            .map((program) => (
+              <ProgramItem
+                key={program.id}
+                program={program}
+                eventId={event.id}
+              />
+            ))
+        )}
 
         {isCreator && (confirmed.length > 0 || interested.length > 0) && (
           <View style={{ marginTop: 24, paddingHorizontal: 16 }}>
@@ -385,14 +436,14 @@ export default function EventDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingHorizontal: 10, paddingBottom: 10 },
+  scrollContent: { paddingBottom: 10 },
   headerButton: { padding: 8 },
   headerActions: { flexDirection: 'row' },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 15,
-    marginHorizontal: 16,
+    marginHorizontal: 24,
   },
   sectionTitle: { fontSize: 18, fontFamily: 'Inter-Bold' },
   emptyText: {
@@ -475,12 +526,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'Inter-Regular',
     color: '#ccc',
-    marginTop: 4,
+    marginTop: 10,
     textAlign: 'left',
   },
-  programsSection: {
-    marginTop: 16,
-  },
+  programsSection: {},
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -491,5 +540,39 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 13,
     fontFamily: 'Inter-Regular',
+  },
+  mapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderRadius: 12,
+    marginTop: 8,
+    borderColor: Colors.dark.primary,
+  },
+  mapBtnText: {
+    fontSize: 13,
+    fontFamily: 'Inter-Medium',
+    marginLeft: 6,
+  },
+  lottieIcon: {
+    width: 30,
+    height: 30,
+  },
+  animaps: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    backgroundColor: '#fefefe',
+    borderRadius: 50,
+    justifyContent: 'flex-start',
+    alignItems: 'center', // centraliza horizontalmente
+  },
+  centeredContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
 });

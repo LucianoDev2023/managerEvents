@@ -216,9 +216,9 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 32, paddingTop: 100 },
   headerButton: { padding: 12 },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(87, 6, 6, 0.05)',
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 8,
     shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
   },
   sectionTitle: {
     fontSize: 18,
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   activityCard: {
-    marginBottom: 12,
+    marginBottom: 2,
   },
   notFoundContainer: {
     flex: 1,

@@ -72,7 +72,12 @@ export default function ActivityItem({
         pressed && Platform.OS === 'ios' && { opacity: 0.7 },
       ]}
     >
-      <Card style={styles.card}>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: colors.background, borderRadius: 10 },
+        ]}
+      >
         <View style={styles.header}>
           <View style={styles.timeContainer}>
             <Clock size={18} color={colors.primary} />
@@ -113,23 +118,33 @@ export default function ActivityItem({
             <ChevronRight size={24} color={colors.primary} />
           </View>
         )}
-      </Card>
+        <View style={styles.photoRow}>
+          <LucideCamera size={16} color={colors.textSecondary} />
+          <Text style={[styles.photoCount, { color: colors.textSecondary }]}>
+            {activity.photos?.length || 0}{' '}
+            {activity.photos?.length === 0
+              ? ''
+              : activity.photos?.length === 1
+              ? 'foto'
+              : 'fotos'}
+          </Text>
+        </View>
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    padding: 10,
+    padding: 14,
     paddingLeft: 18,
-    margin: 8,
-    marginHorizontal: 10,
+    margin: 2,
+    marginHorizontal: 14,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
   },
   timeContainer: {
     flexDirection: 'row',
@@ -167,5 +182,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  photoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  photoCount: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
   },
 });

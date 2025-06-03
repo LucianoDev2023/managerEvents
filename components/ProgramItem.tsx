@@ -59,13 +59,19 @@ export default function ProgramItem({ program, eventId }: ProgramItemProps) {
         pressed && Platform.OS === 'ios' && { opacity: 0.9 },
       ]}
     >
-      <Card style={styles.card}>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: colors.background, shadowColor: colors.text },
+        ]}
+      >
         <View style={styles.dateContainer}>
           <Calendar size={20} color={colors.primary} />
           <Text style={[styles.dateText, { color: colors.text }]}>
             {formatDate(program.date)}
           </Text>
         </View>
+
         <Text style={[styles.statText, { color: colors.textSecondary }]}>
           Visualize as atividades e fotos deste dia.
         </Text>
@@ -93,7 +99,7 @@ export default function ProgramItem({ program, eventId }: ProgramItemProps) {
             </View>
           </View>
         </View>
-      </Card>
+      </View>
     </Pressable>
   );
 }
@@ -101,8 +107,15 @@ export default function ProgramItem({ program, eventId }: ProgramItemProps) {
 const styles = StyleSheet.create({
   card: {
     padding: 16,
-    margin: 8,
+    margin: 4,
     marginHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#fff', // será sobrescrito dinamicamente com `colors.card`
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3, // para Android
   },
   dateContainer: {
     flexDirection: 'row',

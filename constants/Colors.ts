@@ -2,6 +2,7 @@ export default {
   light: {
     background: '#ffffff',
     backGroundSecondary: '#fff',
+    backgroundComents: '#fff',
     text: '#111',
     textSecondary: '#444',
     border: '#ccc',
@@ -12,7 +13,8 @@ export default {
     text2: '#fff',
   },
   dark: {
-    background: '#0b0b0f',
+    background: '#272441',
+    backgroundComents: '#1c1c1e',
     backGroundSecondary: 'transparent',
     text: '#fff',
     textSecondary: '#aaa',

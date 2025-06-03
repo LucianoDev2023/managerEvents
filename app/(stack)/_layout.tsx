@@ -91,6 +91,22 @@ export default function StackLayout() {
             ),
           }}
         />
+        <Stack.Screen
+          name="events/[id]/confirmed-guests"
+          options={{
+            headerTitle: 'Lista de presentes',
+            headerShown: true,
+            headerTitleStyle: { fontFamily: 'Inter-Bold', fontSize: 18 },
+            headerLeft: () => (
+              <TouchableOpacity
+                onPress={() => router.back()}
+                style={{ padding: 8 }}
+              >
+                <ArrowLeft size={24} color={colors.text} />
+              </TouchableOpacity>
+            ),
+          }}
+        />
       </Stack>
     </View>
   );

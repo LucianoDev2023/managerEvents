@@ -67,7 +67,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="seguidos"
         options={{
-          title: 'Seguidos',
+          title: 'Seguindo',
           tabBarIcon: ({ color, size }) => (
             <HeartPulse size={size} color={color} />
           ),

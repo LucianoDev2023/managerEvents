@@ -94,13 +94,8 @@ export default function MyEventsScreen() {
     router.push({ pathname: '/events/[id]', params: { id } });
   };
 
-  const handleOpenInMaps = (location: string) => {
-    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-      location
-    )}`;
-    Linking.openURL(mapsUrl).catch(() =>
-      Alert.alert('Erro', 'Não foi possível abrir o mapa.')
-    );
+  const handleconfirmedGuests = (confirmedGuests: string) => {
+    console.log('visualizar lista de convidados');
   };
 
   const handleShareQR = async () => {
@@ -240,14 +235,18 @@ export default function MyEventsScreen() {
 
           <View style={styles.buttonsRow}>
             <Pressable
-              onPress={() => handleOpenInMaps(item.location)}
+              onPress={() =>
+                router.push({
+                  pathname: '/events/[id]/confirmed-guests',
+                  params: { id: item.id },
+                })
+              }
               style={[styles.mapBtn, { borderColor: colors.border }]}
             >
-              <MapPin size={16} color={colors.primary} />
               <Text
                 style={[styles.mapBtnText, { color: colors.textSecondary }]}
               >
-                Mapa
+                Convidados
               </Text>
             </Pressable>
 
@@ -400,7 +399,6 @@ export default function MyEventsScreen() {
   );
 }
 
-// ✅ Correção aplicada também ao componente `PermissionModal`
 const PermissionModal = ({
   visible,
   onClose,
@@ -415,7 +413,7 @@ const PermissionModal = ({
   visible: boolean;
   onClose: () => void;
   colors: typeof Colors.dark | typeof Colors.light;
-  gradientColors: [string, string, ...string[]]; // <- AQUI ESTÁ O FIX
+  gradientColors: [string, string, ...string[]];
   permissionEmail: string;
   setPermissionEmail: (email: string) => void;
   permissionLevel: PermissionLevel;
@@ -451,7 +449,7 @@ const PermissionModal = ({
             deletar o que criou.
           </Text>
 
-          <Text style={[styles.modalSubtitle, { color: colors.text }]}>
+          <Text style={[styles.modalSubtitle, { color: colors.primary }]}>
             👥 Adicionar Permissão
           </Text>
 

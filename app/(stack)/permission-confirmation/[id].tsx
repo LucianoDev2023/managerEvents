@@ -19,6 +19,7 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 export default function PermissionConfirmationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -75,14 +76,27 @@ export default function PermissionConfirmationScreen() {
 
   const handleSavePermission = () => {
     if (!permissionEmail) return;
+
+    const existing = event.subAdmins?.find(
+      (admin) => admin.email === permissionEmail
+    );
+
+    const updatedSubAdmins = existing
+      ? (event.subAdmins ?? []).map((admin) =>
+          admin.email === permissionEmail
+            ? { ...admin, level: permissionLevel }
+            : admin
+        )
+      : [
+          ...(event.subAdmins ?? []),
+          { email: permissionEmail, level: permissionLevel },
+        ];
+
     const updatedEvent = {
       ...event,
-      subAdmins: (event.subAdmins ?? []).map((admin) =>
-        admin.email === permissionEmail
-          ? { ...admin, level: permissionLevel }
-          : admin
-      ),
+      subAdmins: updatedSubAdmins,
     };
+
     updateEvent(updatedEvent);
     setModalVisible(false);
   };
@@ -136,40 +150,103 @@ export default function PermissionConfirmationScreen() {
         </LinearGradient>
 
         {/* Card das Permissões */}
+        <View style={{ paddingHorizontal: 12, marginTop: 10 }}>
+          <Button
+            title="Add Permissão"
+            onPress={() => {
+              setPermissionEmail('');
+              setPermissionLevel('Admin parcial');
+              setModalVisible(true);
+            }}
+            style={{
+              backgroundColor: colors.primary2,
+              alignSelf: 'flex-end', // botão do tamanho do conteúdo
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderRadius: 10,
+            }}
+            textStyle={{ color: '#fff' }}
+          />
+        </View>
+
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           Permissões Atribuídas
         </Text>
         <View
           style={[
             styles.permissionsCard,
-            { backgroundColor: colors.backGroundSecondary },
+            {
+              backgroundColor: colors.backGroundSecondary,
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+              // borderRadius: 16,
+              // borderWidth: 1,
+              // borderColor: colors.border,
+              gap: 8,
+            },
           ]}
         >
           {(event.subAdmins ?? []).length === 0 ? (
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            <Text
+              style={[
+                styles.emptyText,
+                {
+                  color: colors.textSecondary,
+                  textAlign: 'center',
+                  fontStyle: 'italic',
+                },
+              ]}
+            >
               Nenhuma permissão cadastrada.
             </Text>
           ) : (
             event.subAdmins?.map((item) => (
               <View
                 key={item.email}
-                style={[styles.card, { borderColor: colors.border }]}
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: 12,
+                  borderRadius: 12,
+                  backgroundColor: colors.background,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
               >
-                <View>
-                  <Text style={[styles.email, { color: colors.text }]}>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: colors.text,
+                      marginBottom: 2,
+                    }}
+                  >
                     {item.email}
                   </Text>
-                  <Text style={[styles.level, { color: colors.textSecondary }]}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontStyle: 'italic',
+                      color: colors.textSecondary,
+                    }}
+                  >
                     Permissão: {item.level}
                   </Text>
                 </View>
-                <View style={styles.actions}>
+
+                <View style={{ flexDirection: 'row', gap: 16 }}>
                   <TouchableOpacity
                     onPress={() => handleEdit(item.email, item.level)}
+                    style={{ padding: 6 }}
                   >
                     <Pencil size={20} color={colors.primary} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleRemove(item.email)}>
+                  <TouchableOpacity
+                    onPress={() => handleRemove(item.email)}
+                    style={{ padding: 6 }}
+                  >
                     <Trash2 size={20} color={colors.error} />
                   </TouchableOpacity>
                 </View>
@@ -179,75 +256,113 @@ export default function PermissionConfirmationScreen() {
         </View>
       </ScrollView>
 
-      <Modal visible={modalVisible} transparent animationType="slide">
+      <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.modalContent,
-              { backgroundColor: colors.background },
-            ]}
+          <Animated.View
+            entering={FadeIn}
+            exiting={FadeOut}
+            style={styles.animatedContainer}
           >
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Editar Permissão
-            </Text>
+            <LinearGradient
+              colors={gradientColors}
+              locations={[0, 0.7, 1]}
+              style={[styles.modalContent, { borderColor: colors.primary2 }]}
+            >
+              <Text style={[styles.modalTitle, { color: colors.primary }]}>
+                🔐 Permissões
+              </Text>
 
-            <TextInput
-              placeholder="Email do usuário"
-              value={permissionEmail}
-              onChangeText={setPermissionEmail}
-              style={[
-                styles.input,
-                { borderColor: colors.border, color: colors.text },
-              ]}
-              placeholderTextColor={colors.textSecondary}
-              editable={false}
-            />
+              <Text style={[styles.modalText, { color: colors.text }]}>
+                <Text style={[styles.roleHighlight, { color: colors.primary }]}>
+                  Super admin:
+                </Text>{' '}
+                Controle total sobre todos os recursos. Pode criar, editar,
+                gerenciar permissões de todos os outros usuários. Não pode
+                excluir o evento principal. Permissão exclusiva do criador.
+              </Text>
 
-            <View style={styles.toggleContainer}>
-              {(['Super Admin', 'Admin parcial'] as const).map((level) => (
-                <Pressable
-                  key={level}
-                  onPress={() => setPermissionLevel(level)}
-                  style={[
-                    styles.toggleButton,
-                    {
-                      borderColor: colors.border,
-                      backgroundColor:
-                        permissionLevel === level
-                          ? colors.primary
-                          : 'transparent',
-                    },
-                  ]}
-                >
-                  <Text
-                    style={{
-                      color: permissionLevel === level ? '#fff' : colors.text,
-                      fontWeight: 'bold',
-                    }}
+              <Text style={[styles.modalText, { color: colors.text }]}>
+                <Text style={[styles.roleHighlight, { color: colors.primary }]}>
+                  Admin parcial:
+                </Text>{' '}
+                Com algumas restrições, pode adicionar programas, atividades e
+                fotos. Só pode deletar o que criou.
+              </Text>
+
+              <Text style={[styles.modalSubtitle, { color: colors.text }]}>
+                👥 Adicionar Permissão
+              </Text>
+
+              <TextInput
+                placeholder="Digite o Email"
+                value={permissionEmail}
+                onChangeText={setPermissionEmail}
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.backGroundSecondary,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+                editable={
+                  !event.subAdmins?.some(
+                    (admin) => admin.email === permissionEmail
+                  )
+                }
+              />
+
+              <Text style={[styles.modalLabel, { color: colors.text }]}>
+                Tipo de permissão
+              </Text>
+
+              <View style={styles.toggleRow}>
+                {(['Super Admin', 'Admin parcial'] as const).map((level) => (
+                  <Pressable
+                    key={level}
+                    onPress={() => setPermissionLevel(level)}
+                    style={[
+                      styles.toggleBtn,
+                      {
+                        backgroundColor:
+                          permissionLevel === level ? '#471C7A' : 'transparent',
+                        borderColor:
+                          permissionLevel === level ? '#471C7A' : colors.border,
+                      },
+                    ]}
                   >
-                    {level}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+                    <Text
+                      style={{
+                        color: permissionLevel === level ? '#fff' : colors.text,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {level}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
 
-            <Button
-              title="Salvar"
-              onPress={handleSavePermission}
-              style={{ backgroundColor: colors.primary }}
-              textStyle={{ color: '#fff' }}
-            />
-            <Button
-              variant="cancel"
-              title="Cancelar"
-              onPress={() => setModalVisible(false)}
-              style={{
-                backgroundColor: colors.backGroundSecondary,
-                marginTop: 10,
-              }}
-              textStyle={{ color: '#fff' }}
-            />
-          </View>
+              <View style={styles.buttonRow}>
+                <Button
+                  title="Cancelar"
+                  variant="cancel"
+                  onPress={() => setModalVisible(false)}
+                  style={{ flex: 1, marginRight: 8 }}
+                  textStyle={{ color: 'white' }}
+                />
+                <Button
+                  title="Salvar"
+                  onPress={handleSavePermission}
+                  style={{ backgroundColor: colors.primary, flex: 1 }}
+                  textStyle={{ color: '#fff' }}
+                />
+              </View>
+            </LinearGradient>
+          </Animated.View>
         </View>
       </Modal>
     </LinearGradient>
@@ -279,20 +394,7 @@ const styles = StyleSheet.create({
   email: { fontSize: 16, fontWeight: '600' },
   level: { fontSize: 13, fontStyle: 'italic', textTransform: 'capitalize' },
   actions: { flexDirection: 'row', gap: 16, alignItems: 'center' },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: { width: '90%', padding: 24, borderRadius: 16, gap: 16 },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  input: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 16 },
+
   toggleContainer: { flexDirection: 'row', gap: 10 },
   toggleButton: {
     flex: 1,
@@ -335,5 +437,82 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     padding: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+
+  animatedContainer: {
+    width: '100%',
+    maxWidth: 420,
+  },
+
+  modalContent: {
+    borderRadius: 18,
+    padding: 20,
+    borderWidth: 1,
+  },
+
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+
+  modalSubtitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+
+  modalText: {
+    fontSize: 14,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+
+  roleHighlight: {
+    fontWeight: 'bold',
+  },
+
+  input: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    marginBottom: 12,
+  },
+
+  modalLabel: {
+    fontSize: 14,
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+
+  buttonRow: {
+    flexDirection: 'row',
+    marginTop: 8,
   },
 });

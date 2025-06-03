@@ -85,7 +85,7 @@ export default function FollowedEventsScreen() {
         style={[
           styles.container,
           Platform.OS === 'android' && {
-            paddingTop: RNStatusBar.currentHeight ?? 40,
+            paddingTop: RNStatusBar.currentHeight ?? 20,
           },
         ]}
       >

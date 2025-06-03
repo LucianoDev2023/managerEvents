@@ -1,3 +1,4 @@
+// LandingScreen.tsx - Refatorado para um visual ultra profissional
 import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
@@ -7,7 +8,6 @@ import {
   Platform,
   StatusBar as RNStatusBar,
   Pressable,
-  Image,
   Dimensions,
 } from 'react-native';
 import { useColorScheme } from 'react-native';
@@ -16,10 +16,8 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import LottieView from 'lottie-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-
 import Colors from '@/constants/Colors';
 
-// Importe seus mockups aqui:
 const mockups = [
   require('@/assets/kup/mockup1.png'),
   require('@/assets/kup/mockup2.png'),
@@ -50,7 +48,6 @@ export default function LandingScreen() {
     'Gestão moderna, prática e intuitiva',
   ];
 
-  // Carrossel automático de mockups
   const scrollRef = useRef<ScrollView>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -69,6 +66,7 @@ export default function LandingScreen() {
   return (
     <LinearGradient colors={gradientColors} style={styles.gradient}>
       <StatusBar translucent style="light" backgroundColor="transparent" />
+
       <ScrollView
         contentContainerStyle={[
           styles.container,
@@ -104,10 +102,6 @@ export default function LandingScreen() {
           entering={FadeInDown.delay(250)}
           style={styles.mockupGallery}
         >
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-            Veja o app na prática:
-          </Text>
-
           <ScrollView
             ref={scrollRef}
             horizontal
@@ -175,75 +169,41 @@ const styles = StyleSheet.create({
     paddingVertical: 50,
     paddingBottom: 40,
   },
-  centeredBlock: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
+  centeredBlock: { alignItems: 'center', marginTop: 24 },
   title: {
     fontSize: 40,
-    fontFamily: 'Inter_700Bold',
-    fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
     textAlign: 'center',
     marginBottom: 16,
   },
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Inter-Regular',
     paddingHorizontal: 12,
   },
-  lottieBox: {
-    marginVertical: 20,
-    alignItems: 'center',
-  },
-  lottie: {
-    width: 300,
-    height: 150,
-  },
-  mockupGallery: {
-    // marginVertical: 12,
-    width: '100%',
-  },
+  lottieBox: { marginVertical: 20, alignItems: 'center' },
+  lottie: { width: 300, height: 150 },
+  mockupGallery: { width: '100%' },
   sectionTitle: {
     fontSize: 16,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Inter-SemiBold',
     textAlign: 'center',
   },
-  mockupScroll: {
-    paddingHorizontal: 10,
-    gap: 10,
-  },
+  mockupScroll: { paddingHorizontal: 10, gap: 10 },
   mockupImage: {
     width: MOCKUP_WIDTH,
-    height: 480,
+    height: 380,
     resizeMode: 'contain',
     borderRadius: 16,
     marginRight: 10,
   },
-  featureList: {
-    width: '100%',
-    paddingHorizontal: 6,
-    marginBottom: 32,
-  },
-  featureItem: {
-    marginBottom: 10,
-  },
-  featureText: {
-    fontSize: 15,
-    fontFamily: 'Inter_400Regular',
-  },
-  buttonContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  button: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lottieButton: {
-    width: 280,
-    height: 80,
-  },
+  featureList: { width: '100%', paddingHorizontal: 6, marginBottom: 32 },
+  featureItem: { marginBottom: 10 },
+  featureText: { fontSize: 15, fontFamily: 'Inter-Regular' },
+  buttonContainer: { alignItems: 'center', justifyContent: 'center' },
+  button: { alignItems: 'center', justifyContent: 'center' },
+  lottieButton: { width: 280, height: 80 },
   textOverlay: {
     position: 'absolute',
     justifyContent: 'center',
@@ -254,7 +214,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
     textAlign: 'center',
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Inter-SemiBold',
     marginBottom: 8,
   },
 });

@@ -5,6 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 
@@ -51,7 +53,19 @@ export default function ActivityPhotosScreen() {
   console.log('activity.photos para debugar:', activity?.photos);
 
   if (isLoading) {
-    return <LoadingOverlay message="Carregando fotos atualizadas..." />;
+    return (
+      <View style={styles.centeredContent}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text
+          style={[
+            styles.emptyText,
+            { color: colors.textSecondary, marginTop: 12 },
+          ]}
+        >
+          Carregando programação...
+        </Text>
+      </View>
+    );
   }
 
   if (!event || !program || !activity) {
@@ -87,86 +101,79 @@ export default function ActivityPhotosScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={
-        colorScheme === 'dark'
-          ? ['#0b0b0f', '#1b0033', '#3e1d73']
-          : ['#ffffff', '#f0f0ff', '#e9e6ff']
-      }
-      style={{ flex: 1 }}
-      locations={[0, 0.6, 1]}
-    >
-      <SafeAreaView style={styles.container}>
-        <Stack.Screen
-          options={{
-            headerShown: true,
-            headerTitle: 'Fotos',
-            headerTitleStyle: { fontFamily: 'Inter-Bold', fontSize: 18 },
-            headerLeft: () => (
-              <TouchableOpacity
-                onPress={() => router.back()}
-                style={{ padding: 8 }}
-              >
-                <ArrowLeft size={24} color={colors.text} />
-              </TouchableOpacity>
-            ),
-          }}
-        />
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          headerTitle: 'Fotos',
+          headerTitleStyle: { fontFamily: 'Inter-Bold', fontSize: 18 },
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={{ padding: 8 }}
+            >
+              <ArrowLeft size={24} color={colors.text} />
+            </TouchableOpacity>
+          ),
+        }}
+      />
 
-        <ScrollView
-          contentContainerStyle={{ padding: 2, alignItems: 'flex-start' }}
-        >
-          {photos.length > 0 ? (
-            <View style={{ position: 'relative', flex: 1 }}>
-              <PhotoGallery
-                photos={photos}
-                eventId={event.id}
-                programId={program.id}
-                activityId={activity.id}
-                editable
-                isCreator={isCreator}
-                onDeletePhoto={handleDeletePhoto}
-                deletingPhotoId={deletingPhotoId}
-                refetchEventById={() => refetchEventById(event.id)}
-              />
+      <ScrollView
+        contentContainerStyle={{
+          padding: 0,
+          paddingBottom: 16,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        {photos.length > 0 ? (
+          <PhotoGallery
+            photos={photos}
+            eventId={event.id}
+            programId={program.id}
+            activityId={activity.id}
+            editable
+            isCreator={isCreator}
+            onDeletePhoto={handleDeletePhoto}
+            deletingPhotoId={deletingPhotoId}
+            refetchEventById={() => refetchEventById(event.id)}
+          />
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              Essa atividade ainda não possui fotos.
+            </Text>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={() =>
+                router.push({
+                  pathname:
+                    '/(stack)/events/[id]/program/[programId]/activity/[activityId]/add-photo',
+                  params: {
+                    id: event.id,
+                    programId: program.id,
+                    activityId: activity.id,
+                  },
+                })
+              }
+            >
               {deletingPhotoId && <LoadingOverlay message="Excluindo..." />}
-            </View>
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                Essa atividade ainda não possui fotos.
-              </Text>
-              <TouchableOpacity
-                style={[styles.addButton, { backgroundColor: colors.primary }]}
-                onPress={() =>
-                  router.push({
-                    pathname:
-                      '/(stack)/events/[id]/program/[programId]/activity/[activityId]/add-photo',
-                    params: {
-                      id: event.id,
-                      programId: program.id,
-                      activityId: activity.id,
-                    },
-                  })
-                }
-              >
-                <Text style={styles.addButtonText}>Adicionar Foto</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    </LinearGradient>
+              <Text style={styles.addButtonText}>Adicionar Foto</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    paddingVertical: 8,
+    backgroundColor: '#345677',
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     padding: 24,
     marginTop: 10,
@@ -186,5 +193,11 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontFamily: 'Inter-Medium',
+  },
+  centeredContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
   },
 });

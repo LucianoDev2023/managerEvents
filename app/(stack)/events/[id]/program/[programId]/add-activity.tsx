@@ -194,7 +194,6 @@ export default function AddActivityScreen() {
           <Button
             title="Add atividade"
             onPress={handleSubmit}
-            loading={isSubmitting}
             style={styles.submitButton}
           />
         </View>
