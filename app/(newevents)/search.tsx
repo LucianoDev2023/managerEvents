@@ -1,4 +1,4 @@
-// Refatorado para usar `Guest[]` com base nos novos types
+// Refatorado para usar `Guest[]` com base nos novos types + Loading Overlay
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
@@ -24,11 +24,14 @@ import { getAuth } from 'firebase/auth';
 import LottieView from 'lottie-react-native';
 
 export default function FoundEventScreen() {
+  const [hasConfirmedPresence, setHasConfirmedPresence] = useState(false);
+
   const { accessCode, title } = useLocalSearchParams<{
     accessCode?: string;
     title?: string;
   }>();
   const { state, updateEvent } = useEvents();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
@@ -46,7 +49,6 @@ export default function FoundEventScreen() {
   const [showConfetti, setShowConfetti] = useState(false);
   const user = getAuth().currentUser;
   const userEmail = user?.email ?? 'convidado@anonimo.com';
-
   const userName = user?.displayName ?? 'Convidado';
 
   useEffect(() => {
@@ -72,13 +74,8 @@ export default function FoundEventScreen() {
     if (!eventFound || !user?.uid) return false;
     const authUser = getAuth().currentUser;
     const userEmail = authUser?.email?.toLowerCase();
-
     return eventFound.createdBy === userEmail;
   }, [eventFound, user?.uid]);
-
-  console.log('Criador:', eventFound?.createdBy);
-  console.log('Usuário atual:', userEmail);
-  console.log('É criador?', isCreator);
 
   useEffect(() => {
     if (!eventFound) return;
@@ -97,20 +94,28 @@ export default function FoundEventScreen() {
   const handlePresence = async (mode: 'confirmado' | 'acompanhando') => {
     if (!eventFound) return;
 
-    const updatedGuests = [
-      ...(eventFound.confirmedGuests ?? []).filter(
-        (g) => g.email !== userEmail
-      ),
-      { name: userName, email: userEmail, mode },
-    ];
+    try {
+      setIsSubmitting(true);
 
-    const updatedEvent = { ...eventFound, confirmedGuests: updatedGuests };
-    await updateEvent(updatedEvent);
-    setPresenceStatus(mode === 'confirmado' ? 'confirmed' : 'interested');
+      const updatedGuests = [
+        ...(eventFound.confirmedGuests ?? []).filter(
+          (g) => g.email !== userEmail
+        ),
+        { name: userName, email: userEmail, mode },
+      ];
 
-    if (mode === 'confirmado') {
-      setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 3000);
+      const updatedEvent = { ...eventFound, confirmedGuests: updatedGuests };
+      await updateEvent(updatedEvent);
+      setPresenceStatus(mode === 'confirmado' ? 'confirmed' : 'interested');
+
+      if (!hasConfirmedPresence && mode === 'confirmado') {
+        setShowConfetti(true);
+        setHasConfirmedPresence(true);
+      }
+    } catch (error) {
+      Alert.alert('Erro ao atualizar presença', String(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -122,27 +127,27 @@ export default function FoundEventScreen() {
         style={styles.container}
       >
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+
+        {isSubmitting && (
+          <View style={styles.overlay}>
+            <ActivityIndicator size="large" color="#fff" />
+          </View>
+        )}
+
         {showConfetti && (
-          <View
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 999,
-              elevation: 999,
-              backgroundColor: 'rgba(0, 0, 0, 0.8)', // fundo escuro semi-transparente
-              justifyContent: 'center',
-              alignItems: 'center',
-              pointerEvents: 'none', // permite interação com o conteúdo atrás
-            }}
-          >
+          <View style={styles.overlay}>
             <LottieView
               source={require('@/assets/images/confetti.json')}
               autoPlay
               loop={false}
               style={{ width: '100%', height: '100%' }}
+              onAnimationFinish={() => {
+                setShowConfetti(false);
+                Alert.alert(
+                  '🎉 Evento liberado',
+                  'Agora você pode acessar o evento normalmente.'
+                );
+              }}
             />
           </View>
         )}
@@ -231,7 +236,6 @@ export default function FoundEventScreen() {
 
               {!isCreator && (
                 <View style={{ marginTop: 32, paddingHorizontal: 20 }}>
-                  {/* CARD do convite */}
                   <View
                     style={{
                       backgroundColor:
@@ -255,11 +259,11 @@ export default function FoundEventScreen() {
                           lineHeight: 20,
                         }}
                       >
-                        Você foi convidado para este evento especial! 🥳
+                        Você foi convidado para este evento especial! 🥳{'\n'}
                         {'\n'}
-                        {'\n'}
-                        Escolha abaixo como deseja participar. Sua escolha pode
-                        ser alterada mais tarde no seu perfil.
+                        Para acessar o evento escolha abaixo como deseja
+                        participar. Sua opção poderá ser alterada mais tarde no
+                        seu perfil.
                       </Text>
 
                       <Text
@@ -287,7 +291,6 @@ export default function FoundEventScreen() {
                     </View>
                   </View>
 
-                  {/* Botões fora do card */}
                   <View
                     style={{
                       flexDirection: 'row',
@@ -299,13 +302,14 @@ export default function FoundEventScreen() {
                     <View
                       style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}
                     >
-                      {/* Botão: Confirmar presença */}
                       <Pressable
                         onPress={() => handlePresence('confirmado')}
+                        disabled={isSubmitting}
                         style={[
                           styles.statusButton,
                           presenceStatus === 'confirmed' &&
                             styles.statusButtonActive,
+                          isSubmitting && { opacity: 0.6 },
                         ]}
                       >
                         <Text
@@ -319,13 +323,14 @@ export default function FoundEventScreen() {
                         </Text>
                       </Pressable>
 
-                      {/* Botão: Acompanhar evento */}
                       <Pressable
                         onPress={() => handlePresence('acompanhando')}
+                        disabled={isSubmitting}
                         style={[
                           styles.statusButton,
                           presenceStatus === 'interested' &&
                             styles.statusButtonActive,
+                          isSubmitting && { opacity: 0.6 },
                         ]}
                       >
                         <Text
@@ -358,13 +363,24 @@ export default function FoundEventScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
   header: {
     height: 100,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
   },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', fontFamily: 'Inter-Bold' },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
+  },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
   loadingContainer: {
     marginTop: 60,
@@ -422,14 +438,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   statusButtonActive: { backgroundColor: '#5838AD' },
-  statusButtonSecondary: { backgroundColor: '#444' },
   statusButtonText: {
     color: 'white',
     fontWeight: '600',
     fontSize: 14,
     fontFamily: 'Inter-Medium',
   },
-
   statusButtonTextActive: {
     color: '#fff',
   },

@@ -246,6 +246,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       publicId: doc.data().publicId,
       timestamp: doc.data().timestamp?.toDate?.() ?? new Date(),
       description: doc.data().description ?? '',
+      createdBy: doc.data().createdBy ?? '',
     }));
     dispatch({ type: 'SET_PHOTOS', payload: { activityId, photos } });
   };
@@ -307,6 +308,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
                 publicId: p.publicId,
                 description: p.description ?? '',
                 timestamp: p.timestamp?.toDate?.() ?? new Date(),
+                createdBy: p.createdBy ?? '',
               };
             }
           );
@@ -341,6 +343,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
               publicId: p.publicId,
               description: p.description ?? '',
               timestamp: p.timestamp?.toDate?.() ?? new Date(),
+              createdBy: p.createdBy ?? '',
             };
           }
         );
