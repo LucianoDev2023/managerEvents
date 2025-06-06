@@ -77,10 +77,19 @@ export default function EventFormScreen() {
       description: '',
       accessCode: '',
       coverImage: '',
-      userId: user.uid,
-      createdBy: user.email?.toLowerCase() ?? '',
+      userId: '',
+      createdBy: '',
     },
   });
+  useEffect(() => {
+    if (user) {
+      reset((prev) => ({
+        ...prev,
+        userId: user.uid,
+        createdBy: user.email?.toLowerCase() ?? '',
+      }));
+    }
+  }, [user]);
 
   const startDate = watch('startDate');
   const endDate = watch('endDate');

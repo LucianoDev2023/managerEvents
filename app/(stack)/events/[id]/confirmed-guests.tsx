@@ -1,20 +1,40 @@
-import React from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
 import { ArrowLeft } from 'lucide-react-native';
 import { useColorScheme } from 'react-native';
 import Colors from '@/constants/Colors';
+import type { Guest } from '@/types';
 
 export default function ConfirmedGuestsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state } = useEvents();
+  const { state, getGuestsByEventId } = useEvents();
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
+  const [confirmedGuests, setConfirmedGuests] = useState<Guest[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const event = state.events.find((event) => event.id === id);
-  const confirmedGuests = event?.confirmedGuests ?? [];
+
+  useEffect(() => {
+    const fetchGuests = async () => {
+      if (!id) return;
+      setLoading(true);
+      const guests = await getGuestsByEventId(id);
+      setConfirmedGuests(guests.filter((g) => g.mode === 'confirmado'));
+      setLoading(false);
+    };
+    fetchGuests();
+  }, [id]);
 
   if (!event) {
     return (
@@ -22,6 +42,14 @@ export default function ConfirmedGuestsScreen() {
         <Text style={[styles.emptyText, { color: colors.text }]}>
           Evento não encontrado.
         </Text>
+      </View>
+    );
+  }
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -55,10 +83,15 @@ export default function ConfirmedGuestsScreen() {
                 {item.email}
               </Text>
               <Text style={[styles.guestMode, { color: colors.textSecondary }]}>
-                {item.mode === 'confirmado'
-                  ? '✅ Confirmado'
-                  : '👀 Acompanhando'}
+                ✅ Confirmado
               </Text>
+              {Array.isArray(item.family) && item.family.length > 0 && (
+                <Text
+                  style={[styles.guestEmail, { color: colors.textSecondary }]}
+                >
+                  👨‍👩‍👧 Família: {item.family.join(', ')}
+                </Text>
+              )}
             </View>
           )}
         />

@@ -53,7 +53,6 @@ export default function RegisterScreen() {
       setCameFromRegister(true);
       router.replace('/accountCreatedScreen');
     } catch (error: any) {
-      console.log(error);
       alert('Erro ao registrar: ' + error.message);
     } finally {
       setLoading(false);

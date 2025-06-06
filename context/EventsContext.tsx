@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { Event, Program, Activity, Photo } from '@/types';
 import { db } from '@/config/firebase';
+import { Guest } from '@/types';
+
 import {
   collection,
   getDoc,
@@ -11,6 +13,7 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  setDoc,
   query,
   orderBy,
   Timestamp,
@@ -114,9 +117,10 @@ type EventsContextType = {
   deleteEvent: (eventId: string) => Promise<void>;
   addProgram: (eventId: string, date: Date) => Promise<void>;
   deleteProgram: (eventId: string, programId: string) => Promise<void>;
-  confirmAttendance: (eventId: string, userEmail: string) => Promise<void>;
   refetchEventById: (eventId: string) => Promise<void>;
-
+  getGuests: (eventId: string) => Promise<Guest[]>;
+  saveGuest: (eventId: string, guest: Guest) => Promise<void>;
+  deleteGuest: (eventId: string, guestEmail: string) => Promise<void>;
   addActivity: (
     eventId: string,
     programId: string,
@@ -143,10 +147,18 @@ type EventsContextType = {
   deletePhoto: (
     eventId: string,
     programId: string,
+    activityId: string,
     photoId: string
   ) => Promise<void>;
+  getGuestsByEventId: (eventId: string) => Promise<Guest[]>;
+  getGuestByEmail: (eventId: string, email: string) => Promise<Guest | null>;
+  addGuest: (eventId: string, guest: Guest) => Promise<void>;
+
   loadProgramsByEventId: (eventId: string) => Promise<void>;
-  loadActivitiesByProgramId: (programId: string) => Promise<void>;
+  loadActivitiesByProgramId: (
+    eventId: string,
+    programId: string
+  ) => Promise<void>;
   loadPhotosByActivityId: (
     eventId: string,
     programId: string,
@@ -181,7 +193,6 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
           userId: data.userId,
           createdBy: data.createdBy ?? '',
           subAdmins: data.subAdmins ?? [],
-          confirmedGuests: data.confirmedGuests ?? [],
           programs: [],
         };
       });
@@ -192,22 +203,32 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const loadProgramsByEventId = async (eventId: string) => {
-    const snap = await getDocs(
-      query(collection(db, 'programs'), where('eventId', '==', eventId))
-    );
-    const programs: Program[] = snap.docs.map((doc) => ({
-      id: doc.id,
-      eventId,
-      date: doc.data().date.toDate(),
-      activities: [],
-      photos: [],
-    }));
-    dispatch({ type: 'SET_PROGRAMS', payload: { eventId, programs } });
+    try {
+      const snap = await getDocs(collection(db, 'events', eventId, 'programs'));
+
+      const programs: Program[] = snap.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          eventId,
+          date: data.date?.toDate?.() ?? new Date(), // evita quebra se 'date' estiver undefined
+          activities: [],
+          photos: [],
+        };
+      });
+
+      dispatch({ type: 'SET_PROGRAMS', payload: { eventId, programs } });
+    } catch (error) {
+      console.error('Erro ao carregar os programas:', error);
+    }
   };
 
-  const loadActivitiesByProgramId = async (programId: string) => {
+  const loadActivitiesByProgramId = async (
+    eventId: string,
+    programId: string
+  ) => {
     const snap = await getDocs(
-      query(collection(db, 'activities'), where('programId', '==', programId))
+      collection(db, 'events', eventId, 'programs', programId, 'activities')
     );
     const activities: Activity[] = snap.docs.map((doc) => ({
       id: doc.id,
@@ -225,7 +246,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     programId: string,
     activityId: string
   ) => {
-    const photosSnap = await getDocs(
+    const snap = await getDocs(
       collection(
         db,
         'events',
@@ -237,17 +258,19 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         'photos'
       )
     );
-
-    const photos: Photo[] = photosSnap.docs.map((doc) => ({
-      id: doc.id,
-      activityId,
-      programId,
-      uri: doc.data().uri,
-      publicId: doc.data().publicId,
-      timestamp: doc.data().timestamp?.toDate?.() ?? new Date(),
-      description: doc.data().description ?? '',
-      createdBy: doc.data().createdBy ?? '',
-    }));
+    const photos: Photo[] = snap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        activityId,
+        programId,
+        uri: data.uri,
+        publicId: data.publicId,
+        timestamp: data.timestamp?.toDate?.() ?? new Date(),
+        description: data.description ?? '',
+        createdBy: data.createdBy ?? '',
+      };
+    });
     dispatch({ type: 'SET_PHOTOS', payload: { activityId, photos } });
   };
 
@@ -258,9 +281,9 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!eventSnap.exists()) throw new Error('Evento não encontrado');
       const eventData = eventSnap.data();
 
-      // 2. Buscar todos os programas do evento
+      // 2. Buscar todos os programas do evento (subcoleção)
       const programsSnap = await getDocs(
-        query(collection(db, 'programs'), where('eventId', '==', eventId))
+        collection(db, 'events', eventId, 'programs')
       );
 
       const programs: Program[] = [];
@@ -269,12 +292,9 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         const programId = programDoc.id;
         const programData = programDoc.data();
 
-        // 3. Buscar atividades do programa
+        // 3. Buscar atividades do programa (subcoleção)
         const activitiesSnap = await getDocs(
-          query(
-            collection(db, 'activities'),
-            where('programId', '==', programId)
-          )
+          collection(db, 'events', eventId, 'programs', programId, 'activities')
         );
 
         const activities: Activity[] = [];
@@ -283,7 +303,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
           const activityId = activityDoc.id;
           const activityData = activityDoc.data();
 
-          // 4. Buscar fotos da atividade
+          // 4. Buscar fotos da atividade (subcoleção)
           const activityPhotosSnap = await getDocs(
             collection(
               db,
@@ -302,8 +322,8 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
               const p = photoDoc.data();
               return {
                 id: photoDoc.id,
-                activityId: p.activityId,
-                programId: p.programId,
+                activityId,
+                programId,
                 uri: p.uri,
                 publicId: p.publicId,
                 description: p.description ?? '',
@@ -315,42 +335,20 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
 
           activities.push({
             id: activityId,
-            programId: activityData.programId,
-            time: activityData.time,
+            programId,
             title: activityData.title,
+            time: activityData.time,
             description: activityData.description,
             photos: activityPhotos,
           });
         }
 
-        // 5. Buscar fotos diretamente ligadas ao programa (não à atividade)
-        const programPhotosSnap = await getDocs(
-          query(
-            collection(db, 'photos'),
-            where('programId', '==', programId),
-            where('activityId', '==', '')
-          )
-        );
-
-        const programPhotos: Photo[] = programPhotosSnap.docs.map(
-          (photoDoc) => {
-            const p = photoDoc.data();
-            return {
-              id: photoDoc.id,
-              activityId: '',
-              programId: p.programId,
-              uri: p.uri,
-              publicId: p.publicId,
-              description: p.description ?? '',
-              timestamp: p.timestamp?.toDate?.() ?? new Date(),
-              createdBy: p.createdBy ?? '',
-            };
-          }
-        );
+        // 5. Buscar fotos diretamente do programa (se quiser implementar, crie subcoleção `photos` diretamente em `program`)
+        const programPhotos: Photo[] = [];
 
         programs.push({
           id: programId,
-          eventId: programData.eventId,
+          eventId,
           date: programData.date?.toDate?.() ?? new Date(),
           activities,
           photos: programPhotos,
@@ -370,12 +368,10 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         userId: eventData.userId,
         createdBy: eventData.createdBy ?? '',
         subAdmins: eventData.subAdmins ?? [],
-        confirmedGuests: eventData.confirmedGuests ?? [],
         programs,
       };
 
       dispatch({ type: 'UPDATE_EVENT', payload: updatedEvent });
-      console.log('Evento atualizado:', JSON.stringify(updatedEvent, null, 2));
     } catch (error) {
       console.error('Erro ao refetchEventById:', error);
     }
@@ -434,16 +430,26 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const addProgram = async (eventId: string, date: Date) => {
-    await addDoc(collection(db, 'programs'), {
-      eventId,
-      date: Timestamp.fromDate(date),
-    });
-    await loadProgramsByEventId(eventId);
+    try {
+      const programRef = collection(db, 'events', eventId, 'programs');
+
+      await addDoc(programRef, {
+        eventId,
+        date: Timestamp.fromDate(date),
+      });
+
+      await refetchEventById(eventId); // Atualiza os dados com novos programas
+      await loadProgramsByEventId(eventId); // Opcional, se necessário para seu estado
+    } catch (error) {
+      console.error('Erro ao adicionar programa:', error);
+      throw error;
+    }
   };
 
   const deleteProgram = async (eventId: string, programId: string) => {
-    await deleteDoc(doc(db, 'programs', programId));
-    await loadProgramsByEventId(eventId);
+    const programRef = doc(db, 'events', eventId, 'programs', programId);
+    await deleteDoc(programRef);
+    await refetchEventById(eventId);
   };
 
   const addActivity = async (
@@ -451,12 +457,23 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     programId: string,
     data: Omit<Activity, 'id'>
   ) => {
-    await addDoc(collection(db, 'activities'), {
-      ...data,
+    const activityRef = collection(
+      db,
+      'events',
+      eventId,
+      'programs',
       programId,
-      createdAt: Timestamp.now(),
+      'activities'
+    );
+
+    await addDoc(activityRef, {
+      programId,
+      title: data.title,
+      time: data.time,
+      description: data.description,
     });
-    await loadActivitiesByProgramId(programId);
+
+    await refetchEventById(eventId);
   };
 
   const updateActivity = async (
@@ -469,7 +486,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       time: activity.time,
       description: activity.description,
     });
-    await loadActivitiesByProgramId(programId);
+    await await loadActivitiesByProgramId(eventId, programId);
   };
 
   const deleteActivity = async (
@@ -477,8 +494,17 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     programId: string,
     activityId: string
   ) => {
-    await deleteDoc(doc(db, 'activities', activityId));
-    await loadActivitiesByProgramId(programId);
+    const activityRef = doc(
+      db,
+      'events',
+      eventId,
+      'programs',
+      programId,
+      'activities',
+      activityId
+    );
+    await deleteDoc(activityRef);
+    await refetchEventById(eventId);
   };
 
   const addPhoto = async (
@@ -489,46 +515,102 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     uri: string,
     description: string
   ) => {
-    await addDoc(
-      collection(
-        db,
-        'events',
-        eventId,
-        'programs',
-        programId,
-        'activities',
-        activityId,
-        'photos'
-      ),
-      {
-        publicId,
-        uri,
-        description: description.trim().slice(0, 100),
-        timestamp: Timestamp.now(),
-      }
+    const photoRef = collection(
+      db,
+      'events',
+      eventId,
+      'programs',
+      programId,
+      'activities',
+      activityId,
+      'photos'
     );
-    await loadPhotosByActivityId(eventId, programId, activityId);
+
+    const user = getAuth().currentUser;
+
+    await addDoc(photoRef, {
+      activityId,
+      programId,
+      uri,
+      publicId,
+      description,
+      timestamp: Timestamp.now(),
+      createdBy: user?.email ?? '',
+    });
+
+    await refetchEventById(eventId);
   };
 
   const deletePhoto = async (
     eventId: string,
     programId: string,
+    activityId: string,
     photoId: string
   ) => {
-    await deleteDoc(doc(db, 'photos', photoId));
-    await loadProgramsByEventId(eventId);
+    const photoRef = doc(
+      db,
+      'events',
+      eventId,
+      'programs',
+      programId,
+      'activities',
+      activityId,
+      'photos',
+      photoId
+    );
+    await deleteDoc(photoRef);
+    await refetchEventById(eventId);
   };
 
-  const confirmAttendance = async (eventId: string, userEmail: string) => {
-    const ref = doc(db, 'events', eventId);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) throw new Error('Evento não encontrado');
-    const data = snap.data();
-    const confirmedGuests: string[] = data.confirmedGuests || [];
-    if (!confirmedGuests.includes(userEmail)) {
-      confirmedGuests.push(userEmail);
-      await updateDoc(ref, { confirmedGuests });
+  const getGuestsByEventId = async (eventId: string): Promise<Guest[]> => {
+    const guestsRef = collection(db, 'events', eventId, 'guests');
+    const snapshot = await getDocs(guestsRef);
+    return snapshot.docs.map((doc) => doc.data() as Guest);
+  };
+
+  const addGuest = async (eventId: string, guest: Guest) => {
+    try {
+      const guestRef = doc(db, 'events', eventId, 'guests', guest.email);
+      await setDoc(guestRef, guest, { merge: true });
+    } catch (error) {
+      console.error('Erro ao adicionar convidado:', error);
+      throw error;
     }
+  };
+
+  const getGuestByEmail = async (
+    eventId: string,
+    email: string
+  ): Promise<Guest | null> => {
+    try {
+      const docRef = doc(db, 'events', eventId, 'guests', email);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) return snap.data() as Guest;
+      return null;
+    } catch (error) {
+      console.error('[ERRO] getGuestByEmail:', error);
+      return null;
+    }
+  };
+
+  const getGuests = async (eventId: string): Promise<Guest[]> => {
+    const guestsSnap = await getDocs(
+      collection(db, 'events', eventId, 'guests')
+    );
+    return guestsSnap.docs.map((doc) => doc.data() as Guest);
+  };
+
+  const saveGuest = async (eventId: string, guest: Guest): Promise<void> => {
+    const guestRef = doc(db, 'events', eventId, 'guests', guest.email);
+    await setDoc(guestRef, guest, { merge: true });
+  };
+
+  const deleteGuest = async (
+    eventId: string,
+    guestEmail: string
+  ): Promise<void> => {
+    const guestRef = doc(db, 'events', eventId, 'guests', guestEmail);
+    await deleteDoc(guestRef);
   };
 
   return (
@@ -546,11 +628,16 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         deleteActivity,
         addPhoto,
         deletePhoto,
-        confirmAttendance,
         loadProgramsByEventId,
         loadActivitiesByProgramId,
         loadPhotosByActivityId,
         refetchEventById,
+        getGuests,
+        saveGuest,
+        deleteGuest,
+        getGuestsByEventId,
+        addGuest,
+        getGuestByEmail,
       }}
     >
       {children}

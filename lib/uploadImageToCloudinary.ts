@@ -1,6 +1,4 @@
 export async function uploadImageToCloudinary(uri: string) {
-  console.log('[uploadImageToCloudinary] URI original:', uri);
-
   const isVideo = uri.toLowerCase().endsWith('.mp4');
 
   const type = isVideo ? 'video/mp4' : 'image/jpeg';
@@ -26,7 +24,6 @@ export async function uploadImageToCloudinary(uri: string) {
   );
 
   const json = await res.json();
-  console.log('[Cloudinary response]', json);
 
   if (!res.ok) {
     throw new Error(

@@ -33,6 +33,7 @@ interface ButtonProps {
   textStyle?: StyleProp<TextStyle>;
   icon?: React.ReactNode;
   iconPosition?: 'left' | 'right';
+  accessibilityLabel?: string;
 }
 
 export default function Button({
@@ -47,6 +48,7 @@ export default function Button({
   textStyle,
   icon,
   iconPosition = 'left',
+  accessibilityLabel, // ✅ removido o ponto e vírgula errado aqui
 }: ButtonProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -159,6 +161,7 @@ export default function Button({
       style={buttonStyles}
       onPress={onPress}
       disabled={disabled || loading}
+      accessibilityLabel={accessibilityLabel}
       activeOpacity={0.7}
     >
       {loading ? (

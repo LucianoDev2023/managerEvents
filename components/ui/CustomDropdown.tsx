@@ -139,6 +139,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   modal: {
+    minHeight: 300,
     padding: 16,
     borderRadius: 20,
     maxHeight: 420,
@@ -151,6 +152,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
   },
   option: {
+    minHeight: 300,
     paddingVertical: 14,
     paddingHorizontal: 12,
     borderBottomWidth: 1,

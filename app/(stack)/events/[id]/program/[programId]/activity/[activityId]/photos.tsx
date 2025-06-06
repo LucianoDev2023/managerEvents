@@ -50,7 +50,6 @@ export default function ActivityPhotosScreen() {
   const authUser = getAuth().currentUser;
   const userEmail = authUser?.email?.toLowerCase() ?? '';
   const isCreator = event?.createdBy?.toLowerCase() === userEmail;
-  console.log('activity.photos para debugar:', activity?.photos);
 
   if (isLoading) {
     return (

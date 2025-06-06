@@ -60,10 +60,14 @@ export default function MyEventsScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Se os eventos já foram carregados (mesmo que vazio), remover loading
     const timeout = setTimeout(() => {
+      setIsLoading(false); // garante encerramento após X tempo
+    }, 8000);
+
+    if (state.events) {
       setIsLoading(false);
-    }, 1000); // tempo mínimo para suavizar
+      clearTimeout(timeout);
+    }
 
     return () => clearTimeout(timeout);
   }, [state.events]);
@@ -71,6 +75,7 @@ export default function MyEventsScreen() {
   const [qrVisible, setQrVisible] = useState(false);
   const [qrPayload, setQrPayload] = useState('');
   const qrRef = useRef<ViewShot>(null);
+  const { getGuestsByEventId } = useEvents();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -94,8 +99,13 @@ export default function MyEventsScreen() {
     router.push({ pathname: '/events/[id]', params: { id } });
   };
 
-  const handleconfirmedGuests = (confirmedGuests: string) => {
-    console.log('visualizar lista de convidados');
+  const handleOpenGuests = async (eventId: string) => {
+    try {
+      const guests = await getGuestsByEventId(eventId);
+    } catch (error) {
+      Alert.alert('Erro', 'Erro ao carregar convidados');
+      console.error('Erro ao buscar convidados:', error);
+    }
   };
 
   const handleShareQR = async () => {
@@ -235,12 +245,13 @@ export default function MyEventsScreen() {
 
           <View style={styles.buttonsRow}>
             <Pressable
-              onPress={() =>
+              onPress={async () => {
+                await handleOpenGuests(item.id);
                 router.push({
                   pathname: '/events/[id]/confirmed-guests',
                   params: { id: item.id },
-                })
-              }
+                });
+              }}
               style={[styles.mapBtn, { borderColor: colors.border }]}
             >
               <Text
@@ -379,7 +390,7 @@ export default function MyEventsScreen() {
           visible={modalVisible}
           onClose={() => setModalVisible(false)}
           colors={colors}
-          gradientColors={gradientColors} // 👈 adicionado
+          gradientColors={gradientColors}
           permissionEmail={permissionEmail}
           setPermissionEmail={setPermissionEmail}
           permissionLevel={permissionLevel}
@@ -437,19 +448,23 @@ const PermissionModal = ({
           </Text>
 
           <Text style={[styles.modalText, { color: colors.text }]}>
-            <Text style={styles.roleHighlight}>Super admin:</Text> Controle
-            total sobre todos os recursos. Pode criar, editar, gerenciar
-            permissões de todos os outros usuários. Não pode excluir o evento
-            principal. Permissão exclusiva do criador.
+            <Text style={[styles.roleHighlight, { color: colors.primary }]}>
+              Super admin:
+            </Text>{' '}
+            Controle total sobre todos os recursos. Pode criar, editar,
+            gerenciar permissões de todos os outros usuários. Não pode excluir o
+            evento principal. Permissão exclusiva do criador.
           </Text>
 
           <Text style={[styles.modalText, { color: colors.text }]}>
-            <Text style={styles.roleHighlight}>Admin parcial:</Text> Com algumas
-            restrições, pode adicionar programas, atividades e fotos. Só pode
-            deletar o que criou.
+            <Text style={[styles.roleHighlight, { color: colors.primary }]}>
+              Admin parcial:
+            </Text>{' '}
+            Com algumas restrições, pode adicionar programas, atividades e
+            fotos. Só pode deletar o que criou.
           </Text>
 
-          <Text style={[styles.modalSubtitle, { color: colors.primary }]}>
+          <Text style={[styles.modalSubtitle, { color: colors.text }]}>
             👥 Adicionar Permissão
           </Text>
 
@@ -473,6 +488,7 @@ const PermissionModal = ({
           <Text style={[styles.modalLabel, { color: colors.text }]}>
             Tipo de permissão
           </Text>
+
           <View style={styles.toggleRow}>
             {(['Super Admin', 'Admin parcial'] as const).map((level) => (
               <Pressable
@@ -504,7 +520,7 @@ const PermissionModal = ({
             <Button
               title="Cancelar"
               variant="cancel"
-              onPress={onClose}
+              onPress={onClose ?? (() => {})}
               style={{ flex: 1, marginRight: 8 }}
               textStyle={{ color: 'white' }}
             />
@@ -584,10 +600,18 @@ const SafeAreaView = ({
 
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
+
   container: {
     flex: 1,
     paddingHorizontal: 6,
   },
+
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -595,18 +619,20 @@ const styles = StyleSheet.create({
     marginVertical: 16,
     fontFamily: 'Inter_700Bold',
   },
+
   emptyText: {
     textAlign: 'center',
     marginTop: 24,
     fontSize: 16,
     fontFamily: 'Inter_400Regular',
   },
+
   listContent: {
     paddingBottom: 20,
   },
 
-  // Event Card Styles
   card: {
+    backgroundColor: '#1f1f25',
     marginBottom: 24,
     marginHorizontal: 4,
     borderRadius: 16,
@@ -614,7 +640,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: '#555',
     padding: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 5 },
+    shadowRadius: 10,
+    elevation: 6,
   },
+
   imageWrapper: {
     width: '100%',
     aspectRatio: 22 / 9,
@@ -622,12 +654,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 12,
   },
+
   image: {
     width: '100%',
-    height: '100%',
+    height: 180,
     resizeMode: 'cover',
     borderRadius: 12,
+    justifyContent: 'flex-end',
   },
+
+  blurOverlay: {
+    padding: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -635,50 +675,68 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 6,
   },
+
   overlayTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
     fontFamily: 'Inter_600SemiBold',
   },
+
   overlayLocation: {
     fontSize: 14,
     color: '#ccc',
     fontFamily: 'Inter_400Regular',
   },
+
   overlayDesc: {
     fontSize: 12,
     color: '#ddd',
     fontFamily: 'Inter_400Regular',
   },
-  animatedContainer: {
-    width: '90%',
+
+  eventTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 8,
   },
 
-  // Button Styles
-  buttonsRow: {
+  row: {
     flexDirection: 'row',
-    marginTop: 12,
-    marginBottom: 6,
-    gap: 20,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 4,
   },
+
+  meta: {
+    color: 'white',
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+  },
+
+  animatedContainer: {
+    width: '100%',
+    maxWidth: 420,
+  },
+
   mapBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 4,
-    // paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 1,
   },
+
   mapBtnText: {
     marginLeft: 6,
     fontSize: 13,
     fontFamily: 'Inter_500Medium',
   },
+
   shareBtn: {
     flex: 1,
     flexDirection: 'row',
@@ -687,19 +745,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-evenly',
     paddingVertical: 6,
     borderRadius: 10,
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
   },
+
   shareBtnText: {
     fontSize: 13,
     color: 'white',
     fontFamily: 'Inter_500Medium',
   },
+
   permissionBtn: {
     flex: 1,
     borderRadius: 10,
     paddingVertical: 6,
   },
+
   permissionText: {
     fontSize: 13,
     fontWeight: '600',
@@ -707,78 +766,111 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
   },
 
-  // Modal Styles
+  btnseguir: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+
+  button: {
+    backgroundColor: '#5838AD',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+
+  buttonSecondary: {
+    backgroundColor: '#aaa',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  buttonRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+
+  // Modal (mantido o mais completo e por último)
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 24,
   },
+
   modalContent: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 18,
+    padding: 20,
+    borderWidth: 1,
   },
+
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 12,
-    fontFamily: 'Inter_700Bold',
-  },
-  modalSubtitle: {
-    fontSize: 16,
-    marginTop: 20,
-    marginBottom: 8,
-    fontWeight: 'bold',
-    fontFamily: 'Inter_600SemiBold',
-  },
-  modalText: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: 'Inter_400Regular',
-  },
-  bold: {
-    fontWeight: '600',
-    fontFamily: 'Inter_600SemiBold',
-  },
-  modalLabel: {
-    fontSize: 14,
     marginBottom: 16,
-    marginTop: 12,
-    fontFamily: 'Inter_500Medium',
     textAlign: 'center',
   },
-  input: {
-    fontSize: 15,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderRadius: 12,
-    marginBottom: 12,
-    fontFamily: 'Inter_400Regular',
+
+  modalSubtitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 20,
+    marginBottom: 10,
   },
+
+  modalText: {
+    fontSize: 14,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+
+  roleHighlight: {
+    fontWeight: 'bold',
+  },
+
+  input: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    marginBottom: 12,
+  },
+
+  modalLabel: {
+    fontSize: 14,
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+
   toggleRow: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
-  },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 20,
-    marginTop: 60,
+    justifyContent: 'space-between',
     marginBottom: 20,
   },
 
-  // QR Modal Styles
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginRight: 8,
+  },
   qrBox: {
     backgroundColor: '#fff',
     padding: 24,
@@ -793,6 +885,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontFamily: 'Inter_600SemiBold',
   },
+
   qrShareBtn: {
     marginTop: 16,
     backgroundColor: '#25D366',
@@ -803,22 +896,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',
     width: '100%',
   },
-  roleHighlight: {
-    fontSize: 17, // Aumenta o tamanho apenas do título da permissão
-    fontWeight: 'bold',
-  },
   eventCard: {
     flexDirection: 'column',
   },
-  btnseguir: {
-    flex: 1,
+  buttonsRow: {
     flexDirection: 'row',
+    marginTop: 12,
+    marginBottom: 6,
+    gap: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4,
-    // paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#444',
   },
 });

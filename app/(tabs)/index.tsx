@@ -111,7 +111,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 style={styles.button}
                 onPress={() =>
-                  handleNavigateWithFade('/(newevents)/event-form?mode=create')
+                  handleNavigateWithFade('/events/new?mode=create')
                 }
               >
                 <Text style={styles.buttonText}>Criar um evento novo</Text>
@@ -126,9 +126,7 @@ export default function HomeScreen() {
 
               <TouchableOpacity
                 style={styles.button}
-                onPress={() =>
-                  handleNavigateWithFade('/(newevents)/qr-scanner')
-                }
+                onPress={() => handleNavigateWithFade('/(stack)/qr-scanner')}
               >
                 <Text style={styles.buttonText}>
                   Visualizar um convite recebido

@@ -9,6 +9,7 @@ import {
   StatusBar as RNStatusBar,
   ActivityIndicator,
   Modal,
+  Pressable,
 } from 'react-native';
 import { useColorScheme } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -333,6 +334,16 @@ export default function ProfileScreen() {
                 textStyle={{ color: textColor }}
               />
             </View>
+
+            <Pressable
+              onPress={() => router.push('/(newevents)/my-companions')}
+            >
+              <Text
+                style={{ color: colors.primary, marginTop: 16, fontSize: 16 }}
+              >
+                ✏️ Editar acompanhantes
+              </Text>
+            </Pressable>
 
             <Text style={[styles.sectionTitle, { color: textColor }]}>
               Conta

@@ -91,7 +91,6 @@ export default function EditActivityScreen() {
           }
         }
       } catch (error) {
-        console.log('Error parsing time:', error);
         // Usa um horário padrão se houver erro
         initialDate.setHours(9, 0);
         initialTime = '09:00';

@@ -6,6 +6,7 @@ export type Guest = {
   name: string;
   email: string;
   mode: 'confirmado' | 'acompanhando';
+  family?: string[];
 };
 
 export type Event = {
@@ -21,7 +22,6 @@ export type Event = {
   createdBy: string;
   subAdmins?: SubAdmin[];
   programs: Program[];
-  confirmedGuests?: Guest[]; // ✅ nova propriedade
 };
 
 export type SubAdmin = {
@@ -68,6 +68,7 @@ export type FormValues = {
   coverImage?: string;
   userId: string;
   createdBy: string;
+  searchKey: string; // ✅ nova chave indexada para buscas
 };
 
 type LocationScreenParams = {

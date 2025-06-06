@@ -1,15 +1,12 @@
-// Refatorado para usar `Guest[]` com base nos novos types + Loading Overlay
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
-  ImageBackground,
-  Platform,
-  StatusBar as RNStatusBar,
   ActivityIndicator,
-  Alert,
+  Modal,
+  ImageBackground,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
@@ -17,434 +14,338 @@ import { useColorScheme } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import Colors from '@/constants/Colors';
-import { BlurView } from 'expo-blur';
-import { MapPin, CalendarDays } from 'lucide-react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { getAuth } from 'firebase/auth';
 import LottieView from 'lottie-react-native';
+import { MapPin, CalendarDays } from 'lucide-react-native';
+import { BlurView } from 'expo-blur';
+import { useEventAccess } from '@/hooks/useEventAccess';
 
 export default function FoundEventScreen() {
-  const [hasConfirmedPresence, setHasConfirmedPresence] = useState(false);
-
   const { accessCode, title } = useLocalSearchParams<{
     accessCode?: string;
     title?: string;
   }>();
-  const { state, updateEvent } = useEvents();
+  const { addGuest } = useEvents();
+  const { isLoading, eventFound, guestStatus } = useEventAccess(
+    title,
+    accessCode
+  );
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [modeSelected, setModeSelected] = useState<
+    'confirmado' | 'acompanhando' | null
+  >(null);
 
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
+  const user = getAuth().currentUser;
+  const userEmail = user?.email ?? 'convidado@anonimo.com';
+  const userName = user?.displayName ?? 'Convidado';
 
   const gradientColors: [string, string, ...string[]] =
     colorScheme === 'dark'
       ? ['#0b0b0f', '#1b0033', '#3e1d73']
       : ['#ffffff', '#f0f0ff', '#e9e6ff'];
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [presenceStatus, setPresenceStatus] = useState<
-    'none' | 'confirmed' | 'interested'
-  >('none');
-
-  const [showConfetti, setShowConfetti] = useState(false);
-  const user = getAuth().currentUser;
-  const userEmail = user?.email ?? 'convidado@anonimo.com';
-  const userName = user?.displayName ?? 'Convidado';
-
-  useEffect(() => {
-    if (state.events.length > 0) {
-      setIsLoading(false);
-      return;
-    }
-    const timeout = setTimeout(() => setIsLoading(false), 10000);
-    return () => clearTimeout(timeout);
-  }, [state.events]);
-
-  const eventFound = useMemo(() => {
-    if (!accessCode || !title || state.events.length === 0) return null;
-    return state.events.find(
-      (event) =>
-        event.title.toLowerCase().trim() === title.toLowerCase().trim() &&
-        event.accessCode?.toLowerCase().trim() ===
-          accessCode.toLowerCase().trim()
-    );
-  }, [accessCode, title, state.events]);
-
-  const isCreator = useMemo(() => {
-    if (!eventFound || !user?.uid) return false;
-    const authUser = getAuth().currentUser;
-    const userEmail = authUser?.email?.toLowerCase();
-    return eventFound.createdBy === userEmail;
-  }, [eventFound, user?.uid]);
-
-  useEffect(() => {
-    if (!eventFound) return;
-    const guest = eventFound.confirmedGuests?.find(
-      (g) => g.email === userEmail
-    );
-    setPresenceStatus(
-      guest
-        ? guest.mode === 'confirmado'
-          ? 'confirmed'
-          : 'interested'
-        : 'none'
-    );
-  }, [eventFound, userEmail]);
-
   const handlePresence = async (mode: 'confirmado' | 'acompanhando') => {
     if (!eventFound) return;
-
     try {
       setIsSubmitting(true);
-
-      const updatedGuests = [
-        ...(eventFound.confirmedGuests ?? []).filter(
-          (g) => g.email !== userEmail
-        ),
-        { name: userName, email: userEmail, mode },
-      ];
-
-      const updatedEvent = { ...eventFound, confirmedGuests: updatedGuests };
-      await updateEvent(updatedEvent);
-      setPresenceStatus(mode === 'confirmado' ? 'confirmed' : 'interested');
-
-      if (!hasConfirmedPresence && mode === 'confirmado') {
-        setShowConfetti(true);
-        setHasConfirmedPresence(true);
-      }
+      setModeSelected(mode);
+      await addGuest(eventFound.id, {
+        name: userName,
+        email: userEmail,
+        mode,
+      });
+      setShowConfetti(true);
     } catch (error) {
-      Alert.alert('Erro ao atualizar presença', String(error));
-    } finally {
+      console.error('Erro ao confirmar presença:', error);
       setIsSubmitting(false);
     }
   };
 
-  return (
-    <Animated.View entering={FadeIn} exiting={FadeOut} style={{ flex: 1 }}>
-      <LinearGradient
-        colors={gradientColors}
-        locations={[0, 0.7, 1]}
-        style={styles.container}
+  const handleConfettiFinish = () => {
+    setTimeout(() => {
+      setIsSubmitting(false);
+      if (eventFound) {
+        router.replace(`/events/${eventFound.id}`);
+      }
+    }, 1000);
+  };
+
+  if (isLoading || !eventFound) {
+    return (
+      <View
+        style={[styles.loadingOverlay, { backgroundColor: colors.background }]}
       >
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.text }]}>
+          Carregando evento...
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <LinearGradient colors={gradientColors} style={styles.container}>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
 
-        {isSubmitting && (
-          <View style={styles.overlay}>
-            <ActivityIndicator size="large" color="#fff" />
-          </View>
-        )}
-
-        {showConfetti && (
-          <View style={styles.overlay}>
-            <LottieView
-              source={require('@/assets/images/confetti.json')}
-              autoPlay
-              loop={false}
-              style={{ width: '100%', height: '100%' }}
-              onAnimationFinish={() => {
-                setShowConfetti(false);
-                Alert.alert(
-                  '🎉 Evento liberado',
-                  'Agora você pode acessar o evento normalmente.'
-                );
-              }}
-            />
-          </View>
-        )}
-
-        <View
-          style={[
-            styles.header,
-            {
-              paddingTop:
-                Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
-            },
-          ]}
-        >
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Evento Encontrado
-          </Text>
-        </View>
-
-        <View style={styles.content}>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={[styles.loadingText, { color: colors.text }]}>
-                Buscando evento...
-              </Text>
-            </View>
-          ) : eventFound ? (
-            <>
-              <Pressable
-                disabled={presenceStatus === 'none'}
-                style={[
-                  styles.card,
-                  presenceStatus === 'none' && { opacity: 0.5 },
-                ]}
-                onPress={() => {
-                  if (presenceStatus === 'none') {
-                    Alert.alert(
-                      'Confirmação necessária',
-                      'Por favor, confirme sua presença ou acompanhe o evento antes de acessar os detalhes.'
-                    );
-                    return;
-                  }
-                  router.push(`/events/${eventFound.id}`);
-                }}
-              >
-                <View style={styles.card}>
-                  <ImageBackground
-                    source={{ uri: eventFound.coverImage }}
-                    style={styles.image}
-                    imageStyle={{
-                      borderTopLeftRadius: 16,
-                      borderTopRightRadius: 16,
-                    }}
+        {(isSubmitting || showConfetti) && (
+          <Modal visible transparent animationType="fade">
+            <View style={styles.overlayDimmed}>
+              {showConfetti && (
+                <LottieView
+                  source={require('@/assets/images/confetti.json')}
+                  autoPlay
+                  loop={false}
+                  style={{ width: '100%', height: '100%' }}
+                  onAnimationFinish={handleConfettiFinish}
+                />
+              )}
+              {modeSelected === 'confirmado' && (
+                <View style={styles.confettiMessageContainer}>
+                  <Text
+                    style={[styles.confettiMessage, { color: colors.text }]}
                   >
-                    <BlurView
-                      intensity={50}
-                      tint={colorScheme}
-                      style={styles.blurOverlay}
-                    >
-                      <Text style={styles.eventTitle}>{eventFound.title}</Text>
-                      <View style={styles.row}>
-                        <CalendarDays size={16} color="#fff" />
-                        <Text style={styles.meta}>
-                          {new Date(eventFound.startDate).toLocaleDateString(
-                            'pt-BR'
-                          )}{' '}
-                          até{' '}
-                          {new Date(eventFound.endDate).toLocaleDateString(
-                            'pt-BR'
-                          )}
-                        </Text>
-                      </View>
-                      {eventFound.location && (
-                        <View style={styles.row}>
-                          <MapPin size={16} color="#fff" />
-                          <Text style={styles.meta}>{eventFound.location}</Text>
-                        </View>
-                      )}
-                    </BlurView>
-                  </ImageBackground>
-                  <View style={styles.cardFooter}>
-                    <Text style={styles.buttonText}>Toque para acessar</Text>
-                  </View>
-                </View>
-              </Pressable>
-
-              {!isCreator && (
-                <View style={{ marginTop: 32, paddingHorizontal: 20 }}>
-                  <View
-                    style={{
-                      backgroundColor:
-                        colorScheme === 'dark' ? '#1f1f25' : '#f4f4fb',
-                      borderRadius: 16,
-                      padding: 20,
-                      shadowColor: '#000',
-                      shadowOpacity: 0.15,
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowRadius: 6,
-                      elevation: 4,
-                    }}
-                  >
-                    <View style={{ gap: 25 }}>
-                      <Text
-                        style={{
-                          fontSize: 14,
-                          fontFamily: 'Inter-Medium',
-                          color: colors.text,
-                          textAlign: 'left',
-                          lineHeight: 20,
-                        }}
-                      >
-                        Você foi convidado para este evento especial! 🥳{'\n'}
-                        {'\n'}
-                        Para acessar o evento escolha abaixo como deseja
-                        participar. Sua opção poderá ser alterada mais tarde no
-                        seu perfil.
-                      </Text>
-
-                      <Text
-                        style={{
-                          fontSize: 14,
-                          fontFamily: 'Inter-Regular',
-                          color: colors.textSecondary,
-                          textAlign: 'left',
-                        }}
-                      >
-                        Sua resposta atual:{' '}
-                        <Text
-                          style={{
-                            fontFamily: 'Inter-Bold',
-                            color: colors.text,
-                          }}
-                        >
-                          {presenceStatus === 'confirmed'
-                            ? 'Presença confirmada ✅'
-                            : presenceStatus === 'interested'
-                            ? 'Acompanhando evento 👀'
-                            : 'Nenhuma resposta registrada'}
-                        </Text>
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'center',
-                      gap: 12,
-                      marginTop: 20,
-                    }}
-                  >
-                    <View
-                      style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}
-                    >
-                      <Pressable
-                        onPress={() => handlePresence('confirmado')}
-                        disabled={isSubmitting}
-                        style={[
-                          styles.statusButton,
-                          presenceStatus === 'confirmed' &&
-                            styles.statusButtonActive,
-                          isSubmitting && { opacity: 0.6 },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.statusButtonText,
-                            presenceStatus === 'confirmed' &&
-                              styles.statusButtonTextActive,
-                          ]}
-                        >
-                          Confirmar presença
-                        </Text>
-                      </Pressable>
-
-                      <Pressable
-                        onPress={() => handlePresence('acompanhando')}
-                        disabled={isSubmitting}
-                        style={[
-                          styles.statusButton,
-                          presenceStatus === 'interested' &&
-                            styles.statusButtonActive,
-                          isSubmitting && { opacity: 0.6 },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.statusButtonText,
-                            presenceStatus === 'interested' &&
-                              styles.statusButtonTextActive,
-                          ]}
-                        >
-                          Acompanhar evento
-                        </Text>
-                      </Pressable>
-                    </View>
-                  </View>
+                    🎉 Presença confirmada com sucesso!
+                  </Text>
                 </View>
               )}
-            </>
-          ) : (
-            <Text
-              style={[styles.notFoundText, { color: colors.textSecondary }]}
+            </View>
+          </Modal>
+        )}
+
+        <View style={styles.content}>
+          <View style={[styles.card, { backgroundColor: colors.background }]}>
+            <ImageBackground
+              source={{ uri: eventFound.coverImage }}
+              style={styles.image}
+              imageStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
+            />
+            <BlurView
+              intensity={40}
+              tint={colorScheme}
+              style={styles.blurOverlay}
             >
-              Nenhum evento correspondente foi encontrado.
-            </Text>
-          )}
+              <Text style={[styles.eventTitle, { color: colors.text }]}>
+                {eventFound.title}
+              </Text>
+              <View style={styles.row}>
+                <CalendarDays size={16} color={colors.text} />
+                <Text style={[styles.meta, { color: colors.text }]}>
+                  {' '}
+                  {new Date(eventFound.startDate).toLocaleDateString(
+                    'pt-BR'
+                  )}{' '}
+                  até {new Date(eventFound.endDate).toLocaleDateString('pt-BR')}{' '}
+                </Text>
+              </View>
+              <View style={styles.row}>
+                <MapPin size={16} color={colors.text} />
+                <Text style={[styles.meta, { color: colors.text }]}>
+                  {eventFound.location}
+                </Text>
+              </View>
+            </BlurView>
+          </View>
         </View>
+
+        <Modal
+          visible={guestStatus === 'none' && !isSubmitting && !showConfetti}
+          transparent
+          animationType="fade"
+        >
+          <View style={styles.modalOverlay}>
+            <Animated.View
+              entering={FadeIn}
+              exiting={FadeOut}
+              style={styles.animatedContainer}
+            >
+              <LinearGradient
+                colors={gradientColors}
+                locations={[0, 0.7, 1]}
+                style={[styles.modalContent, { borderColor: colors.primary }]}
+              >
+                <Text
+                  style={[
+                    styles.modalText,
+                    {
+                      color: colors.text,
+                      fontSize: 16,
+                      textAlign: 'center',
+                      marginTop: 8,
+                    },
+                  ]}
+                >
+                  💫 Seja muito bem-vindo(a)
+                </Text>
+                <Text
+                  style={[
+                    styles.modalTitle,
+                    { color: colors.primary, fontSize: 22 },
+                  ]}
+                >
+                  Você foi convidado!
+                </Text>
+                <Text
+                  style={[
+                    styles.modalText,
+                    {
+                      color: colors.text,
+                      fontSize: 15,
+                      textAlign: 'center',
+                      marginTop: 12,
+                    },
+                  ]}
+                >
+                  Escolha como deseja participar deste momento especial.{' '}
+                  <Text style={{ fontStyle: 'italic' }}>
+                    Você poderá alterar sua escolha a qualquer momento.
+                  </Text>
+                </Text>
+                <View style={styles.modalButtons}>
+                  <Pressable
+                    onPress={() => handlePresence('confirmado')}
+                    style={[
+                      styles.confirmBtn,
+                      { backgroundColor: colors.primary },
+                    ]}
+                  >
+                    <Text style={[styles.confirmText, { color: '#fff' }]}>
+                      Confirmar Presença
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handlePresence('acompanhando')}
+                    style={[
+                      styles.secondaryBtn,
+                      { backgroundColor: colors.backgroundComents },
+                    ]}
+                  >
+                    <Text style={[styles.confirmText, { color: '#fff' }]}>
+                      Acompanhar Evento
+                    </Text>
+                  </Pressable>
+                </View>
+                <Pressable
+                  onPress={() => router.replace('/')}
+                  style={[
+                    styles.cancelBtn,
+                    {
+                      backgroundColor:
+                        colorScheme === 'dark' ? '#ffffff22' : '#00000011',
+                    },
+                  ]}
+                >
+                  <Text style={[styles.cancelText, { color: colors.text }]}>
+                    Voltar
+                  </Text>
+                </Pressable>
+              </LinearGradient>
+            </Animated.View>
+          </View>
+        </Modal>
       </LinearGradient>
-    </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  overlay: {
+  content: { flex: 1, paddingHorizontal: 20, paddingTop: 24 },
+  overlayDimmed: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 999,
+    backgroundColor: 'rgba(0,0,0,0.7)',
   },
-  header: {
-    height: 100,
-    justifyContent: 'center',
+  confettiMessageContainer: {
+    position: 'absolute',
+    top: '60%',
+    width: '100%',
     alignItems: 'center',
     paddingHorizontal: 20,
   },
-  headerTitle: {
+  confettiMessage: {
     fontSize: 20,
     fontWeight: 'bold',
-    fontFamily: 'Inter-Bold',
-  },
-  content: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
-  loadingContainer: {
-    marginTop: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
     textAlign: 'center',
-    marginTop: 10,
-    fontFamily: 'Inter-Regular',
-  },
-  notFoundText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 50,
-    fontFamily: 'Inter-Regular',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
   },
   card: {
-    backgroundColor: '#1f1f25',
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 5 },
-    shadowRadius: 10,
-    elevation: 6,
+    elevation: 4,
   },
-  image: { height: 180, justifyContent: 'flex-end' },
-  blurOverlay: { padding: 16, backgroundColor: 'rgba(0, 0, 0, 0.3)' },
-  eventTitle: {
-    color: 'white',
+  image: { height: 180, width: '100%' },
+  blurOverlay: { padding: 16, backgroundColor: 'rgba(0,0,0,0.25)' },
+  eventTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  meta: { fontSize: 13 },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    zIndex: 100,
+  },
+  animatedContainer: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  modalContent: {
+    padding: 24,
+    borderWidth: 1.5,
+    borderRadius: 20,
+  },
+  modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 8,
+    textAlign: 'center',
+    marginBottom: 10,
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  meta: { color: 'white', fontSize: 13, fontFamily: 'Inter-Regular' },
-  cardFooter: {
-    backgroundColor: '#b18aff',
-    paddingVertical: 12,
+  modalText: { fontSize: 15, textAlign: 'center', marginBottom: 24 },
+  modalButtons: { flexDirection: 'row', gap: 12 },
+  confirmBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
     alignItems: 'center',
   },
-  buttonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 15,
-    fontFamily: 'Inter-SemiBold',
+  secondaryBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
   },
-  statusButton: {
-    backgroundColor: 'rgba(143, 103, 254, 0.1)',
-    paddingVertical: 10,
+  confirmText: { fontSize: 14, fontWeight: '600' },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  loadingText: { fontSize: 16, fontWeight: '500', marginTop: 12 },
+  cancelBtn: {
+    marginTop: 20,
     paddingHorizontal: 16,
-    borderRadius: 24,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignSelf: 'center',
+    justifyContent: 'center',
   },
-  statusButtonActive: { backgroundColor: '#5838AD' },
-  statusButtonText: {
-    color: 'white',
+  cancelText: {
+    fontSize: 15,
     fontWeight: '600',
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-  },
-  statusButtonTextActive: {
-    color: '#fff',
   },
 });

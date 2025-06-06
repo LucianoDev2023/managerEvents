@@ -71,7 +71,7 @@ export default function QRScannerScreen() {
 
     setScanned(true);
     try {
-      router.push({
+      router.replace({
         pathname: '/(newevents)/search',
         params: {
           accessCode: qrData.accessCode,

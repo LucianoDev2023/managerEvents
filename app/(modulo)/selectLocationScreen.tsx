@@ -54,7 +54,7 @@ export default function SelectLocationScreen() {
 
   useEffect(() => {
     const setupLocation = async () => {
-      console.log('enviou do mode do botao', mode);
+
       if (mode === 'edit' && lat && lng) {
         const latitude = parseFloat(lat);
         const longitude = parseFloat(lng);
@@ -144,9 +144,9 @@ export default function SelectLocationScreen() {
       return;
     }
     router.replace({
-      pathname: '/(newevents)/event-form',
+      pathname: '/(stack)/events/new',
       params: {
-        redirectTo: '(newevents)/event-form',
+        redirectTo: 'events/new',
         id,
         mode,
         lat: selected.latitude.toString(),

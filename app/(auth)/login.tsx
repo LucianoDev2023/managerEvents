@@ -19,6 +19,19 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import Colors from '@/constants/Colors';
 
+import { db } from '@/config/firebase';
+import {
+  addDoc,
+  collection,
+  deleteField,
+  doc,
+  getDocs,
+  setDoc,
+  Timestamp,
+  updateDoc,
+} from 'firebase/firestore';
+import { Guest } from '@/types';
+
 export default function LoginScreen() {
   const scheme = useColorScheme() ?? 'dark';
   const theme = Colors[scheme];
@@ -37,6 +50,7 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
+
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {

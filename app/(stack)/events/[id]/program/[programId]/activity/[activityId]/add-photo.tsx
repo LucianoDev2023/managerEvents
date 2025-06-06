@@ -81,7 +81,6 @@ export default function AddActivityPhotoScreen() {
         });
 
         if (!result.canceled && result.assets?.[0]?.uri) {
-          console.log('Image selected with URI:', result.assets[0].uri);
           setSelectedImage(result.assets[0].uri);
         }
       } catch (error) {
@@ -118,10 +117,6 @@ export default function AddActivityPhotoScreen() {
     setIsSubmitting(true);
 
     try {
-      console.log(
-        'Tentando upload com URI:',
-        selectedImage.substring(0, 50) + '...'
-      );
       const { uri, publicId } = await uploadImageToCloudinary(selectedImage);
       await addPhoto(id, programId, activityId, publicId, uri, description);
       await refetchEventById(id);
@@ -284,6 +279,7 @@ export default function AddActivityPhotoScreen() {
               <Button
                 title="Adicionar Foto"
                 onPress={handleSubmit}
+                accessibilityLabel="Botão para adicionar a foto selecionada"
                 disabled={!selectedImage}
                 style={styles.submitButton}
               />
