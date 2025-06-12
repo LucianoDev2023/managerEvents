@@ -44,6 +44,7 @@ import { useFollowedEvents } from '@/hooks/useFollowedEvents';
 import { useEvents } from '@/context/EventsContext';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
+
 import {
   getGuestParticipationsByEmail,
   getGuestParticipationsByEventId,
@@ -53,6 +54,9 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function MyEventsScreen() {
   const [invitedEvents, setInvitedEvents] = useState<Event[]>([]);
+  const [allUserEvents, setAllUserEvents] = useState<Event[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+
   const {
     toggleFollowEvent,
     isFollowing,
@@ -84,19 +88,12 @@ export default function MyEventsScreen() {
   const [qrVisible, setQrVisible] = useState(false);
   const [qrPayload, setQrPayload] = useState('');
   const qrRef = useRef<ViewShot>(null);
-  const [participatingEvents, setParticipatingEvents] = useState<Event[]>([]);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [permissionEmail, setPermissionEmail] = useState('');
   const [permissionLevel, setPermissionLevel] =
     useState<PermissionLevel>('Admin parcial');
-
-  const filteredEvents = state.events.filter(
-    (event) =>
-      event.createdBy?.toLowerCase() === userEmail ||
-      event.subAdmins?.some((admin) => admin.email.toLowerCase() === userEmail)
-  );
 
   const gradientColors: [string, string, ...string[]] =
     colorScheme === 'dark'
@@ -330,31 +327,43 @@ export default function MyEventsScreen() {
   };
 
   useEffect(() => {
-    const fetchParticipatingEvents = async () => {
+    const fetchUserEvents = async () => {
       if (!userEmail) return;
 
-      const participations = await getGuestParticipationsByEmail(userEmail);
-      const eventIds = participations.map((p) => p.eventId);
+      setLoadingEvents(true);
+      const start = Date.now(); // marca o início
 
-      const filtered = state.events.filter((event) => {
-        const isParticipant = eventIds.includes(event.id);
-        const isCreator = event.createdBy?.toLowerCase() === userEmail;
-        const isSuperAdmin = event.subAdmins?.some(
-          (admin) =>
-            admin.email.toLowerCase() === userEmail &&
-            admin.level === 'Super Admin'
+      try {
+        const participations = await getGuestParticipationsByEmail(userEmail);
+        const eventIdsFromGuests = participations.map((p) => p.eventId);
+
+        const result = state.events.filter((event) => {
+          const isCreator = event.createdBy?.toLowerCase() === userEmail;
+          const isSubAdmin = event.subAdmins?.some(
+            (admin) => admin.email.toLowerCase() === userEmail
+          );
+          const isGuest = eventIdsFromGuests.includes(event.id);
+
+          return isCreator || isSubAdmin || isGuest;
+        });
+
+        const uniqueEvents = Array.from(
+          new Map(result.map((e) => [e.id, e])).values()
         );
-        // Só considera como "evento que estou participando" se:
-        // - sou participante (está em guestParticipations)
-        // - NÃO sou criador
-        // - NÃO sou Super Admin
-        return isParticipant && !isCreator && !isSuperAdmin;
-      });
 
-      setParticipatingEvents(filtered);
+        setAllUserEvents(uniqueEvents);
+      } catch (err) {
+        console.error('Erro ao buscar eventos relacionados:', err);
+      } finally {
+        // garante ao menos 1 segundo de exibição do loading
+        const elapsed = Date.now() - start;
+        const delay = Math.max(0, 1000 - elapsed);
+
+        setTimeout(() => setLoadingEvents(false), delay);
+      }
     };
 
-    fetchParticipatingEvents();
+    fetchUserEvents();
   }, [state.events, userEmail]);
 
   // if (isLoading) {
@@ -368,6 +377,21 @@ export default function MyEventsScreen() {
   //         ]}
   //       >
   //         Carregando programação...
+  //       </Text>
+  //     </View>
+  //   );
+  // }
+  // if (loadingEvents) {
+  //   return (
+  //     <View style={styles.centeredContent}>
+  //       <ActivityIndicator size="large" color={colors.primary} />
+  //       <Text
+  //         style={[
+  //           styles.emptyText,
+  //           { color: colors.textSecondary, marginTop: 12 },
+  //         ]}
+  //       >
+  //         Carregando eventos...
   //       </Text>
   //     </View>
   //   );
@@ -389,41 +413,11 @@ export default function MyEventsScreen() {
         <Text style={[styles.title, { color: colors.text }]}>Meus Eventos</Text>
 
         <FlatList
-          data={filteredEvents}
+          data={allUserEvents}
           keyExtractor={(item) => item.id}
           ListEmptyComponent={
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Você ainda não criou eventos
-            </Text>
-          }
-          renderItem={renderEventItem}
-          contentContainerStyle={styles.listContent}
-        />
-        {invitedEvents.length > 0 && (
-          <>
-            <Text style={[styles.title, { color: colors.text }]}>
-              Meus Convites
-            </Text>
-
-            <FlatList
-              data={invitedEvents}
-              keyExtractor={(item) => item.id + '_guest'}
-              renderItem={renderEventItem}
-              contentContainerStyle={styles.listContent}
-            />
-          </>
-        )}
-
-        <Text style={[styles.title, { color: colors.text }]}>
-          Eventos que estou participando
-        </Text>
-
-        <FlatList
-          data={participatingEvents}
-          keyExtractor={(item) => item.id}
-          ListEmptyComponent={
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Nenhum evento confirmado ou acompanhado.
+              Nenhum evento relacionado a você encontrado.
             </Text>
           }
           renderItem={renderEventItem}

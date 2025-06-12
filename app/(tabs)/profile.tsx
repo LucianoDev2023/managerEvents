@@ -338,14 +338,14 @@ export default function ProfileScreen() {
               <View style={styles.dropdownContainer}>
                 <CustomDropdown
                   items={state.events.filter((event) => {
-                    const isCreator =
-                      event.createdBy?.toLowerCase() === userEmail;
-                    const isSuperAdmin = event.subAdmins?.some(
-                      (admin) =>
-                        admin.email.toLowerCase() === userEmail &&
-                        admin.level === 'Super Admin'
-                    );
-                    return isCreator || isSuperAdmin;
+                    const isAuthorized =
+                      event.createdBy?.toLowerCase() === userEmail ||
+                      event.subAdmins?.some(
+                        (admin) =>
+                          admin.email.toLowerCase() === userEmail &&
+                          ['Super Admin', 'Admin parcial'].includes(admin.level)
+                      );
+                    return isAuthorized;
                   })}
                   placeholder="-- Escolha um evento --"
                   getItemLabel={(event) => event.title}
@@ -382,12 +382,12 @@ export default function ProfileScreen() {
             </Text>
             <View style={styles.dropdownContainer}>
               <CustomDropdown
-                items={guestEvents} // ← antes era `userEvents`
+                items={participantEvents}
                 placeholder="-- Escolha um evento --"
                 getItemLabel={(event) => event.title}
                 onSelect={(event) => {
                   router.push({
-                    pathname: '/(stack)/events/[id]/edit-participation',
+                    pathname: '/(stack)/events/[id]/edit-my-participation',
                     params: { id: event.id },
                   });
                 }}

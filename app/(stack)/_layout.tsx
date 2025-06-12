@@ -64,6 +64,12 @@ export default function StackLayout() {
           }}
         />
         <Stack.Screen
+          name="events/[id]/edit-participation/[guestId]"
+          options={{
+            title: 'Editar acompanhantes',
+          }}
+        />
+        <Stack.Screen
           name="events/[id]/edit-my-participation"
           options={{
             title: '',

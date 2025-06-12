@@ -22,15 +22,19 @@ export default function AddGuestScreen() {
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+
   const [mode, setMode] = useState<'confirmado' | 'acompanhando'>('confirmado');
   const [familyInput, setFamilyInput] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
-    // if (!email) {
-    //   Alert.alert('Erro', 'Email é obrigatório.');
-    //   return;
-    // }
+    const userEmail = `manual-${Date.now()}@convite.local`;
+
+    if (!name.trim()) {
+      Alert.alert('Erro', 'Nome é obrigatório.');
+      return;
+    }
+
     setLoading(true);
 
     const family = familyInput
@@ -38,12 +42,12 @@ export default function AddGuestScreen() {
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 
-    const participationId = `${id}_${email.toLowerCase()}`;
+    const participationId = `${id}_${userEmail}`;
     const participation = {
       id: participationId,
       eventId: id,
-      userEmail: email.toLowerCase(),
-      userName: name || null,
+      userEmail,
+      userName: name.trim(),
       mode,
       family,
     };
@@ -58,7 +62,7 @@ export default function AddGuestScreen() {
       router.back();
     } catch (error) {
       console.error(error);
-      Alert.alert('Não foi possível adicionar o convidado.');
+      Alert.alert('Erro', 'Não foi possível adicionar o convidado.');
     } finally {
       setLoading(false);
     }

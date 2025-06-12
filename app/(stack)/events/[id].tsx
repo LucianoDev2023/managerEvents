@@ -36,6 +36,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import LottieView from 'lottie-react-native';
 import type { Guest, Event } from '@/types';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 export default function EventDetailScreen() {
   const { refetchEventById, deleteEvent, addProgram, getGuestsByEventId } =
@@ -126,11 +127,28 @@ export default function EventDetailScreen() {
 
   if (!event || isLoading) {
     return (
-      <View
-        style={[styles.centeredContent, { backgroundColor: colors.background }]}
+      <Animated.View
+        entering={FadeIn.duration(300)}
+        exiting={FadeOut.duration(300)}
+        style={styles.centeredContent}
       >
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+        <View
+          style={[
+            styles.centeredContent,
+            { backgroundColor: colors.background },
+          ]}
+        >
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text
+            style={[
+              styles.emptyText,
+              { color: colors.textSecondary, marginTop: 12 },
+            ]}
+          >
+            Carregando programação...
+          </Text>
+        </View>
+      </Animated.View>
     );
   }
 
@@ -335,5 +353,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 24,
+    fontSize: 16,
+    fontFamily: 'Inter_400Regular',
   },
 });

@@ -244,7 +244,8 @@ export default function ConfirmedGuestsScreen() {
                   <Text
                     style={[styles.guestEmail, { color: colors.textSecondary }]}
                   >
-                    {'' + item.family.join('\n')}
+                    {'🤝    '}
+                    {'' + item.family.join('\n🤝    ')}
                   </Text>
                   <Text
                     style={[
@@ -260,7 +261,7 @@ export default function ConfirmedGuestsScreen() {
                 <Text
                   style={[styles.guestEmail, { color: colors.textSecondary }]}
                 >
-                  🙋‍♂️ Sem acompanhantes
+                  Sem acompanhantes
                 </Text>
               )}
 
@@ -268,24 +269,20 @@ export default function ConfirmedGuestsScreen() {
                 userEmail?.toLowerCase() === item.userEmail?.toLowerCase()) && (
                 <Pressable
                   onPress={() => {
-                    const isOwnParticipation =
-                      userEmail?.toLowerCase() ===
-                      item.userEmail?.toLowerCase();
-
                     if (!item.userEmail) {
                       Alert.alert('Erro', 'Email do convidado ausente.');
                       return;
                     }
 
-                    if (isOwnParticipation) {
-                      router.push(
-                        `/(stack)/events/${id}/edit-my-participation`
-                      );
-                    } else if (hasPermission) {
-                      router.push(
-                        `/(stack)/events/${id}/edit-participation/${item.userEmail}`
-                      );
-                    }
+                    const isOwn =
+                      userEmail?.toLowerCase() ===
+                      item.userEmail?.toLowerCase();
+
+                    router.push(
+                      userEmail?.toLowerCase() === item.userEmail?.toLowerCase()
+                        ? `/(stack)/events/${id}/edit-my-participation`
+                        : `/(stack)/events/${id}/edit-participation/${item.userEmail}`
+                    );
                   }}
                   style={{
                     marginTop: 8,

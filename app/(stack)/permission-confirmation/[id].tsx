@@ -20,6 +20,7 @@ import Button from '@/components/ui/Button';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { getAuth } from 'firebase/auth';
 
 export default function PermissionConfirmationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -75,6 +76,11 @@ export default function PermissionConfirmationScreen() {
   };
 
   const handleSavePermission = () => {
+    if (isPartialAdmin && permissionLevel === 'Super Admin') {
+      Alert.alert('Erro', 'Admins parciais não podem atribuir Super Admin.');
+      return;
+    }
+
     if (!permissionEmail) return;
 
     const existing = event.subAdmins?.find(
@@ -101,6 +107,18 @@ export default function PermissionConfirmationScreen() {
     setModalVisible(false);
   };
 
+  const userEmail = getAuth().currentUser?.email ?? '';
+  const isCreator = userEmail === event.createdBy;
+  const isSuperAdmin = event.subAdmins?.some(
+    (admin) => admin.email === userEmail && admin.level === 'Super Admin'
+  );
+  const isPartialAdmin = event.subAdmins?.some(
+    (admin) => admin.email === userEmail && admin.level === 'Admin parcial'
+  );
+
+  // Pode abrir o botão de adicionar permissões
+  const canGrantPermission = isCreator || isSuperAdmin || isPartialAdmin;
+
   const gradientColors =
     colorScheme === 'dark'
       ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
@@ -113,60 +131,52 @@ export default function PermissionConfirmationScreen() {
       locations={[0, 0.7, 1]}
     >
       <ScrollView showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={gradientColors}
-          locations={[0, 0.9, 1]}
-          style={styles.gradient}
+        <Pressable
+          onPress={() => {}}
+          style={[styles.card, { backgroundColor: colors.background }]}
         >
+          {event.coverImage && (
+            <Image source={{ uri: event.coverImage }} style={styles.image} />
+          )}
+          <View style={styles.info}>
+            <Text style={[styles.title, { color: colors.text }]}>
+              {event.title}
+            </Text>
+            <Text style={[styles.location, { color: colors.textSecondary }]}>
+              <MapPin size={12} color={colors.textSecondary} /> {event.location}
+            </Text>
+          </View>
           <Pressable
-            onPress={() => {}}
-            style={[
-              styles.card,
-              { backgroundColor: colors.backGroundSecondary },
-            ]}
-          >
-            {event.coverImage && (
-              <Image source={{ uri: event.coverImage }} style={styles.image} />
-            )}
-            <View style={styles.info}>
-              <Text style={[styles.title, { color: colors.text }]}>
-                {event.title}
-              </Text>
-              <Text style={[styles.location, { color: colors.textSecondary }]}>
-                <MapPin size={12} color={colors.textSecondary} />{' '}
-                {event.location}
-              </Text>
-            </View>
-            <Pressable
-              onPress={() =>
-                Alert.alert(
-                  'Excluir evento?',
-                  'Função de exclusão não implementada.'
-                )
-              }
-              style={styles.deleteBtn}
-            ></Pressable>
-          </Pressable>
-        </LinearGradient>
+            onPress={() =>
+              Alert.alert(
+                'Excluir evento?',
+                'Função de exclusão não implementada.'
+              )
+            }
+            style={styles.deleteBtn}
+          ></Pressable>
+        </Pressable>
 
         {/* Card das Permissões */}
         <View style={{ paddingHorizontal: 12, marginTop: 10 }}>
-          <Button
-            title="Add Permissão"
-            onPress={() => {
-              setPermissionEmail('');
-              setPermissionLevel('Admin parcial');
-              setModalVisible(true);
-            }}
-            style={{
-              backgroundColor: colors.primary2,
-              alignSelf: 'flex-end', // botão do tamanho do conteúdo
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-              borderRadius: 10,
-            }}
-            textStyle={{ color: '#fff' }}
-          />
+          {canGrantPermission && (
+            <Button
+              title="Add Permissão"
+              onPress={() => {
+                setPermissionEmail('');
+                setPermissionLevel('Admin parcial');
+                setModalVisible(true);
+              }}
+              style={{
+                backgroundColor: colors.primary2,
+                alignSelf: 'flex-end',
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderRadius: 10,
+              }}
+              textStyle={{ color: '#fff' }}
+            />
+          )}
         </View>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -243,12 +253,14 @@ export default function PermissionConfirmationScreen() {
                   >
                     <Pencil size={20} color={colors.primary} />
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleRemove(item.email)}
-                    style={{ padding: 6 }}
-                  >
-                    <Trash2 size={20} color={colors.error} />
-                  </TouchableOpacity>
+                  {(isCreator || isSuperAdmin) && (
+                    <TouchableOpacity
+                      onPress={() => handleRemove(item.email)}
+                      style={{ padding: 6 }}
+                    >
+                      <Trash2 size={20} color={colors.error} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             ))
@@ -285,8 +297,9 @@ export default function PermissionConfirmationScreen() {
                 <Text style={[styles.roleHighlight, { color: colors.primary }]}>
                   Admin parcial:
                 </Text>{' '}
-                Com algumas restrições, pode adicionar programas, atividades e
-                fotos. Só pode deletar o que criou.
+                Possui algumas restrições, mas pode adicionar programas,
+                atividades e fotos. Não poderá deltar programas, atividade ou
+                fotos do evento.
               </Text>
 
               <Text style={[styles.modalSubtitle, { color: colors.text }]}>
@@ -320,30 +333,41 @@ export default function PermissionConfirmationScreen() {
               </Text>
 
               <View style={styles.toggleRow}>
-                {(['Super Admin', 'Admin parcial'] as const).map((level) => (
-                  <Pressable
-                    key={level}
-                    onPress={() => setPermissionLevel(level)}
-                    style={[
-                      styles.toggleBtn,
-                      {
-                        backgroundColor:
-                          permissionLevel === level ? '#471C7A' : 'transparent',
-                        borderColor:
-                          permissionLevel === level ? '#471C7A' : colors.border,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={{
-                        color: permissionLevel === level ? '#fff' : colors.text,
-                        fontWeight: '600',
-                      }}
+                {(['Super Admin', 'Admin parcial'] as const)
+                  .filter((level) =>
+                    isPartialAdmin
+                      ? level === 'Admin parcial' || level === permissionLevel
+                      : true
+                  )
+                  .map((level) => (
+                    <Pressable
+                      key={level}
+                      onPress={() => setPermissionLevel(level)}
+                      style={[
+                        styles.toggleBtn,
+                        {
+                          backgroundColor:
+                            permissionLevel === level
+                              ? '#471C7A'
+                              : 'transparent',
+                          borderColor:
+                            permissionLevel === level
+                              ? '#471C7A'
+                              : colors.border,
+                        },
+                      ]}
                     >
-                      {level}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <Text
+                        style={{
+                          color:
+                            permissionLevel === level ? '#fff' : colors.text,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {level}
+                      </Text>
+                    </Pressable>
+                  ))}
               </View>
 
               <View style={styles.buttonRow}>
