@@ -19,6 +19,7 @@ import { Bell } from 'lucide-react-native';
 import { BackHandler } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useGuestEvents } from '@/hooks/useGuestEvents';
 
 import Colors from '@/constants/Colors';
 import { useEvents } from '@/context/EventsContext';
@@ -35,11 +36,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { auth } from '@/config/firebase';
 import { useAuthListener } from '@/hooks/useAuthListener';
 import LottieView from 'lottie-react-native';
+import {
+  getGuestParticipationsByEmail,
+  GuestParticipation,
+} from '@/config/guestParticipation.ts';
 
 export default function ProfileScreen() {
   const { user, authLoading } = useAuthListener();
   const { state } = useEvents();
   const router = useRouter();
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const { guestEvents } = useGuestEvents();
 
   const [supportVisible, setSupportVisible] = useState(false);
 
@@ -96,34 +103,23 @@ export default function ProfileScreen() {
     }, [supportVisible])
   );
 
+  const [participations, setParticipations] = useState<GuestParticipation[]>(
+    []
+  );
+  const [loadingParticipations, setLoadingParticipations] = useState(true);
   const userEmail = user?.email?.toLowerCase();
-  const userEvents = state.events.filter(
-    (event) =>
-      event.createdBy?.toLowerCase() === userEmail ||
-      event.subAdmins?.some((admin) => admin.email.toLowerCase() === userEmail)
-  );
 
-  const totalEvents = userEvents.length;
-  const totalPrograms = userEvents.reduce(
-    (sum, e) => sum + e.programs.length,
-    0
-  );
-  const totalActivities = userEvents.reduce(
-    (sum, e) =>
-      sum + e.programs.reduce((pSum, p) => pSum + p.activities.length, 0),
-    0
-  );
-  const totalPhotos = userEvents.reduce(
-    (sum, e) =>
-      sum +
-      e.programs.reduce(
-        (pSum, p) =>
-          pSum +
-          p.activities.reduce((aSum, a) => aSum + (a.photos?.length ?? 0), 0),
-        0
-      ),
-    0
-  );
+  useEffect(() => {
+    if (!userEmail) return;
+
+    const fetch = async () => {
+      const data = await getGuestParticipationsByEmail(userEmail);
+      setParticipations(data);
+      setLoadingParticipations(false);
+    };
+
+    fetch();
+  }, [userEmail]);
 
   const handleLogout = () => {
     Alert.alert('Sair da conta', 'Deseja mesmo sair?', [
@@ -143,22 +139,57 @@ export default function ProfileScreen() {
     ]);
   };
 
-  // const handleClearData = () => {
-  //   Alert.alert(
-  //     'Limpar tudo?',
-  //     'Isso excluirá todos os eventos e programas permanentemente.',
-  //     [
-  //       { text: 'Cancelar', style: 'cancel' },
-  //       {
-  //         text: 'Excluir tudo',
-  //         style: 'destructive',
-  //         onPress: () => {
-  //           Alert.alert('Dados apagados', 'Todos os eventos foram removidos.');
-  //         },
-  //       },
-  //     ]
-  //   );
-  // };
+  // Eventos criados ou administrados
+  const createdOrAdminEvents = state.events.filter(
+    (event) =>
+      event.createdBy?.toLowerCase() === userEmail ||
+      event.subAdmins?.some((admin) => admin.email.toLowerCase() === userEmail)
+  );
+
+  // Eventos em que o usuário participa
+  const participantEvents = guestEvents.filter((event) =>
+    participations.some(
+      (p) =>
+        p.eventId === event.id &&
+        p.userEmail.toLowerCase() === userEmail &&
+        (p.mode === 'confirmado' || p.mode === 'acompanhando')
+    )
+  );
+
+  const allAccessibleEvents = [
+    ...createdOrAdminEvents,
+    ...participantEvents.filter(
+      (event) => !createdOrAdminEvents.some((e) => e.id === event.id)
+    ),
+  ];
+
+  const followedEvents = guestEvents.filter(
+    (event) =>
+      event.createdBy?.toLowerCase() !== userEmail &&
+      !event.subAdmins?.some((admin) => admin.email.toLowerCase() === userEmail)
+  );
+
+  const totalEvents = allAccessibleEvents.length;
+  const totalPrograms = allAccessibleEvents.reduce(
+    (sum, e) => sum + e.programs.length,
+    0
+  );
+  const totalActivities = allAccessibleEvents.reduce(
+    (sum, e) =>
+      sum + e.programs.reduce((pSum, p) => pSum + p.activities.length, 0),
+    0
+  );
+  const totalPhotos = allAccessibleEvents.reduce(
+    (sum, e) =>
+      sum +
+      e.programs.reduce(
+        (pSum, p) =>
+          pSum +
+          p.activities.reduce((aSum, a) => aSum + (a.photos?.length ?? 0), 0),
+        0
+      ),
+    0
+  );
 
   const handleGoToPermissions = (eventId: string) => {
     router.push({
@@ -306,12 +337,24 @@ export default function ProfileScreen() {
               </Text>
               <View style={styles.dropdownContainer}>
                 <CustomDropdown
-                  items={state.events.filter(
-                    (event) => event.createdBy?.toLowerCase() === userEmail
-                  )}
+                  items={state.events.filter((event) => {
+                    const isCreator =
+                      event.createdBy?.toLowerCase() === userEmail;
+                    const isSuperAdmin = event.subAdmins?.some(
+                      (admin) =>
+                        admin.email.toLowerCase() === userEmail &&
+                        admin.level === 'Super Admin'
+                    );
+                    return isCreator || isSuperAdmin;
+                  })}
                   placeholder="-- Escolha um evento --"
-                  onSelect={(event) => handleGoToPermissions(event.id)}
                   getItemLabel={(event) => event.title}
+                  onSelect={(event) => {
+                    router.push({
+                      pathname: '/(stack)/permission-confirmation/[id]',
+                      params: { id: event.id },
+                    });
+                  }}
                   icon={<Bell size={20} color={textColor} />}
                   backgroundColor={colors.backGroundSecondary}
                   borderColor={colors.border}
@@ -334,16 +377,50 @@ export default function ProfileScreen() {
                 textStyle={{ color: textColor }}
               />
             </View>
-
-            <Pressable
-              onPress={() => router.push('/(newevents)/my-companions')}
-            >
-              <Text
-                style={{ color: colors.primary, marginTop: 16, fontSize: 16 }}
-              >
-                ✏️ Editar acompanhantes
-              </Text>
-            </Pressable>
+            <Text style={[styles.sectionTitle, { color: textColor }]}>
+              Editar acompanhantes
+            </Text>
+            <View style={styles.dropdownContainer}>
+              <CustomDropdown
+                items={guestEvents} // ← antes era `userEvents`
+                placeholder="-- Escolha um evento --"
+                getItemLabel={(event) => event.title}
+                onSelect={(event) => {
+                  router.push({
+                    pathname: '/(stack)/events/[id]/edit-participation',
+                    params: { id: event.id },
+                  });
+                }}
+                icon={<Bell size={20} color={textColor} />}
+                backgroundColor={colors.backGroundSecondary}
+                borderColor={colors.border}
+                textColor={textColor}
+              />
+              {/* {followedEvents.length > 0 && (
+                <>
+                  <Text style={[styles.sectionTitle, { color: textColor }]}>
+                    Eventos que você acompanha
+                  </Text>
+                  <View style={styles.dropdownContainer}>
+                    <CustomDropdown
+                      items={followedEvents}
+                      placeholder="-- Acompanhando --"
+                      getItemLabel={(event) => event.title}
+                      onSelect={(event) => {
+                        router.push({
+                          pathname: '/(stack)/events/[id]',
+                          params: { id: event.id },
+                        });
+                      }}
+                      icon={<Bell size={20} color={textColor} />}
+                      backgroundColor={colors.backGroundSecondary}
+                      borderColor={colors.border}
+                      textColor={textColor}
+                    />
+                  </View>
+                </>
+              )} */}
+            </View>
 
             <Text style={[styles.sectionTitle, { color: textColor }]}>
               Conta
@@ -499,6 +576,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
   dropdownContainer: {
     marginBottom: 24,
+    marginLeft: 40,
   },
   testHelp: {
     fontSize: 15,

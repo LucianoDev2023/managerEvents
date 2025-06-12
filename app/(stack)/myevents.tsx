@@ -14,6 +14,7 @@ import {
   TextInput,
   BackHandler,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
@@ -28,6 +29,7 @@ import {
   HeartOff,
   Heart,
 } from 'lucide-react-native';
+import LoadingOverlay from '@/components/LoadingOverlay';
 import QRCode from 'react-native-qrcode-svg';
 import ViewShot from 'react-native-view-shot';
 import * as FileSystem from 'expo-file-system';
@@ -40,10 +42,17 @@ import type { Event, PermissionLevel } from '@/types/index';
 import LottieView from 'lottie-react-native';
 import { useFollowedEvents } from '@/hooks/useFollowedEvents';
 import { useEvents } from '@/context/EventsContext';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/config/firebase';
+import {
+  getGuestParticipationsByEmail,
+  getGuestParticipationsByEventId,
+} from '@/hooks/guestService';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function MyEventsScreen() {
+  const [invitedEvents, setInvitedEvents] = useState<Event[]>([]);
   const {
     toggleFollowEvent,
     isFollowing,
@@ -57,25 +66,25 @@ export default function MyEventsScreen() {
   const userEmail = auth.currentUser?.email?.toLowerCase();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
-  const [isLoading, setIsLoading] = useState(true);
+  // const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setIsLoading(false); // garante encerramento após X tempo
-    }, 8000);
+  // useEffect(() => {
+  //   const timeout = setTimeout(() => {
+  //     setIsLoading(false); // garante encerramento após X tempo
+  //   }, 8000);
 
-    if (state.events) {
-      setIsLoading(false);
-      clearTimeout(timeout);
-    }
+  //   if (state.events) {
+  //     setIsLoading(false);
+  //     clearTimeout(timeout);
+  //   }
 
-    return () => clearTimeout(timeout);
-  }, [state.events]);
+  //   return () => clearTimeout(timeout);
+  // }, [state.events]);
 
   const [qrVisible, setQrVisible] = useState(false);
   const [qrPayload, setQrPayload] = useState('');
   const qrRef = useRef<ViewShot>(null);
-  const { getGuestsByEventId } = useEvents();
+  const [participatingEvents, setParticipatingEvents] = useState<Event[]>([]);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -98,13 +107,13 @@ export default function MyEventsScreen() {
   const handleNavigate = (id: string) => {
     router.push({ pathname: '/events/[id]', params: { id } });
   };
-
   const handleOpenGuests = async (eventId: string) => {
     try {
-      const guests = await getGuestsByEventId(eventId);
+      const guests = await getGuestParticipationsByEventId(eventId);
+      // se quiser salvar no contexto:
+      // dispatch({ type: 'SET_EVENT_GUESTS', payload: { eventId, guests } });
     } catch (error) {
-      Alert.alert('Erro', 'Erro ao carregar convidados');
-      console.error('Erro ao buscar convidados:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os convidados.');
     }
   };
 
@@ -290,40 +299,28 @@ export default function MyEventsScreen() {
             ) : (
               <Pressable
                 onPress={() => {
+                  const wasFollowing = isFollowing(item.id);
                   toggleFollowEvent(item);
-                  if (isFollowing(item.id)) {
-                    Alert.alert('Atenção', 'Evento deixará de ser seguido.');
+
+                  if (wasFollowing) {
+                    Alert.alert('Removido', 'Você deixou de seguir o evento.');
+                  } else {
+                    Alert.alert(
+                      'Sucesso',
+                      'Você está agora seguindo este evento e poderá acompanhar no menu principal,"Seguindo"'
+                    );
                   }
                 }}
-                style={[styles.permissionBtn]}
+                style={styles.permissionBtn}
               >
-                {isFollowing(item.id) ? (
-                  <View style={styles.btnseguir}>
-                    <Heart size={16} color={colors.primary} />
-
-                    <Text
-                      style={[
-                        styles.mapBtnText,
-                        { color: colors.textSecondary },
-                      ]}
-                    >
-                      {isFollowing(item.id) ? 'Seguindo' : 'Seguir'}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.btnseguir}>
-                    <Heart size={16} color={colors.primary} />
-
-                    <Text
-                      style={[
-                        styles.mapBtnText,
-                        { color: colors.textSecondary },
-                      ]}
-                    >
-                      {isFollowing(item.id) ? 'Seguindo' : 'Seguir'}
-                    </Text>
-                  </View>
-                )}
+                <View style={styles.btnseguir}>
+                  <Heart size={16} color={colors.primary} />
+                  <Text
+                    style={[styles.mapBtnText, { color: colors.textSecondary }]}
+                  >
+                    {isFollowing(item.id) ? 'Seguindo' : 'Seguir'}
+                  </Text>
+                </View>
               </Pressable>
             )}
           </View>
@@ -332,32 +329,49 @@ export default function MyEventsScreen() {
     );
   };
 
-  if (isLoading) {
-    return (
-      <LinearGradient colors={gradientColors} style={styles.gradient}>
-        <SafeAreaView style={styles.container}>
-          <StatusBar
-            translucent
-            backgroundColor="transparent"
-            style={colorScheme === 'dark' ? 'light' : 'dark'}
-          />
-          <View
-            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-          >
-            <LottieView
-              source={require('@/assets/images/loading.json')}
-              autoPlay
-              loop
-              style={{ width: 150, height: 150 }}
-            />
-            <Text style={{ color: colors.text, marginTop: 16, fontSize: 16 }}>
-              Carregando eventos...
-            </Text>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
-    );
-  }
+  useEffect(() => {
+    const fetchParticipatingEvents = async () => {
+      if (!userEmail) return;
+
+      const participations = await getGuestParticipationsByEmail(userEmail);
+      const eventIds = participations.map((p) => p.eventId);
+
+      const filtered = state.events.filter((event) => {
+        const isParticipant = eventIds.includes(event.id);
+        const isCreator = event.createdBy?.toLowerCase() === userEmail;
+        const isSuperAdmin = event.subAdmins?.some(
+          (admin) =>
+            admin.email.toLowerCase() === userEmail &&
+            admin.level === 'Super Admin'
+        );
+        // Só considera como "evento que estou participando" se:
+        // - sou participante (está em guestParticipations)
+        // - NÃO sou criador
+        // - NÃO sou Super Admin
+        return isParticipant && !isCreator && !isSuperAdmin;
+      });
+
+      setParticipatingEvents(filtered);
+    };
+
+    fetchParticipatingEvents();
+  }, [state.events, userEmail]);
+
+  // if (isLoading) {
+  //   return (
+  //     <View style={styles.centeredContent}>
+  //       <ActivityIndicator size="large" color={colors.primary} />
+  //       <Text
+  //         style={[
+  //           styles.emptyText,
+  //           { color: colors.textSecondary, marginTop: 12 },
+  //         ]}
+  //       >
+  //         Carregando programação...
+  //       </Text>
+  //     </View>
+  //   );
+  // }
 
   return (
     <LinearGradient
@@ -372,14 +386,44 @@ export default function MyEventsScreen() {
       />
 
       <SafeAreaView style={styles.container}>
-        <Text style={[styles.title, { color: colors.text }]}>Eventos</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Meus Eventos</Text>
 
         <FlatList
           data={filteredEvents}
           keyExtractor={(item) => item.id}
           ListEmptyComponent={
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Nenhum evento disponível.
+              Você ainda não criou eventos
+            </Text>
+          }
+          renderItem={renderEventItem}
+          contentContainerStyle={styles.listContent}
+        />
+        {invitedEvents.length > 0 && (
+          <>
+            <Text style={[styles.title, { color: colors.text }]}>
+              Meus Convites
+            </Text>
+
+            <FlatList
+              data={invitedEvents}
+              keyExtractor={(item) => item.id + '_guest'}
+              renderItem={renderEventItem}
+              contentContainerStyle={styles.listContent}
+            />
+          </>
+        )}
+
+        <Text style={[styles.title, { color: colors.text }]}>
+          Eventos que estou participando
+        </Text>
+
+        <FlatList
+          data={participatingEvents}
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              Nenhum evento confirmado ou acompanhado.
             </Text>
           }
           renderItem={renderEventItem}
@@ -901,10 +945,15 @@ const styles = StyleSheet.create({
   },
   buttonsRow: {
     flexDirection: 'row',
-    marginTop: 12,
-    marginBottom: 6,
-    gap: 20,
+    marginTop: 4,
+    gap: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  centeredContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
   },
 });

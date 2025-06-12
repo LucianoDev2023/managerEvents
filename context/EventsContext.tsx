@@ -54,6 +54,14 @@ type EventsAction =
   | { type: 'UPDATE_EVENT'; payload: Event }
   | { type: 'DELETE_EVENT'; payload: string };
 
+type GuestParticipation = {
+  userEmail: string;
+  eventId: string;
+  name: string;
+  mode: 'confirmado' | 'acompanhando';
+  family?: string[];
+};
+
 const eventsReducer = (
   state: EventsState,
   action: EventsAction
@@ -117,9 +125,8 @@ type EventsContextType = {
   deleteEvent: (eventId: string) => Promise<void>;
   addProgram: (eventId: string, date: Date) => Promise<void>;
   deleteProgram: (eventId: string, programId: string) => Promise<void>;
-  refetchEventById: (eventId: string) => Promise<void>;
-  getGuests: (eventId: string) => Promise<Guest[]>;
-  saveGuest: (eventId: string, guest: Guest) => Promise<void>;
+  refetchEventById: (eventId: string) => Promise<Event | null>;
+
   deleteGuest: (eventId: string, guestEmail: string) => Promise<void>;
   addActivity: (
     eventId: string,
@@ -150,9 +157,33 @@ type EventsContextType = {
     activityId: string,
     photoId: string
   ) => Promise<void>;
-  getGuestsByEventId: (eventId: string) => Promise<Guest[]>;
-  getGuestByEmail: (eventId: string, email: string) => Promise<Guest | null>;
-  addGuest: (eventId: string, guest: Guest) => Promise<void>;
+  getGuestParticipationsByEmail: (
+    userEmail: string
+  ) => Promise<GuestParticipation[]>;
+
+  confirmPresence: (
+    userEmail: string,
+    eventId: string,
+    name: string,
+    mode: 'confirmado' | 'acompanhando',
+    family?: string[]
+  ) => Promise<void>;
+
+  getGuestParticipation: (
+    eventId: string,
+    userEmail: string
+  ) => Promise<GuestParticipation | null>;
+  updateGuestParticipation: (
+    eventId: string,
+    userEmail: string,
+    updates: Partial<GuestParticipation>
+  ) => Promise<void>;
+  addGuestParticipation: (participation: GuestParticipation) => Promise<void>;
+  updateParticipation: (
+    userEmail: string,
+    eventId: string,
+    updates: Partial<GuestParticipation>
+  ) => Promise<void>;
 
   loadProgramsByEventId: (eventId: string) => Promise<void>;
   loadActivitiesByProgramId: (
@@ -164,6 +195,7 @@ type EventsContextType = {
     programId: string,
     activityId: string
   ) => Promise<void>;
+  getGuestsByEventId: (eventId: string) => Promise<Guest[]>;
 };
 
 const EventsContext = createContext<EventsContextType | undefined>(undefined);
@@ -274,14 +306,14 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     dispatch({ type: 'SET_PHOTOS', payload: { activityId, photos } });
   };
 
-  const refetchEventById = async (eventId: string) => {
+  const refetchEventById = async (eventId: string): Promise<Event | null> => {
     try {
       // 1. Buscar evento principal
       const eventSnap = await getDoc(doc(db, 'events', eventId));
       if (!eventSnap.exists()) throw new Error('Evento não encontrado');
       const eventData = eventSnap.data();
 
-      // 2. Buscar todos os programas do evento (subcoleção)
+      // 2. Buscar todos os programas do evento
       const programsSnap = await getDocs(
         collection(db, 'events', eventId, 'programs')
       );
@@ -292,7 +324,6 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         const programId = programDoc.id;
         const programData = programDoc.data();
 
-        // 3. Buscar atividades do programa (subcoleção)
         const activitiesSnap = await getDocs(
           collection(db, 'events', eventId, 'programs', programId, 'activities')
         );
@@ -303,7 +334,6 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
           const activityId = activityDoc.id;
           const activityData = activityDoc.data();
 
-          // 4. Buscar fotos da atividade (subcoleção)
           const activityPhotosSnap = await getDocs(
             collection(
               db,
@@ -343,7 +373,6 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
           });
         }
 
-        // 5. Buscar fotos diretamente do programa (se quiser implementar, crie subcoleção `photos` diretamente em `program`)
         const programPhotos: Photo[] = [];
 
         programs.push({
@@ -355,7 +384,6 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         });
       }
 
-      // 6. Atualizar evento no estado com os programas completos
       const updatedEvent: Event = {
         id: eventSnap.id,
         title: eventData.title,
@@ -372,8 +400,11 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       };
 
       dispatch({ type: 'UPDATE_EVENT', payload: updatedEvent });
+
+      return updatedEvent; // ✅ Adicionado
     } catch (error) {
       console.error('Erro ao refetchEventById:', error);
+      return null; // ✅ Retorno seguro em caso de erro
     }
   };
 
@@ -562,55 +593,121 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     await refetchEventById(eventId);
   };
 
-  const getGuestsByEventId = async (eventId: string): Promise<Guest[]> => {
-    const guestsRef = collection(db, 'events', eventId, 'guests');
-    const snapshot = await getDocs(guestsRef);
-    return snapshot.docs.map((doc) => doc.data() as Guest);
-  };
-
-  const addGuest = async (eventId: string, guest: Guest) => {
-    try {
-      const guestRef = doc(db, 'events', eventId, 'guests', guest.email);
-      await setDoc(guestRef, guest, { merge: true });
-    } catch (error) {
-      console.error('Erro ao adicionar convidado:', error);
-      throw error;
-    }
-  };
-
-  const getGuestByEmail = async (
-    eventId: string,
-    email: string
-  ): Promise<Guest | null> => {
-    try {
-      const docRef = doc(db, 'events', eventId, 'guests', email);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) return snap.data() as Guest;
-      return null;
-    } catch (error) {
-      console.error('[ERRO] getGuestByEmail:', error);
-      return null;
-    }
-  };
-
-  const getGuests = async (eventId: string): Promise<Guest[]> => {
-    const guestsSnap = await getDocs(
-      collection(db, 'events', eventId, 'guests')
-    );
-    return guestsSnap.docs.map((doc) => doc.data() as Guest);
-  };
-
-  const saveGuest = async (eventId: string, guest: Guest): Promise<void> => {
-    const guestRef = doc(db, 'events', eventId, 'guests', guest.email);
-    await setDoc(guestRef, guest, { merge: true });
-  };
-
   const deleteGuest = async (
     eventId: string,
     guestEmail: string
   ): Promise<void> => {
     const guestRef = doc(db, 'events', eventId, 'guests', guestEmail);
     await deleteDoc(guestRef);
+  };
+
+  // Adicionar participação do convidado na coleção global
+
+  const addGuestParticipation = async (participation: GuestParticipation) => {
+    try {
+      const docId = `${participation.userEmail}_${participation.eventId}`;
+      const guestRef = doc(db, 'guestParticipations', docId);
+      await setDoc(guestRef, participation, { merge: true });
+    } catch (error) {
+      console.error('Erro ao adicionar participação:', error);
+      throw error;
+    }
+  };
+
+  // Buscar participações do usuário por email
+  const getGuestParticipationsByEmail = async (userEmail: string) => {
+    try {
+      const q = query(
+        collection(db, 'guestParticipations'),
+        where('userEmail', '==', userEmail)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((doc) => doc.data() as GuestParticipation);
+    } catch (error) {
+      console.error('Erro ao buscar participações:', error);
+      throw error;
+    }
+  };
+  // Buscar participação específica de usuário em evento
+  const getGuestParticipation = async (eventId: string, userEmail: string) => {
+    try {
+      const docId = `${userEmail}_${eventId}`;
+      const ref = doc(db, 'guestParticipations', docId);
+      const snapshot = await getDoc(ref);
+      return snapshot.exists() ? (snapshot.data() as GuestParticipation) : null;
+    } catch (error) {
+      console.error('Erro ao buscar participação:', error);
+      throw error;
+    }
+  };
+
+  // Atualizar modo de participação e familiares
+  const updateGuestParticipation = async (
+    eventId: string,
+    userEmail: string,
+    updates: Partial<GuestParticipation>
+  ) => {
+    try {
+      const docId = `${userEmail}_${eventId}`;
+      const ref = doc(db, 'guestParticipations', docId);
+      await updateDoc(ref, updates);
+    } catch (error) {
+      console.error('Erro ao atualizar participação:', error);
+      throw error;
+    }
+  };
+
+  // Função de confirmação de presença com nova estrutura
+  async function confirmPresence(
+    userEmail: string,
+    eventId: string,
+    userName: string,
+    mode: 'confirmado' | 'acompanhando',
+    family: string[] = []
+  ): Promise<void> {
+    const docRef = doc(db, 'guestParticipations', `${eventId}_${userEmail}`);
+    await setDoc(docRef, {
+      eventId,
+      userEmail,
+      userName,
+      mode,
+      family,
+      timestamp: new Date(),
+    });
+  }
+
+  const updateParticipation = async (
+    userEmail: string,
+    eventId: string,
+    updates: Partial<GuestParticipation>
+  ) => {
+    try {
+      const docId = `${userEmail}_${eventId}`;
+      const ref = doc(db, 'guestParticipations', docId);
+      await updateDoc(ref, updates);
+    } catch (error) {
+      console.error('Erro ao atualizar dados da participação:', error);
+      throw error;
+    }
+  };
+
+  const getGuestsByEventId = async (eventId: string): Promise<Guest[]> => {
+    const snapshot = await getDocs(
+      query(
+        collection(db, 'guestParticipations'),
+        where('eventId', '==', eventId)
+      )
+    );
+
+    return snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        name: data.userName ?? data.name ?? '',
+        email: data.userEmail ?? data.email ?? '',
+        mode: data.mode,
+        family: data.family ?? [],
+      } satisfies Guest;
+    });
   };
 
   return (
@@ -632,12 +729,14 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         loadActivitiesByProgramId,
         loadPhotosByActivityId,
         refetchEventById,
-        getGuests,
-        saveGuest,
+        getGuestParticipationsByEmail,
+        getGuestParticipation,
+        updateGuestParticipation,
+        confirmPresence,
+        addGuestParticipation,
+        updateParticipation,
         deleteGuest,
         getGuestsByEventId,
-        addGuest,
-        getGuestByEmail,
       }}
     >
       {children}

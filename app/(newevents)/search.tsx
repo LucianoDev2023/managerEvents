@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Modal,
   ImageBackground,
+  Alert,
+  TextInput,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
@@ -17,20 +19,22 @@ import Colors from '@/constants/Colors';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { getAuth } from 'firebase/auth';
 import LottieView from 'lottie-react-native';
-import { MapPin, CalendarDays } from 'lucide-react-native';
+import { MapPin, CalendarDays, QrCode } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { useEventAccess } from '@/hooks/useEventAccess';
 
 export default function FoundEventScreen() {
+  const [guestFamily, setGuestFamily] = useState<string[]>([]);
+  const [familyInput, setFamilyInput] = useState('');
   const { accessCode, title } = useLocalSearchParams<{
     accessCode?: string;
     title?: string;
   }>();
-  const { addGuest } = useEvents();
   const { isLoading, eventFound, guestStatus } = useEventAccess(
     title,
     accessCode
   );
+  const { confirmPresence } = useEvents();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -54,16 +58,35 @@ export default function FoundEventScreen() {
     try {
       setIsSubmitting(true);
       setModeSelected(mode);
-      await addGuest(eventFound.id, {
-        name: userName,
-        email: userEmail,
+      await confirmPresence(
+        userEmail,
+        eventFound.id,
+        userName,
         mode,
-      });
+        guestFamily
+      );
+
       setShowConfetti(true);
     } catch (error) {
       console.error('Erro ao confirmar presença:', error);
       setIsSubmitting(false);
     }
+  };
+
+  const handleAddFamily = () => {
+    const trimmed = familyInput.trim();
+    if (!trimmed) return;
+    if (guestFamily.includes(trimmed)) {
+      Alert.alert('Este nome já foi adicionado.');
+      return;
+    }
+    setGuestFamily([...guestFamily, trimmed]);
+    setFamilyInput('');
+  };
+
+  const handleRemoveFamily = (index: number) => {
+    const updated = guestFamily.filter((_, i) => i !== index);
+    setGuestFamily(updated);
   };
 
   const handleConfettiFinish = () => {
@@ -75,7 +98,7 @@ export default function FoundEventScreen() {
     }, 1000);
   };
 
-  if (isLoading || !eventFound) {
+  if (isLoading) {
     return (
       <View
         style={[styles.loadingOverlay, { backgroundColor: colors.background }]}
@@ -84,6 +107,43 @@ export default function FoundEventScreen() {
         <Text style={[styles.loadingText, { color: colors.text }]}>
           Carregando evento...
         </Text>
+      </View>
+    );
+  }
+
+  if (!eventFound) {
+    return (
+      <View
+        style={[styles.loadingOverlay, { backgroundColor: colors.background }]}
+      >
+        {/* <LottieView
+    source={require('@/assets/images/error.json')} // você pode usar um lottie animado de erro
+    autoPlay
+    loop={false}
+    style={{ width: 180, height: 180 }}
+  /> */}
+
+        <Text
+          style={[
+            styles.loadingText,
+            {
+              color: colors.text,
+              fontSize: 18,
+              textAlign: 'center',
+              marginTop: 16,
+            },
+          ]}
+        >
+          Nenhum evento localizado com o código informado.
+        </Text>
+
+        <Pressable
+          onPress={() => router.replace('/(stack)/qr-scanner')}
+          style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+        >
+          <QrCode size={20} color="#fff" />
+          <Text style={styles.retryBtnText}>Ler outro QR Code</Text>
+        </Pressable>
       </View>
     );
   }
@@ -121,7 +181,11 @@ export default function FoundEventScreen() {
         <View style={styles.content}>
           <View style={[styles.card, { backgroundColor: colors.background }]}>
             <ImageBackground
-              source={{ uri: eventFound.coverImage }}
+              source={
+                eventFound.coverImage
+                  ? { uri: eventFound.coverImage }
+                  : require('../../assets/images/favicon.png')
+              }
               style={styles.image}
               imageStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
             />
@@ -188,7 +252,7 @@ export default function FoundEventScreen() {
                     { color: colors.primary, fontSize: 22 },
                   ]}
                 >
-                  Você foi convidado!
+                  Você é meu convidado!
                 </Text>
                 <Text
                   style={[
@@ -206,9 +270,83 @@ export default function FoundEventScreen() {
                     Você poderá alterar sua escolha a qualquer momento.
                   </Text>
                 </Text>
+
+                {/* Acompanhantes */}
+                <Text
+                  style={[
+                    styles.modalTitle,
+                    { color: colors.primary, fontSize: 16, marginTop: 24 },
+                  ]}
+                >
+                  Acompanhantes (opcional)
+                </Text>
+
+                {guestFamily.map((name, index) => (
+                  <View
+                    key={index}
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Text style={{ flex: 1, color: colors.text }}>
+                      • {name}
+                    </Text>
+                    <Pressable onPress={() => handleRemoveFamily(index)}>
+                      <Text style={{ color: '#ff3b30', fontWeight: '600' }}>
+                        Remover
+                      </Text>
+                    </Pressable>
+                  </View>
+                ))}
+
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <TextInput
+                      placeholder="Nome do acompanhante"
+                      placeholderTextColor={
+                        colorScheme === 'dark' ? '#aaa' : '#666'
+                      }
+                      value={familyInput}
+                      onChangeText={setFamilyInput}
+                      style={{
+                        margin: 20,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        padding: 10,
+                        borderRadius: 8,
+                        color: colors.text,
+                      }}
+                    />
+                  </View>
+                  <Pressable
+                    onPress={handleAddFamily}
+                    style={{ justifyContent: 'center' }}
+                  >
+                    <Text style={{ color: colors.primary, fontWeight: '600' }}>
+                      + Adicionar
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* Botões */}
                 <View style={styles.modalButtons}>
                   <Pressable
-                    onPress={() => handlePresence('confirmado')}
+                    onPress={() =>
+                      Alert.alert(
+                        'Confirmar presença?',
+                        'Você deseja confirmar presença neste evento?',
+                        [
+                          { text: 'Cancelar', style: 'cancel' },
+                          {
+                            text: 'Confirmar',
+                            onPress: () => handlePresence('confirmado'),
+                          },
+                        ]
+                      )
+                    }
                     style={[
                       styles.confirmBtn,
                       { backgroundColor: colors.primary },
@@ -219,7 +357,19 @@ export default function FoundEventScreen() {
                     </Text>
                   </Pressable>
                   <Pressable
-                    onPress={() => handlePresence('acompanhando')}
+                    onPress={() =>
+                      Alert.alert(
+                        'Acompanhar evento?',
+                        'Você deseja apenas acompanhar este evento por enquanto?',
+                        [
+                          { text: 'Cancelar', style: 'cancel' },
+                          {
+                            text: 'Sim',
+                            onPress: () => handlePresence('acompanhando'),
+                          },
+                        ]
+                      )
+                    }
                     style={[
                       styles.secondaryBtn,
                       { backgroundColor: colors.backgroundComents },
@@ -230,6 +380,7 @@ export default function FoundEventScreen() {
                     </Text>
                   </Pressable>
                 </View>
+
                 <Pressable
                   onPress={() => router.replace('/')}
                   style={[
@@ -347,5 +498,26 @@ const styles = StyleSheet.create({
   cancelText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  retryBtn: {
+    marginTop: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+
+  retryBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
 });

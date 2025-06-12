@@ -1,5 +1,5 @@
 // app/(tabs)/event-detail-refatorado.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,12 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { useLocalSearchParams, Stack, router } from 'expo-router';
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  router,
+  Stack,
+} from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
@@ -30,17 +35,13 @@ import { getAuth } from 'firebase/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import LottieView from 'lottie-react-native';
-import type { Guest } from '@/types';
+import type { Guest, Event } from '@/types';
 
 export default function EventDetailScreen() {
-  const {
-    state,
-    deleteEvent,
-    addProgram,
-    refetchEventById,
-    getGuestsByEventId,
-  } = useEvents();
+  const { refetchEventById, deleteEvent, addProgram, getGuestsByEventId } =
+    useEvents();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [event, setEvent] = useState<Event | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingProgram, setIsAddingProgram] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -48,25 +49,48 @@ export default function EventDetailScreen() {
   const [confirmed, setConfirmed] = useState<Guest[]>([]);
   const [interested, setInterested] = useState<Guest[]>([]);
 
-  const event = state.events.find((e) => e.id === id);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
-  const authUser = getAuth().currentUser;
-  const userEmail = authUser?.email?.toLowerCase() ?? '';
-  const isCreator = event?.createdBy?.toLowerCase() === userEmail;
-  const isSubAdmin = event?.subAdmins?.some(
-    (admin) =>
-      admin.email.toLowerCase() === userEmail &&
-      (admin.level.toLowerCase() === 'super admin' ||
-        admin.level.toLowerCase() === 'admin parcial')
+  const userEmail = getAuth().currentUser?.email?.toLowerCase() ?? '';
+
+  const hasPermission =
+    event &&
+    (event.createdBy?.toLowerCase() === userEmail ||
+      event.subAdmins?.some(
+        (admin) =>
+          admin.email.toLowerCase() === userEmail &&
+          (admin.level === 'Super Admin' || admin.level === 'Admin parcial')
+      ));
+
+  const fetchEventData = useCallback(async () => {
+    if (!id) return;
+    setIsLoading(true);
+    try {
+      const updatedEvent = await refetchEventById(id);
+      if (updatedEvent) {
+        setEvent(updatedEvent);
+        const guests = await getGuestsByEventId(updatedEvent.id);
+        setConfirmed(guests.filter((g) => g.mode === 'confirmado'));
+        setInterested(guests.filter((g) => g.mode === 'acompanhando'));
+      }
+    } catch {
+      Alert.alert('Erro', 'Não foi possível carregar os dados.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchEventData();
+    }, [fetchEventData])
   );
-  const hasPermission = isCreator || isSubAdmin;
 
   const handleOpenInMaps = (location: string) => {
-    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
       location
     )}`;
-    Linking.openURL(mapsUrl).catch(() =>
+    Linking.openURL(url).catch(() =>
       Alert.alert('Erro', 'Não foi possível abrir o mapa.')
     );
   };
@@ -82,13 +106,14 @@ export default function EventDetailScreen() {
   };
 
   const confirmAddProgram = async (date: Date) => {
-    const exists = event?.programs.some(
+    const exists = event?.programs?.some(
       (p) => new Date(p.date).toDateString() === date.toDateString()
     );
     if (!exists && event) {
       setIsAddingProgram(true);
       try {
         await addProgram(event.id, date);
+        await fetchEventData(); // Atualiza com o novo dia
       } catch {
         Alert.alert('Erro', 'Não foi possível adicionar o dia.');
       } finally {
@@ -99,42 +124,13 @@ export default function EventDetailScreen() {
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      await refetchEventById(id);
-      const ev = state.events.find((e) => e.id === id);
-      if (ev) {
-        const guests = await getGuestsByEventId(ev.id);
-        setConfirmed(guests.filter((g) => g.mode === 'confirmado'));
-        setInterested(guests.filter((g) => g.mode === 'acompanhando'));
-      }
-      setIsLoading(false);
-    };
-    if (id) fetchData();
-  }, [id]);
-
-  if (!event) {
+  if (!event || isLoading) {
     return (
-      <LinearGradient
-        colors={
-          colorScheme === 'dark'
-            ? ['#0b0b0f', '#1b0033', '#3e1d73']
-            : ['#ffffff', '#f0f0ff', '#e9e6ff']
-        }
-        style={styles.container}
+      <View
+        style={[styles.centeredContent, { backgroundColor: colors.background }]}
       >
-        <Stack.Screen
-          options={{
-            headerShown: true,
-            headerTitle: 'Evento não encontrado',
-          }}
-        />
-        <Text style={[styles.notFoundText, { color: colors.text }]}>
-          Evento não encontrado
-        </Text>
-        <Button title="Voltar" onPress={() => router.back()} />
-      </LinearGradient>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
     );
   }
 
@@ -152,7 +148,7 @@ export default function EventDetailScreen() {
           headerShown: true,
           headerTitle: 'Detalhes do evento',
           headerLeft: () => (
-            <TouchableOpacity onPress={() => router.replace('/')}>
+            <TouchableOpacity onPress={() => router.back()}>
               <ArrowLeft size={24} color={colors.text} />
             </TouchableOpacity>
           ),
@@ -169,7 +165,7 @@ export default function EventDetailScreen() {
                 >
                   <Edit size={20} color={colors.text} />
                 </TouchableOpacity>
-                {isCreator && (
+                {event.createdBy === userEmail && (
                   <TouchableOpacity onPress={() => deleteEvent(event.id)}>
                     <Trash2 size={20} color={colors.error} />
                   </TouchableOpacity>
@@ -229,13 +225,9 @@ export default function EventDetailScreen() {
         )}
       </View>
 
-      {isLoading ? (
-        <View style={styles.centeredContent}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
-          {event.programs
+      <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+        {event.programs?.length ? (
+          event.programs
             .sort(
               (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
             )
@@ -245,9 +237,13 @@ export default function EventDetailScreen() {
                 program={program}
                 eventId={event.id}
               />
-            ))}
-        </ScrollView>
-      )}
+            ))
+        ) : (
+          <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
+            Nenhuma programação ainda.
+          </Text>
+        )}
+      </ScrollView>
 
       {isAddingProgram && <LoadingOverlay message="Adicionando dia..." />}
 
@@ -256,8 +252,8 @@ export default function EventDetailScreen() {
           value={selectedDate}
           mode="date"
           display="default"
-          minimumDate={event.startDate}
-          maximumDate={event.endDate}
+          minimumDate={new Date(event.startDate)}
+          maximumDate={new Date(event.endDate)}
           onChange={handleDateChange}
         />
       )}
@@ -273,6 +269,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     marginBottom: 20,
   },
+
   overlayBottom: {
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 12,
@@ -306,17 +303,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'Inter-Bold',
   },
-  notFoundText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-  },
-  centeredContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
   headerActions: { flexDirection: 'row', gap: 12 },
   mapBtn: {
     flexDirection: 'row',
@@ -343,5 +329,11 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     justifyContent: 'flex-start',
     alignItems: 'center',
+  },
+  centeredContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,10 @@ import { router } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import {
+  getGuestParticipationsByEmail,
+  GuestParticipation,
+} from '@/config/guestParticipation.ts';
 
 const normalizeDate = (date: Date) => {
   const d = new Date(date);
@@ -29,10 +33,18 @@ const normalizeDate = (date: Date) => {
 };
 
 export default function CalendarScreen() {
+  const [participations, setParticipations] = useState<GuestParticipation[]>(
+    []
+  );
+
   const userEmail = getAuth().currentUser?.email?.toLowerCase() ?? '';
   const { state } = useEvents();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
+
+  useEffect(() => {
+    getGuestParticipationsByEmail(userEmail).then(setParticipations);
+  }, [userEmail]);
 
   const gradientColors =
     colorScheme === 'dark'
@@ -68,17 +80,24 @@ export default function CalendarScreen() {
       const date = normalizeDate(new Date(year, month, day));
 
       const hasEvent = state.events.some((event) => {
-        if (!event.createdBy) return false;
-
         const start = normalizeDate(event.startDate);
         const end = normalizeDate(event.endDate);
 
-        const isCreator = event.createdBy.toLowerCase() === userEmail;
+        const isCreator = event.createdBy?.toLowerCase() === userEmail;
         const isSubAdmin = event.subAdmins?.some(
           (admin) => admin.email.toLowerCase() === userEmail
         );
 
-        return (isCreator || isSubAdmin) && date >= start && date <= end;
+        const isConfirmed = participations.some(
+          (p) => p.mode === 'confirmado' && p.eventId === event.id
+        );
+        const isFollowing = participations.some(
+          (p) => p.mode === 'acompanhando' && p.eventId === event.id
+        );
+
+        const hasAccess = isCreator || isSubAdmin || isConfirmed || isFollowing;
+
+        return hasAccess && date >= start && date <= end;
       });
 
       days.push({ day, hasEvent });
@@ -102,7 +121,17 @@ export default function CalendarScreen() {
         (admin) => admin.email.toLowerCase() === userEmail
       );
 
-      if (!isCreator && !isSubAdmin) return false;
+      const isConfirmed = participations.some(
+        (p) => p.mode === 'confirmado' && p.eventId === event.id
+      );
+
+      const isFollowing = participations.some(
+        (p) => p.mode === 'acompanhando' && p.eventId === event.id
+      );
+
+      const hasAccess = isCreator || isSubAdmin || isConfirmed || isFollowing;
+
+      if (!hasAccess) return false;
 
       const isInMonth =
         (start.getMonth() === month && start.getFullYear() === year) ||
@@ -112,7 +141,7 @@ export default function CalendarScreen() {
 
       return isInMonth;
     });
-  }, [selectedMonth, state.events]);
+  }, [selectedMonth, state.events, participations]);
 
   const formatDate = (date: Date) =>
     date.toLocaleDateString('pt-BR', {
@@ -124,6 +153,14 @@ export default function CalendarScreen() {
   const handleEventPress = (eventId: string) => {
     router.push(`/(stack)/events/${eventId}`);
   };
+
+  if (!state.events.length && !participations.length) {
+    return (
+      <View style={styles.container}>
+        <Text style={{ color: colors.text }}>Carregando eventos...</Text>
+      </View>
+    );
+  }
 
   return (
     <LinearGradient
@@ -227,7 +264,12 @@ export default function CalendarScreen() {
                 onPress={() => handleEventPress(event.id)}
                 activeOpacity={0.7}
               >
-                <View style={styles.cardShadow}>
+                <View
+                  style={[
+                    styles.cardShadow,
+                    { backgroundColor: colors.backGroundSecondary },
+                  ]}
+                >
                   <View
                     style={[
                       styles.eventCard,
@@ -348,7 +390,6 @@ const styles = StyleSheet.create({
   },
   cardShadow: {
     borderRadius: 12,
-    backgroundColor: '#000', // fallback para Android shadow
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,

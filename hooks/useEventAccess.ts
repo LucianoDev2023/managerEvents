@@ -4,7 +4,7 @@ import { getAuth } from 'firebase/auth';
 import { useEvents } from '@/context/EventsContext';
 
 export function useEventAccess(title?: string, accessCode?: string) {
-  const { state, getGuestByEmail } = useEvents();
+  const { state, getGuestParticipation } = useEvents(); // atualizado
   const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -18,56 +18,71 @@ export function useEventAccess(title?: string, accessCode?: string) {
   const userEmail = user?.email ?? 'convidado@anonimo.com';
 
   useEffect(() => {
+    if (!title || !accessCode) {
+      setIsLoading(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      if (!eventFound) {
+        console.warn('❌ Evento não encontrado após 8 segundos.');
+        setIsLoading(false);
+      }
+    }, 8000);
+
+    const normalizedAccessCode = accessCode.toLowerCase().trim();
+    const normalizedTitle = title.toLowerCase().trim();
+
+    const found = state.events.find(
+      (e) =>
+        e.accessCode?.toLowerCase().trim() === normalizedAccessCode &&
+        e.title?.toLowerCase().trim() === normalizedTitle
+    );
+
+    if (found) {
+      setEventFound(found);
+      clearTimeout(timeout);
+      setIsLoading(false);
+    }
+
+    return () => clearTimeout(timeout);
+  }, [state.events, title, accessCode]);
+
+  useEffect(() => {
     const verifyAccess = async () => {
-      if (!title || !accessCode || !userEmail || state.events.length === 0) {
-        setIsLoading(false);
-        return;
-      }
-
-      // Gera uma chave de busca única combinando título e código de acesso
-      const searchKey = `${title.toLowerCase().trim()}__${accessCode
-        .toLowerCase()
-        .trim()}`;
-
-      // Busca usando a chave otimizada (assumindo que `event.searchKey` está presente nos dados do evento)
-      const event = state.events.find(
-        (e) =>
-          `${e.title?.toLowerCase().trim()}__${e.accessCode
-            ?.toLowerCase()
-            .trim()}` === searchKey
-      );
-
-      if (!event) {
-        setIsLoading(false);
-        return;
-      }
-
-      setEventFound(event);
+      if (!eventFound || !userEmail) return;
 
       const isCreatorUser =
-        event.createdBy?.toLowerCase() === userEmail.toLowerCase();
+        eventFound.createdBy?.toLowerCase() === userEmail.toLowerCase();
       setIsCreator(isCreatorUser);
 
       if (isCreatorUser) {
-        router.replace(`/events/${event.id}`);
+        router.replace(`/events/${eventFound.id}`);
         return;
       }
 
-      const guest = await getGuestByEmail(event.id, userEmail);
+      try {
+        const participation = await getGuestParticipation(
+          eventFound.id,
+          userEmail
+        );
 
-      if (guest) {
-        const status = guest.mode === 'confirmado' ? 'confirmed' : 'interested';
-        setGuestStatus(status);
-        router.replace(`/events/${event.id}`);
-      } else {
+        if (participation) {
+          const status =
+            participation.mode === 'confirmado' ? 'confirmed' : 'interested';
+          setGuestStatus(status);
+          router.replace(`/events/${eventFound.id}`);
+        } else {
+          setGuestStatus('none');
+        }
+      } catch (error) {
+        console.error('Erro ao buscar participação:', error);
         setGuestStatus('none');
       }
-
-      setIsLoading(false);
     };
 
     verifyAccess();
-  }, [state.events, title, accessCode, userEmail]);
+  }, [eventFound, userEmail]);
 
   return {
     isLoading,

@@ -56,9 +56,11 @@ export default function PhotoGallery({
   const colors = Colors[colorScheme];
   const auth = getAuth();
   const currentUser = auth.currentUser;
+  const displayName = currentUser?.displayName;
 
   const [isViewerVisible, setIsViewerVisible] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+
   const handleShareImage = async (imageUrl: string) => {
     try {
       const downloadPath = FileSystem.documentDirectory + 'shared-image.jpg';
@@ -135,13 +137,20 @@ export default function PhotoGallery({
                       style={styles.photo}
                       resizeMode="cover"
                     />
-                    <View style={styles.descriptionContainer}>
+                    <View
+                      style={[
+                        styles.descriptionContainer,
+                        { backgroundColor: colors.backgroundC },
+                      ]}
+                    >
                       <MessageSquare
                         size={16}
-                        color="#555"
+                        color={colors.primary}
                         style={styles.icon}
                       />
-                      <Text style={styles.descriptionText}>
+                      <Text
+                        style={[styles.descriptionText, { color: colors.text }]}
+                      >
                         {photo.description}
                       </Text>
                     </View>
@@ -250,10 +259,15 @@ export default function PhotoGallery({
                         { backgroundColor: colors.backgroundComents },
                       ]}
                     >
-                      <Text style={styles.commentAuthor}>
-                        {comment.email.split('@')[0]}
+                      <Text style={styles.commentAuthor}>{displayName}</Text>
+                      <Text
+                        style={[
+                          styles.commentText,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {comment.text}
                       </Text>
-                      <Text style={styles.commentText}>{comment.text}</Text>
                       <View style={styles.commentFooterRow}>
                         <Text style={styles.commentTime}>
                           {formatDistanceToNow(comment.createdAt.toDate(), {
@@ -332,7 +346,6 @@ const styles = StyleSheet.create({
     width: ITEM_WIDTH,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#666',
     borderBottomLeftRadius: 14,
     borderBottomRightRadius: 14,
     paddingHorizontal: 12,
@@ -342,7 +355,6 @@ const styles = StyleSheet.create({
   descriptionText: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
-    color: '#333',
     lineHeight: 20,
     flex: 1,
   },
@@ -403,7 +415,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   commentText: {
-    color: '#c9d1d9',
     fontSize: 15,
     fontFamily: 'Inter_400Regular',
     lineHeight: 22,

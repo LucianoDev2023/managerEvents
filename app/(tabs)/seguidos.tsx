@@ -41,32 +41,21 @@ export default function FollowedEventsScreen() {
   };
 
   const renderItem = ({ item }: any) => (
-    <LinearGradient
-      colors={gradientColors}
-      locations={[0, 0.9, 1]}
-      style={styles.gradient}
+    <Pressable
+      onPress={() => router.push(`/events/${item.id}`)}
+      style={[styles.card, { backgroundColor: colors.backgroundC }]}
     >
-      <Pressable
-        onPress={() => router.push(`/events/${item.id}`)}
-        style={styles.card}
-      >
-        <Image source={{ uri: item.coverImage }} style={styles.image} />
-        <View style={styles.info}>
-          <Text style={[styles.title, { color: colors.text }]}>
-            {item.title}
-          </Text>
-          <Text style={[styles.location, { color: colors.textSecondary }]}>
-            <MapPin size={12} color={colors.textSecondary} /> {item.location}
-          </Text>
-        </View>
-        <Pressable
-          onPress={() => handleDelete(item.id)}
-          style={styles.deleteBtn}
-        >
-          <Trash2 size={20} color={colors.error} />
-        </Pressable>
+      <Image source={{ uri: item.coverImage }} style={styles.image} />
+      <View style={styles.info}>
+        <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+        <Text style={[styles.location, { color: colors.textSecondary }]}>
+          <MapPin size={12} color={colors.textSecondary} /> {item.location}
+        </Text>
+      </View>
+      <Pressable onPress={() => handleDelete(item.id)} style={styles.deleteBtn}>
+        <Trash2 size={20} color={colors.error} />
       </Pressable>
-    </LinearGradient>
+    </Pressable>
   );
 
   return (
@@ -90,7 +79,7 @@ export default function FollowedEventsScreen() {
         ]}
       >
         <Text style={[styles.titleHeader, { color: colors.text }]}>
-          Eventos Seguidos
+          Eventos seguidos
         </Text>
 
         <FlatList

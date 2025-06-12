@@ -61,7 +61,7 @@ export default function ActivityPhotosScreen() {
             { color: colors.textSecondary, marginTop: 12 },
           ]}
         >
-          Carregando programação...
+          Carregando fotos...
         </Text>
       </View>
     );
@@ -92,7 +92,7 @@ export default function ActivityPhotosScreen() {
   const handleDeletePhoto = async (photo: { id: string; publicId: string }) => {
     setDeletingPhotoId(photo.id);
     try {
-      await deletePhoto(event.id, program.id, photo.id);
+      // await deletePhoto(event.id, program.id, photo.id);
       await refetchEventById(event.id); // atualiza a lista após exclusão
     } finally {
       setDeletingPhotoId(null);
@@ -134,7 +134,9 @@ export default function ActivityPhotosScreen() {
             isCreator={isCreator}
             onDeletePhoto={handleDeletePhoto}
             deletingPhotoId={deletingPhotoId}
-            refetchEventById={() => refetchEventById(event.id)}
+            refetchEventById={async () => {
+              await refetchEventById(event.id);
+            }}
           />
         ) : (
           <View style={styles.emptyContainer}>

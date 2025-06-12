@@ -104,6 +104,19 @@ export default function CustomDropdown<T>({
                     </Text>
                   </TouchableOpacity>
                 )}
+                ListEmptyComponent={
+                  <Text
+                    style={{
+                      textAlign: 'center',
+                      paddingVertical: 24,
+                      fontSize: 16,
+                      fontFamily: 'Inter-Regular',
+                      color: colors.text,
+                    }}
+                  >
+                    Você não possui convites confirmados.
+                  </Text>
+                }
               />
             </LinearGradient>
           </View>
@@ -137,9 +150,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 24,
     borderRadius: 20,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#333',
   },
   modal: {
-    minHeight: 300,
+    minHeight: 100,
     padding: 16,
     borderRadius: 20,
     maxHeight: 420,
@@ -152,10 +167,9 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
   },
   option: {
-    minHeight: 300,
+    minHeight: 100,
     paddingVertical: 14,
     paddingHorizontal: 12,
-    borderBottomWidth: 1,
     borderBottomColor: '#444',
   },
   optionText: {

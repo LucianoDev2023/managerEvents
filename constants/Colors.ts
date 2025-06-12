@@ -1,6 +1,7 @@
 export default {
   light: {
     background: '#ffffff',
+    backgroundC: '#B9B6FF',
     backGroundSecondary: '#fff',
     backgroundComents: '#fff',
     text: '#111',
@@ -14,9 +15,10 @@ export default {
   },
   dark: {
     background: '#272441',
+    backgroundC: '#1F1C33',
     backgroundComents: '#1c1c1e',
     backGroundSecondary: 'transparent',
-    text: '#fff',
+    text: '#fefefe',
     textSecondary: '#aaa',
     border: '#555',
     primary: '#b18aff',

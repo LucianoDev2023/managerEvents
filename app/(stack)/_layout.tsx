@@ -51,12 +51,30 @@ export default function StackLayout() {
           },
         }}
       >
-        {/* <Stack.Screen
-          name="events/[id]/edit_event"
+        <Stack.Screen
+          name="events/[id]/edit-guest"
           options={{
             title: '',
           }}
-        /> */}
+        />
+        <Stack.Screen
+          name="events/[id]"
+          options={{
+            title: '',
+          }}
+        />
+        <Stack.Screen
+          name="events/[id]/edit-my-participation"
+          options={{
+            title: '',
+          }}
+        />
+        <Stack.Screen
+          name="events/[id]/edit-participation"
+          options={{
+            title: 'Editar acompanhantes',
+          }}
+        />
 
         <Stack.Screen
           name="myevents"

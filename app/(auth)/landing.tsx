@@ -1,5 +1,4 @@
-// LandingScreen.tsx - Refatorado para um visual ultra profissional
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +8,7 @@ import {
   StatusBar as RNStatusBar,
   Pressable,
   Dimensions,
+  AccessibilityRole,
 } from 'react-native';
 import { useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import LottieView from 'lottie-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Colors from '@/constants/Colors';
+import { Check } from 'lucide-react-native';
 
 const mockups = [
   require('@/assets/kup/mockup1.png'),
@@ -26,7 +27,18 @@ const mockups = [
   require('@/assets/kup/mockup5.png'),
 ];
 
-const MOCKUP_WIDTH = 180;
+const MOCKUP_WIDTH = Dimensions.get('window').width * 0.7;
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const SIDE_SPACING = (SCREEN_WIDTH - MOCKUP_WIDTH) / 4;
+
+const features = [
+  'Gerencie seus eventos',
+  'Controle de convidados e presença',
+  'Compartilhamento por QR Code e WhatsApp',
+  'Galeria privada de fotos por atividade',
+  'Administração por múltiplos usuários',
+  'Perfeito para todo tipo de evento: aniversários, casamentos, encontros sociais ou confraternizações',
+];
 
 export default function LandingScreen() {
   const colorScheme = useColorScheme() ?? 'dark';
@@ -38,30 +50,23 @@ export default function LandingScreen() {
       ? ['#0b0b0f', '#1b0033', '#3e1d73']
       : ['#ffffff', '#f0f0ff', '#e9e6ff'];
 
-  const features = [
-    'Criação e organização de eventos completos',
-    'Programações e atividades personalizadas',
-    'Galeria de fotos com descrição por atividade',
-    'Compartilhe via QR Code e WhatsApp',
-    'Controle de permissões por colaborador',
-    'Indicação da localização pelo Google maps',
-    'Gestão moderna, prática e intuitiva',
-  ];
-
   const scrollRef = useRef<ScrollView>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const mockupIndex = useRef(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const nextIndex = (currentIndex + 1) % mockups.length;
+      mockupIndex.current = (mockupIndex.current + 1) % mockups.length;
       scrollRef.current?.scrollTo({
-        x: nextIndex * MOCKUP_WIDTH,
+        x: mockupIndex.current * MOCKUP_WIDTH,
         animated: true,
       });
-      setCurrentIndex(nextIndex);
     }, 3000);
     return () => clearInterval(interval);
-  }, [currentIndex]);
+  }, []);
+
+  const handleNavigate = useCallback(() => {
+    router.push('/(auth)/login');
+  }, []);
 
   return (
     <LinearGradient colors={gradientColors} style={styles.gradient}>
@@ -81,8 +86,8 @@ export default function LandingScreen() {
           style={styles.centeredBlock}
         >
           <Text style={[styles.title, { color: colors.primary }]}>PLANNIX</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Gerencie eventos como nunca antes: fácil, moderno e no seu ritmo.
+          <Text style={[styles.slogan, { color: colors.text }]}>
+            Sua experiência de eventos no seu tempo, no seu estilo.
           </Text>
         </Animated.View>
 
@@ -106,8 +111,10 @@ export default function LandingScreen() {
             ref={scrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.mockupScroll}
-            snapToInterval={MOCKUP_WIDTH}
+            contentContainerStyle={{
+              paddingHorizontal: SIDE_SPACING,
+            }}
+            snapToInterval={10}
             decelerationRate="fast"
             scrollEventThrottle={16}
           >
@@ -115,7 +122,10 @@ export default function LandingScreen() {
               <Animated.Image
                 key={index}
                 source={img}
-                style={styles.mockupImage}
+                style={[
+                  styles.mockupImage,
+                  index === mockups.length - 1 && { marginRight: 0 }, // remove margem do último
+                ]}
                 entering={FadeInDown.delay(300 + index * 100)}
               />
             ))}
@@ -128,8 +138,13 @@ export default function LandingScreen() {
         >
           {features.map((item, index) => (
             <View key={index} style={styles.featureItem}>
+              <Check
+                size={18}
+                color={colors.primary}
+                style={styles.featureIcon}
+              />
               <Text style={[styles.featureText, { color: colors.text }]}>
-                • {item}
+                {item}
               </Text>
             </View>
           ))}
@@ -140,8 +155,10 @@ export default function LandingScreen() {
           style={styles.buttonContainer}
         >
           <Pressable
-            onPress={() => router.push('/(auth)/login')}
+            onPress={handleNavigate}
             style={styles.button}
+            accessible
+            accessibilityRole="button"
           >
             <LottieView
               source={require('@/assets/images/action.json')}
@@ -154,6 +171,8 @@ export default function LandingScreen() {
             </View>
           </Pressable>
         </Animated.View>
+
+        <Text style={styles.testimonial}>Experimente a versão Beta. V 1.0</Text>
       </ScrollView>
     </LinearGradient>
   );
@@ -174,10 +193,19 @@ const styles = StyleSheet.create({
     fontSize: 40,
     fontFamily: 'Inter-Bold',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
+    textShadowColor: '#000',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  slogan: {
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+    textAlign: 'center',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     textAlign: 'center',
     fontFamily: 'Inter-Regular',
     paddingHorizontal: 12,
@@ -185,22 +213,28 @@ const styles = StyleSheet.create({
   lottieBox: { marginVertical: 20, alignItems: 'center' },
   lottie: { width: 300, height: 150 },
   mockupGallery: { width: '100%' },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    textAlign: 'center',
-  },
   mockupScroll: { paddingHorizontal: 10, gap: 10 },
   mockupImage: {
     width: MOCKUP_WIDTH,
     height: 380,
     resizeMode: 'contain',
     borderRadius: 16,
-    marginRight: 10,
+    marginRight: 10, // consistente com o SNAP_INTERVAL
   },
   featureList: { width: '100%', paddingHorizontal: 6, marginBottom: 32 },
-  featureItem: { marginBottom: 10 },
-  featureText: { fontSize: 15, fontFamily: 'Inter-Regular' },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  featureIcon: {
+    marginRight: 10,
+  },
+  featureText: {
+    fontSize: 15,
+    fontFamily: 'Inter-Regular',
+    flexShrink: 1,
+  },
   buttonContainer: { alignItems: 'center', justifyContent: 'center' },
   button: { alignItems: 'center', justifyContent: 'center' },
   lottieButton: { width: 280, height: 80 },
@@ -216,5 +250,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Inter-SemiBold',
     marginBottom: 8,
+  },
+  testimonial: {
+    fontSize: 14,
+    fontFamily: 'Inter-Light',
+    color: '#aaa',
+    textAlign: 'center',
+    marginTop: 24,
   },
 });
