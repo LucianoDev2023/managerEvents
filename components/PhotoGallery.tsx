@@ -40,6 +40,7 @@ interface PhotoGalleryProps {
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.9;
 const ITEM_HEIGHT = ITEM_WIDTH * 0.6;
+const currentUser = getAuth().currentUser;
 
 export default function PhotoGallery({
   photos,
@@ -105,6 +106,7 @@ export default function PhotoGallery({
               uid: currentUser?.uid ?? '',
               email: currentUser?.email ?? '',
               isSuperAdmin: isCreator,
+              name: currentUser?.displayName ?? '',
             },
             eventCreatorId: photo.createdBy ?? '',
           });
@@ -259,7 +261,10 @@ export default function PhotoGallery({
                         { backgroundColor: colors.backgroundComents },
                       ]}
                     >
-                      <Text style={styles.commentAuthor}>{displayName}</Text>
+                      <Text style={styles.commentAuthor}>
+                        {comment.name ?? 'Usuário'}
+                      </Text>
+
                       <Text
                         style={[
                           styles.commentText,

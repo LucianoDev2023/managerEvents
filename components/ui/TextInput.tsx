@@ -15,6 +15,7 @@ import { Eye, EyeOff } from 'lucide-react-native';
 
 interface TextInputProps {
   label?: string;
+  labelColor?: string;
   placeholder?: string;
   value: string;
   onChangeText: (text: string) => void;
@@ -41,6 +42,7 @@ interface TextInputProps {
 
 export default function TextInput({
   label,
+  labelColor, // ✅ aqui!
   placeholder,
   value,
   onChangeText,
@@ -57,7 +59,7 @@ export default function TextInput({
   editable = true,
   onBlur,
   onFocus,
-  icon, // ✅ Recebe o ícone
+  icon,
 }: TextInputProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -86,9 +88,9 @@ export default function TextInput({
 
   return (
     <View style={[styles.container, style]}>
-      {label && (
-        <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
-      )}
+      <Text style={[styles.label, { color: labelColor ?? colors.text }]}>
+        {label}
+      </Text>
 
       <View
         style={[
@@ -96,7 +98,7 @@ export default function TextInput({
           {
             borderColor: getBorderColor(),
             backgroundColor:
-              colorScheme === 'dark' ? colors.backgroundAlt : colors.background,
+              colorScheme === 'dark' ? colors.background : colors.background,
           },
         ]}
       >
@@ -106,9 +108,9 @@ export default function TextInput({
           style={[
             styles.input,
             {
-              color: colors.text,
-              height: multiline ? 24 * numberOfLines : 48,
+              minHeight: multiline ? 120 : 48,
               textAlignVertical: multiline ? 'top' : 'center',
+              paddingVertical: multiline ? 12 : 0,
             },
             inputStyle,
           ]}

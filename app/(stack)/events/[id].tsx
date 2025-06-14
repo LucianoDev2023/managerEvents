@@ -234,12 +234,44 @@ export default function EventDetailScreen() {
           Programação diária
         </Text>
         {hasPermission && (
-          <Button
-            title="Add Dia"
-            icon={<Plus size={16} color="white" />}
-            onPress={() => setShowDatePicker(true)}
-            size="small"
-          />
+          <View style={{ flexDirection: 'row' }}>
+            <View style={[styles.buttonRow, { marginBottom: 10 }]}>
+              <TouchableOpacity
+                onPress={() => setShowDatePicker(true)}
+                style={[
+                  styles.controlButton,
+                  { borderColor: colors.primary },
+                  isAddingProgram && styles.disabled,
+                ]}
+                disabled={isAddingProgram}
+                activeOpacity={0.8}
+              >
+                <Plus size={18} color={colors.text} />
+                <Text
+                  style={[styles.controlButtonText, { color: colors.text }]}
+                >
+                  {isAddingProgram ? 'Adicionando...' : 'Dia'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() =>
+                  router.push(
+                    `/events/${event.id}/eventOrganizerNoteViewScreen`
+                  )
+                }
+                style={[styles.controlButton, { borderColor: colors.primary }]}
+                activeOpacity={0.8}
+              >
+                <Edit size={18} color={colors.text} />
+                <Text
+                  style={[styles.controlButtonText, { color: colors.text }]}
+                >
+                  Notas
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
       </View>
 
@@ -312,10 +344,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
   },
   sectionHeader: {
+    alignContent: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 15,
-    marginHorizontal: 24,
+    alignItems: 'center',
+    marginHorizontal: 18,
   },
   sectionTitle: {
     fontSize: 18,
@@ -359,5 +392,31 @@ const styles = StyleSheet.create({
     marginTop: 24,
     fontSize: 16,
     fontFamily: 'Inter_400Regular',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+
+  controlButton: {
+    justifyContent: 'center',
+    alignContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 6,
+  },
+
+  controlButtonText: {
+    fontSize: 14,
+    justifyContent: 'center',
+    fontFamily: 'Inter_500Medium',
+  },
+
+  disabled: {
+    opacity: 0.5,
   },
 });

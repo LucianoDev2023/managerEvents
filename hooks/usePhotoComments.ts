@@ -18,6 +18,7 @@ export interface PhotoComment {
   createdAt: any;
   email: string;
   userId: string;
+  name?: string;
 }
 
 interface UsePhotoCommentsParams {
@@ -29,6 +30,7 @@ interface UsePhotoCommentsParams {
     uid: string;
     email: string;
     isSuperAdmin: boolean;
+    name: string;
   };
   eventCreatorId: string;
 }
@@ -71,6 +73,7 @@ export function usePhotoComments({
         email: doc.data().email,
         userId: doc.data().userId,
         createdAt: doc.data().createdAt,
+        name: doc.data().name,
       }));
       setComments(data);
     });
@@ -101,6 +104,7 @@ export function usePhotoComments({
         email: currentUser.email,
         userId: currentUser.uid,
         createdAt: serverTimestamp(),
+        name: currentUser.name,
       });
 
       setNewComment('');

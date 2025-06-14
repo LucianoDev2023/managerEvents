@@ -58,6 +58,12 @@ export default function StackLayout() {
           }}
         />
         <Stack.Screen
+          name="events/new"
+          options={{
+            title: '',
+          }}
+        />
+        <Stack.Screen
           name="events/[id]"
           options={{
             title: '',
@@ -75,6 +81,19 @@ export default function StackLayout() {
             title: '',
           }}
         />
+        <Stack.Screen
+          name="events/[id]/eventOrganizerNoteViewScreen"
+          options={{
+            title: '',
+          }}
+        />
+        <Stack.Screen
+          name="events/[id]/eventOrganizerNoteScreen"
+          options={{
+            title: '',
+          }}
+        />
+
         <Stack.Screen
           name="events/[id]/edit-participation"
           options={{

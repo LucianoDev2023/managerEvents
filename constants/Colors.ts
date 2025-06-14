@@ -23,7 +23,7 @@ export default {
     border: '#555',
     primary: '#b18aff',
     error: '#f44336',
-    text2: '#fff',
+    text2: '#aaa',
     primary2: '#483887',
   },
 };

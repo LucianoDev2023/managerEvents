@@ -168,12 +168,18 @@ export default function ProgramDetailScreen() {
               Atividades
             </Text>
             {hasPermission && (
-              <Button
-                title="Adicionar"
-                size="small"
-                icon={<Plus size={16} color="#fff" />}
+              <TouchableOpacity
                 onPress={handleAddActivity}
-              />
+                style={[styles.controlButton, { borderColor: colors.primary }]}
+                activeOpacity={0.8}
+              >
+                <Plus size={16} color="white" />
+                <Text
+                  style={[styles.controlButtonText, { color: colors.text }]}
+                >
+                  Adicionar
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
 
@@ -285,5 +291,19 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Medium',
     textAlign: 'center',
     marginBottom: 24,
+  },
+  controlButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    gap: 6,
+  },
+
+  controlButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter_500Medium',
   },
 });

@@ -314,7 +314,7 @@ export default function EventFormScreen() {
               onChangeText={field.onChange}
               multiline
               numberOfLines={4}
-              icon={<Info size={20} color={colors.primary} />}
+              // icon={<Info size={20} color={colors.primary} />}
             />
           )}
         />
@@ -324,8 +324,8 @@ export default function EventFormScreen() {
           name="accessCode"
           render={({ field }) => (
             <TextInput
-              label="Código de Acesso"
-              placeholder="ABC123"
+              label="Palavra que define o evento"
+              placeholder="Ex: Amor, Alegria, Gratidão..."
               value={field.value}
               onChangeText={field.onChange}
               error={errors.accessCode?.message}
@@ -333,13 +333,19 @@ export default function EventFormScreen() {
           )}
         />
 
-        <Button
-          title={coverImage ? 'Alterar imagem' : 'Selecionar imagem'}
+        <TouchableOpacity
+          style={[
+            styles.imageSelectorSmall,
+            {
+              borderColor: colors.border,
+            },
+          ]}
+          activeOpacity={0.7}
           onPress={async () => {
             const result = await ImagePicker.launchImageLibraryAsync({
               allowsEditing: true,
               quality: 0.8,
-              aspect: [4, 3],
+              aspect: [2, 1], // proporção menor
             });
 
             if (!result.canceled) {
@@ -356,8 +362,15 @@ export default function EventFormScreen() {
               }
             }
           }}
-          loading={isUploadingCover}
-        />
+        >
+          <Text style={styles.imageSelectorSmallText}>
+            {isUploadingCover
+              ? 'Enviando...'
+              : coverImage
+              ? 'Alterar imagem'
+              : 'Selecionar foto'}
+          </Text>
+        </TouchableOpacity>
 
         {coverImage && (
           <Image
@@ -447,5 +460,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter-Regular',
     marginTop: 4,
+  },
+  imageSelectorSmall: {
+    width: '100%',
+    aspectRatio: 2, // proporção 2:1
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent', // transparente
+    marginBottom: 12,
+  },
+  imageSelectorSmallText: {
+    fontSize: 14,
+    color: '#999',
+    fontFamily: 'Inter_500Medium',
   },
 });
