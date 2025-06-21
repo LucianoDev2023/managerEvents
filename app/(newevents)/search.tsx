@@ -30,7 +30,7 @@ export default function FoundEventScreen() {
     accessCode?: string;
     title?: string;
   }>();
-  const { isLoading, eventFound, guestStatus } = useEventAccess(
+  const { isLoading, eventFound, guestStatus, refetchAccess } = useEventAccess(
     title,
     accessCode
   );
@@ -66,6 +66,7 @@ export default function FoundEventScreen() {
         guestFamily
       );
 
+      await refetchAccess(); // <== força atualização após confirmar
       setShowConfetti(true);
     } catch (error) {
       console.error('Erro ao confirmar presença:', error);
@@ -521,3 +522,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
   },
 });
+function refetchAccess() {
+  throw new Error('Function not implemented.');
+}

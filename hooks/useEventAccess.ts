@@ -2,21 +2,24 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import { useEvents } from '@/context/EventsContext';
+import { Event } from '@/types'; // substitua pelo seu tipo real, se houver
+
+type GuestStatus = 'none' | 'confirmed' | 'interested';
 
 export function useEventAccess(title?: string, accessCode?: string) {
-  const { state, getGuestParticipation } = useEvents(); // atualizado
+  const { state, getGuestParticipation } = useEvents();
   const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(true);
-  const [eventFound, setEventFound] = useState<any | null>(null);
+  const [verifyingAccess, setVerifyingAccess] = useState(true);
+  const [eventFound, setEventFound] = useState<Event | null>(null);
   const [isCreator, setIsCreator] = useState(false);
-  const [guestStatus, setGuestStatus] = useState<
-    'none' | 'confirmed' | 'interested'
-  >('none');
+  const [guestStatus, setGuestStatus] = useState<GuestStatus>('none');
 
   const user = getAuth().currentUser;
   const userEmail = user?.email ?? 'convidado@anonimo.com';
 
+  // 🔎 Busca o evento com base no título e código
   useEffect(() => {
     if (!title || !accessCode) {
       setIsLoading(false);
@@ -48,46 +51,47 @@ export function useEventAccess(title?: string, accessCode?: string) {
     return () => clearTimeout(timeout);
   }, [state.events, title, accessCode]);
 
-  useEffect(() => {
-    const verifyAccess = async () => {
-      if (!eventFound || !userEmail) return;
+  const refetchAccess = async () => {
+    if (!eventFound || !userEmail) return;
 
-      const isCreatorUser =
-        eventFound.createdBy?.toLowerCase() === userEmail.toLowerCase();
-      setIsCreator(isCreatorUser);
+    const isCreatorUser =
+      eventFound.createdBy?.toLowerCase() === userEmail.toLowerCase();
 
-      if (isCreatorUser) {
+    setIsCreator(isCreatorUser);
+
+    if (isCreatorUser) {
+      router.replace(`/events/${eventFound.id}`);
+      return;
+    }
+
+    try {
+      const participation = await getGuestParticipation(
+        eventFound.id,
+        userEmail
+      );
+      if (participation) {
+        const status =
+          participation.mode === 'confirmado' ? 'confirmed' : 'interested';
+        setGuestStatus(status);
         router.replace(`/events/${eventFound.id}`);
-        return;
-      }
-
-      try {
-        const participation = await getGuestParticipation(
-          eventFound.id,
-          userEmail
-        );
-
-        if (participation) {
-          const status =
-            participation.mode === 'confirmado' ? 'confirmed' : 'interested';
-          setGuestStatus(status);
-          router.replace(`/events/${eventFound.id}`);
-        } else {
-          setGuestStatus('none');
-        }
-      } catch (error) {
-        console.error('Erro ao buscar participação:', error);
+      } else {
         setGuestStatus('none');
       }
-    };
+    } catch (error) {
+      console.error('Erro ao buscar participação:', error);
+      setGuestStatus('none');
+    }
+  };
 
-    verifyAccess();
+  useEffect(() => {
+    refetchAccess().finally(() => setVerifyingAccess(false));
   }, [eventFound, userEmail]);
 
   return {
-    isLoading,
+    isLoading: isLoading || verifyingAccess,
     eventFound,
     isCreator,
     guestStatus,
+    refetchAccess, // <== aqui
   };
 }

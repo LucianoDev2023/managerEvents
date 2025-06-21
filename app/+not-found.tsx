@@ -1,15 +1,37 @@
-import { Link, Stack } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { Stack, router } from 'expo-router';
+import * as Linking from 'expo-linking';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 
 export default function NotFoundScreen() {
+  useEffect(() => {
+    const redirectIfValid = async () => {
+      const url = await Linking.getInitialURL();
+      if (url) {
+        const parsed = Linking.parse(url);
+        const title = parsed.queryParams?.title as string;
+        const code = parsed.queryParams?.code as string;
+
+        if (title && code) {
+          router.replace({
+            pathname: '/(newevents)/search',
+            params: { title, accessCode: code },
+          });
+        } else {
+          router.replace('/');
+        }
+      }
+    };
+
+    redirectIfValid();
+  }, []);
+
   return (
     <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
+      <Stack.Screen options={{ title: 'Redirecionando...' }} />
       <View style={styles.container}>
-        <Text style={styles.text}>...</Text>
-        <Link href="/" style={styles.link}>
-          <Text>Retornar a página inicial!</Text>
-        </Link>
+        <ActivityIndicator size="large" />
+        <Text style={styles.text}>Buscando evento...</Text>
       </View>
     </>
   );
@@ -23,11 +45,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   text: {
-    fontSize: 20,
-    fontWeight: 600,
-  },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
+    fontSize: 18,
+    marginTop: 10,
   },
 });

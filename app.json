@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "planejeja",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,10 +15,12 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.luciano_dev_2025.gerenciadordeeventos",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização para exibir o mapa corretamente.",
         "NSLocationAlwaysUsageDescription": "Permita acesso à sua localização mesmo em segundo plano."
-      }
+      },
+      "associatedDomains": ["applinks:planejeja.com.br"]
     },
     "android": {
       "permissions": [
@@ -35,8 +37,16 @@
         {
           "action": "VIEW",
           "data": {
-            "scheme": "myapp",
-            "host": "*"
+            "scheme": "https",
+            "host": "planejeja.com.br",
+            "pathPrefix": "/"
+          },
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "data": {
+            "scheme": "planejeja"
           },
           "category": ["BROWSABLE", "DEFAULT"]
         }
@@ -48,7 +58,6 @@
       },
       "backgroundColor": "#3e1d73"
     },
-
     "web": {
       "bundler": "metro",
       "output": "single",

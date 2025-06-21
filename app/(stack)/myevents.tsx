@@ -21,6 +21,8 @@ import { getAuth } from 'firebase/auth';
 import { useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
+import ShareEventButton from '@/components/ShareEventButton';
+
 import {
   MapPin,
   Share2,
@@ -267,7 +269,7 @@ export default function MyEventsScreen() {
               </Text>
             </Pressable>
 
-            <Pressable
+            {/* <Pressable
               onPress={() => {
                 setQrPayload(
                   JSON.stringify({
@@ -280,9 +282,16 @@ export default function MyEventsScreen() {
               style={styles.shareBtn}
             >
               {/* <Share2 size={16} color="white" /> */}
-              <Text style={styles.shareBtnText}> {'Enviar '}</Text>
+            {/* <Text style={styles.shareBtnText}> {'Enviar '}</Text>
               <QrCode size={16} color="white" />
-            </Pressable>
+            </Pressable> */}
+            {item.accessCode && (
+              <ShareEventButton
+                title={item.title}
+                accessCode={item.accessCode}
+                showCopyLink={false}
+              />
+            )}
 
             {isCreator || isAdm ? (
               <Button

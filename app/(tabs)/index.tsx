@@ -9,6 +9,7 @@ import {
   StatusBar as RNStatusBar,
   BackHandler,
   Modal,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColorScheme } from 'react-native';
@@ -45,12 +46,37 @@ export default function HomeScreen() {
     transform: [{ scale: scale.value }],
   }));
 
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     const onBackPress = () => {
+  //       setExitModalVisible(true);
+  //       return true;
+  //     };
+  //     BackHandler.addEventListener('hardwareBackPress', onBackPress);
+  //     return () => {
+  //       BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+  //     };
+  //   }, [])
+  // );
+
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        setExitModalVisible(true);
+        Alert.alert(
+          'Sair do aplicativo?',
+          'Você realmente deseja fechar o app?',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Sair',
+              onPress: () => BackHandler.exitApp(),
+              style: 'destructive',
+            },
+          ]
+        );
         return true;
       };
+
       BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => {
         BackHandler.removeEventListener('hardwareBackPress', onBackPress);
@@ -59,7 +85,7 @@ export default function HomeScreen() {
   );
 
   const confirmExit = () => BackHandler.exitApp();
-  const cancelExit = () => setExitModalVisible(false);
+  // const cancelExit = () => setExitModalVisible(false);
 
   const handleNavigateWithFade = (path: Parameters<typeof router.push>[0]) => {
     opacity.value = withTiming(0, { duration: 300 }, () => {
@@ -144,35 +170,37 @@ export default function HomeScreen() {
             />
           </View>
         </Animated.View>
-      </SafeAreaView>
+        {/* <Modal
+          visible={exitModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={cancelExit}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Sair do aplicativo?</Text>
+              <Text style={styles.modalMessage}>
+                Você realmente deseja fechar o app?
+              </Text>
 
-      <Modal
-        visible={exitModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={cancelExit}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Sair do aplicativo?</Text>
-            <Text style={styles.modalMessage}>
-              Você realmente deseja fechar o app?
-            </Text>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                onPress={cancelExit}
-                style={styles.cancelButton}
-              >
-                <Text style={styles.cancelText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={confirmExit} style={styles.exitButton}>
-                <Text style={styles.exitText}>Sair</Text>
-              </TouchableOpacity>
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  onPress={cancelExit}
+                  style={styles.cancelButton}
+                >
+                  <Text style={styles.cancelText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={confirmExit}
+                  style={styles.exitButton}
+                >
+                  <Text style={styles.exitText}>Sair</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal> */}
+      </SafeAreaView>
     </LinearGradient>
   );
 }
@@ -222,10 +250,10 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 24 : 0,
   },
   modalCard: {
     width: '100%',
@@ -233,12 +261,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 24,
+    paddingTop:
+      Platform.OS === 'android' ? 24 + (RNStatusBar.currentHeight ?? 0) : 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 8,
   },
+
   modalTitle: {
     fontSize: 18,
     fontFamily: 'Inter-Bold',
