@@ -69,7 +69,8 @@ export function useEventAccess(title?: string, accessCode?: string) {
         eventFound.id,
         userEmail
       );
-      if (participation) {
+
+      if (participation?.mode) {
         const status =
           participation.mode === 'confirmado' ? 'confirmed' : 'interested';
         setGuestStatus(status);

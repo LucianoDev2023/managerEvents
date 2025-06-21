@@ -631,7 +631,8 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
   // Buscar participação específica de usuário em evento
   const getGuestParticipation = async (eventId: string, userEmail: string) => {
     try {
-      const docId = `${userEmail}_${eventId}`;
+      const safeEmail = userEmail.toLowerCase().trim();
+      const docId = `${eventId}_${safeEmail}`;
       const ref = doc(db, 'guestParticipations', docId);
       const snapshot = await getDoc(ref);
       return snapshot.exists() ? (snapshot.data() as GuestParticipation) : null;
