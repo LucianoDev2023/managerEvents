@@ -66,7 +66,6 @@ export default function FoundEventScreen() {
         guestFamily
       );
 
-      await refetchAccess(); // <== força atualização após confirmar
       setShowConfetti(true);
     } catch (error) {
       console.error('Erro ao confirmar presença:', error);

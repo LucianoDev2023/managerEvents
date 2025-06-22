@@ -281,8 +281,8 @@ export default function MyEventsScreen() {
               }}
               style={styles.shareBtn}
             >
-              {/* <Share2 size={16} color="white" /> */}
-            {/* <Text style={styles.shareBtnText}> {'Enviar '}</Text>
+              {<Share2 size={16} color="white" />}
+              <Text style={styles.shareBtnText}> {'Enviar '}</Text>
               <QrCode size={16} color="white" />
             </Pressable> */}
             {item.accessCode && (

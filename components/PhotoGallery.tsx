@@ -282,7 +282,20 @@ export default function PhotoGallery({
                         </Text>
                         {canDeleteComment(comment) && (
                           <TouchableOpacity
-                            onPress={() => deleteComment(comment)}
+                            onPress={() => {
+                              Alert.alert(
+                                'Confirmar exclusão',
+                                'Deseja excluir este comentário?',
+                                [
+                                  { text: 'Cancelar', style: 'cancel' },
+                                  {
+                                    text: 'Excluir',
+                                    style: 'destructive',
+                                    onPress: () => deleteComment(comment),
+                                  },
+                                ]
+                              );
+                            }}
                             disabled={isDeletingCommentIds.includes(comment.id)}
                           >
                             <Text style={styles.commentActionText}>

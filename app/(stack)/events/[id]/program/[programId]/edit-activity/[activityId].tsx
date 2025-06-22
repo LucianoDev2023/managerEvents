@@ -32,7 +32,10 @@ export default function EditActivityScreen() {
     activityId: string;
   }>();
 
-  const { state, updateActivity, deleteActivity } = useEvents();
+  // const { state, updateActivity, deleteActivity } = useEvents();
+  const { state, updateActivity, deleteActivity, refetchEventById } =
+    useEvents();
+
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -149,11 +152,14 @@ export default function EditActivityScreen() {
         description: formValues.description,
       });
 
+      await refetchEventById(id);
+
       Alert.alert('Atualização', 'Essa atividade foi atualizada com sucesso.', [
         { text: 'OK', onPress: () => router.back() },
       ]);
-    } catch (error) {
-      Alert.alert('Erro', 'Falha ao atualizar atividade.');
+    } catch (error: any) {
+      console.error('Erro ao atualizar atividade:', error);
+      Alert.alert('Erro', error?.message ?? 'Falha ao atualizar atividade.');
     } finally {
       setIsSubmitting(false);
     }
@@ -298,6 +304,7 @@ export default function EditActivityScreen() {
           value={formValues.title}
           onChangeText={(text) => updateFormValue('title', text)}
           error={errors.title}
+          inputStyle={{ color: colors.text }}
         />
 
         <TextInput
@@ -307,6 +314,7 @@ export default function EditActivityScreen() {
           onChangeText={(text) => updateFormValue('description', text)}
           multiline
           numberOfLines={4}
+          inputStyle={{ color: colors.text }}
         />
 
         <View style={styles.buttonsContainer}>

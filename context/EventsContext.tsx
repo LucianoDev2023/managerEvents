@@ -512,12 +512,23 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     programId: string,
     activity: Activity
   ) => {
-    await updateDoc(doc(db, 'activities', activity.id), {
+    const activityRef = doc(
+      db,
+      'events',
+      eventId,
+      'programs',
+      programId,
+      'activities',
+      activity.id
+    );
+
+    await updateDoc(activityRef, {
       title: activity.title,
       time: activity.time,
       description: activity.description,
     });
-    await await loadActivitiesByProgramId(eventId, programId);
+
+    await loadActivitiesByProgramId(eventId, programId);
   };
 
   const deleteActivity = async (

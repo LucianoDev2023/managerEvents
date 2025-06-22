@@ -7,9 +7,10 @@ import {
   Platform,
   Share,
   Alert,
+  Pressable,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { SendHorizontalIcon, Share2 } from 'lucide-react-native';
+import { SendHorizontalIcon } from 'lucide-react-native';
 
 type ShareEventButtonProps = {
   title: string;
@@ -48,16 +49,23 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+      <Pressable
+        onPress={handleShare}
+        style={({ pressed }) => [
+          styles.shareBtn,
+          pressed && { opacity: 0.7 }, // exemplo de feedback visual
+        ]}
+      >
         <SendHorizontalIcon size={16} color="#fff" />
-        <Text style={styles.shareText}>Compartilhar</Text>
-      </TouchableOpacity>
+        <Text style={styles.shareText}> Compartilhar</Text>
+      </Pressable>
 
+      {/* 
       {showCopyLink && (
-        <TouchableOpacity style={styles.copyBtn} onPress={handleCopyLink}>
+        <Pressable style={styles.copyBtn} onPress={handleCopyLink}>
           <Text style={styles.copyText}>Copiar link</Text>
-        </TouchableOpacity>
-      )}
+        </Pressable>
+      )} */}
     </View>
   );
 };
@@ -68,15 +76,13 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     gap: 8,
-    marginTop: 8,
   },
   shareBtn: {
-    flex: 1,
     flexDirection: 'row',
     backgroundColor: '#25D366',
     alignItems: 'center',
-    justifyContent: 'space-evenly',
-    paddingVertical: 6,
+    justifyContent: 'center',
+    paddingVertical: 5,
     paddingHorizontal: 8,
     borderRadius: 10,
   },
@@ -85,6 +91,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontSize: 13,
   },
+
   copyBtn: {
     marginTop: 4,
   },
