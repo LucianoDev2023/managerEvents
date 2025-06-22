@@ -57,7 +57,7 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({
         onPress={() => setShowOptions(true)}
         style={({ pressed }) => [
           styles.shareBtn,
-          { backgroundColor: colors.primary },
+          { backgroundColor: '#09960C' },
           pressed && { opacity: 0.8 },
         ]}
       >

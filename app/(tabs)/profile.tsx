@@ -15,7 +15,7 @@ import { useColorScheme } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import CustomDropdown from '@/components/ui/CustomDropdown';
-import { Bell } from 'lucide-react-native';
+import { Bell, HeartHandshake } from 'lucide-react-native';
 import { BackHandler } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -445,6 +445,15 @@ export default function ProfileScreen() {
                 textStyle={{ color: '#f44336' }}
               />
             </View>
+            <Button
+              title="Apoiar o App 💜"
+              icon={<HeartHandshake size={20} color={textColor} />}
+              onPress={() => router.push('/donate')}
+              variant="ghost"
+              fullWidth
+              style={styles.menuButton}
+              textStyle={{ color: textColor }}
+            />
 
             <Text style={[styles.versionText, { color: textSecondary }]}>
               Versão 1.0.0

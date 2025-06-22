@@ -264,69 +264,36 @@ export default function ConfirmedGuestsScreen() {
                   Sem acompanhantes
                 </Text>
               )}
-
-              {(hasPermission ||
-                userEmail?.toLowerCase() === item.userEmail?.toLowerCase()) && (
-                <Pressable
-                  onPress={() => {
-                    if (!item.userEmail) {
-                      Alert.alert('Erro', 'Email do convidado ausente.');
-                      return;
-                    }
-
-                    const isOwn =
-                      userEmail?.toLowerCase() ===
-                      item.userEmail?.toLowerCase();
-
-                    router.push(
-                      userEmail?.toLowerCase() === item.userEmail?.toLowerCase()
-                        ? `/(stack)/events/${id}/edit-my-participation`
-                        : `/(stack)/events/${id}/edit-participation/${item.userEmail}`
-                    );
-                  }}
-                  style={{
-                    marginTop: 8,
-                    alignSelf: 'flex-start',
-                    borderWidth: 1,
-                    borderColor: colors.primary,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 8,
-                  }}
-                >
-                  <Text style={{ color: colors.text2, fontWeight: '600' }}>
-                    ✏️ Editar acompanhantes
-                  </Text>
-                </Pressable>
-              )}
-
-              {(hasPermission ||
-                userEmail?.toLowerCase() === item.userEmail?.toLowerCase()) && (
-                <>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'flex-start',
+                  flexWrap: 'wrap',
+                  marginTop: 12,
+                  gap: 8,
+                }}
+              >
+                {(hasPermission ||
+                  userEmail?.toLowerCase() ===
+                    item.userEmail?.toLowerCase()) && (
                   <Pressable
-                    onPress={() =>
-                      Alert.alert(
-                        item.mode === 'confirmado'
-                          ? 'Mudar para Interessado?'
-                          : 'Confirmar presença?',
-                        item.mode === 'confirmado'
-                          ? 'Você deixará de estar confirmado. Deseja continuar?'
-                          : 'Você será marcado como confirmado no evento.',
-                        [
-                          { text: 'Cancelar', style: 'cancel' },
-                          {
-                            text: 'Sim',
-                            onPress: () =>
-                              updateParticipationMode(
-                                item.id,
-                                item.mode === 'confirmado'
-                                  ? 'acompanhando'
-                                  : 'confirmado'
-                              ),
-                          },
-                        ]
-                      )
-                    }
+                    onPress={() => {
+                      if (!item.userEmail) {
+                        Alert.alert('Erro', 'Email do convidado ausente.');
+                        return;
+                      }
+
+                      const isOwn =
+                        userEmail?.toLowerCase() ===
+                        item.userEmail?.toLowerCase();
+
+                      router.push(
+                        userEmail?.toLowerCase() ===
+                          item.userEmail?.toLowerCase()
+                          ? `/(stack)/events/${id}/edit-my-participation`
+                          : `/(stack)/events/${id}/edit-participation/${item.userEmail}`
+                      );
+                    }}
                     style={{
                       marginTop: 8,
                       alignSelf: 'flex-start',
@@ -338,43 +305,88 @@ export default function ConfirmedGuestsScreen() {
                     }}
                   >
                     <Text style={{ color: colors.text2, fontWeight: '600' }}>
-                      {item.mode === 'confirmado'
-                        ? '👀 Mudar para Interessado'
-                        : '✅ Confirmar presença'}
+                      ✏️ Editar
                     </Text>
                   </Pressable>
+                )}
 
-                  <Pressable
-                    onPress={() =>
-                      Alert.alert(
-                        'Remover convidado?',
-                        'Tem certeza que deseja remover este convidado do evento?',
-                        [
-                          { text: 'Cancelar', style: 'cancel' },
-                          {
-                            text: 'Remover',
-                            style: 'destructive',
-                            onPress: () => removeParticipation(item.id),
-                          },
-                        ]
-                      )
-                    }
-                    style={{
-                      marginTop: 8,
-                      alignSelf: 'flex-start',
-                      borderWidth: 1,
-                      borderColor: colors.primary,
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderRadius: 8,
-                    }}
-                  >
-                    <Text style={{ color: colors.text2, fontWeight: '600' }}>
-                      🗑️ Remover
-                    </Text>
-                  </Pressable>
-                </>
-              )}
+                {(hasPermission ||
+                  userEmail?.toLowerCase() ===
+                    item.userEmail?.toLowerCase()) && (
+                  <>
+                    <Pressable
+                      onPress={() =>
+                        Alert.alert(
+                          item.mode === 'confirmado'
+                            ? 'Mudar para Interessado?'
+                            : 'Confirmar presença?',
+                          item.mode === 'confirmado'
+                            ? 'Você deixará de estar confirmado. Deseja continuar?'
+                            : 'Você será marcado como confirmado no evento.',
+                          [
+                            { text: 'Cancelar', style: 'cancel' },
+                            {
+                              text: 'Sim',
+                              onPress: () =>
+                                updateParticipationMode(
+                                  item.id,
+                                  item.mode === 'confirmado'
+                                    ? 'acompanhando'
+                                    : 'confirmado'
+                                ),
+                            },
+                          ]
+                        )
+                      }
+                      style={{
+                        marginTop: 8,
+                        alignSelf: 'flex-start',
+                        borderWidth: 1,
+                        borderColor: colors.primary,
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text style={{ color: colors.text2, fontWeight: '600' }}>
+                        {item.mode === 'confirmado'
+                          ? '👀 Mudar'
+                          : '✅ Confirmar presença'}
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() =>
+                        Alert.alert(
+                          'Remover convidado?',
+                          'Tem certeza que deseja remover este convidado do evento?',
+                          [
+                            { text: 'Cancelar', style: 'cancel' },
+                            {
+                              text: 'Remover',
+                              style: 'destructive',
+                              onPress: () => removeParticipation(item.id),
+                            },
+                          ]
+                        )
+                      }
+                      style={{
+                        marginTop: 8,
+                        alignSelf: 'flex-start',
+                        borderWidth: 1,
+                        borderColor: colors.primary,
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text style={{ color: colors.text2, fontWeight: '600' }}>
+                        🗑️
+                      </Text>
+                    </Pressable>
+                  </>
+                )}
+              </View>
             </View>
           )}
         />
@@ -414,5 +426,15 @@ const styles = StyleSheet.create({
     marginTop: 24,
     fontSize: 16,
     fontFamily: 'Inter_400Regular',
+  },
+  actionBtn: {
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  actionText: {
+    fontWeight: '600',
+    fontSize: 13,
   },
 });

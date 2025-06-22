@@ -103,41 +103,6 @@ export default function AddGuestScreen() {
         autoCapitalize="none"
       /> */}
 
-      <View style={styles.modeContainer}>
-        <Pressable
-          onPress={() => setMode('confirmado')}
-          style={[
-            styles.modeButton,
-            {
-              backgroundColor:
-                mode === 'confirmado' ? colors.primary : 'transparent',
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <Text style={{ color: mode === 'confirmado' ? '#fff' : colors.text }}>
-            ✅ Confirmado
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setMode('acompanhando')}
-          style={[
-            styles.modeButton,
-            {
-              backgroundColor:
-                mode === 'acompanhando' ? colors.primary : 'transparent',
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <Text
-            style={{ color: mode === 'acompanhando' ? '#fff' : colors.text }}
-          >
-            👀 Interessado
-          </Text>
-        </Pressable>
-      </View>
-
       <TextInput
         placeholder="Acompanhantes (separados por vírgula)"
         placeholderTextColor={colors.textSecondary}

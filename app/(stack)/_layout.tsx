@@ -100,6 +100,18 @@ export default function StackLayout() {
             title: 'Editar acompanhantes',
           }}
         />
+        <Stack.Screen
+          name="events/[id]/add-guest"
+          options={{
+            title: '',
+          }}
+        />
+        <Stack.Screen
+          name="donate"
+          options={{
+            title: 'Doação',
+          }}
+        />
 
         <Stack.Screen
           name="myevents"
