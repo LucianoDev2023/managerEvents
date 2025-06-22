@@ -54,7 +54,6 @@ export default function SelectLocationScreen() {
 
   useEffect(() => {
     const setupLocation = async () => {
-
       if (mode === 'edit' && lat && lng) {
         const latitude = parseFloat(lat);
         const longitude = parseFloat(lng);
@@ -201,7 +200,9 @@ export default function SelectLocationScreen() {
         query={{
           key: GOOGLE_PLACES_API_KEY,
           language: 'pt-BR',
-          components: 'country:br',
+          location: '-15.793889,-47.882778', // Brasília (latitude, longitude)
+          radius: 2000000,
+          // components: 'country:br',
         }}
         fetchDetails
         styles={{
