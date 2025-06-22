@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Pressable,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { getAuth } from 'firebase/auth';
@@ -18,6 +19,7 @@ import ActivityItem from '@/components/ActivityItem';
 import { Event, Program } from '@/types';
 import Animated from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { scheduleNotification } from '@/app/utils/notifications';
 
 export default function ProgramDetailScreen() {
   const { id, programId } = useLocalSearchParams<{
@@ -167,6 +169,7 @@ export default function ProgramDetailScreen() {
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Atividades
             </Text>
+
             {hasPermission && (
               <TouchableOpacity
                 onPress={handleAddActivity}
@@ -207,6 +210,7 @@ export default function ProgramDetailScreen() {
                     programId={program.id}
                     createdBy={event.createdBy}
                     subAdmins={event.subAdmins}
+                    programDate={program.date}
                   />
                 </Animated.View>
               ))

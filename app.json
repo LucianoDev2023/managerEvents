@@ -30,7 +30,8 @@
         "ACCESS_COARSE_LOCATION",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "MEDIA_LIBRARY"
+        "MEDIA_LIBRARY",
+        "NOTIFICATIONS"
       ],
       "package": "com.luciano_dev_2025.gerenciadordeeventos",
       "intentFilters": [

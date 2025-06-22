@@ -14,6 +14,7 @@ import { useColorScheme } from 'react-native';
 import { Activity, SubAdmin } from '@/types';
 import { router } from 'expo-router';
 import { getAuth } from 'firebase/auth';
+import { scheduleNotification } from '@/app/utils/notifications';
 
 interface ActivityItemProps {
   activity: Activity;
@@ -21,6 +22,7 @@ interface ActivityItemProps {
   programId: string;
   createdBy: string;
   subAdmins?: SubAdmin[];
+  programDate: string | Date;
 }
 
 export default function ActivityItem({
@@ -29,6 +31,7 @@ export default function ActivityItem({
   programId,
   createdBy,
   subAdmins = [],
+  programDate, //
 }: ActivityItemProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -81,9 +84,22 @@ export default function ActivityItem({
         <View style={styles.header}>
           <View style={styles.timeContainer}>
             <Clock size={18} color={colors.primary} />
-            <Text style={[styles.time, { color: colors.primary }]}>
+            <Text style={[styles.time, { color: colors.text, marginLeft: 6 }]}>
               {activity.time}
             </Text>
+
+            <Pressable
+              onPress={() =>
+                scheduleNotification({
+                  title: activity.title,
+                  date: programDate,
+                  time: activity.time,
+                })
+              }
+              style={styles.inlineNotifyButton}
+            >
+              <Text style={styles.inlineNotifyButtonText}>🔔</Text>
+            </Pressable>
           </View>
 
           {hasPermission && (
@@ -192,5 +208,20 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+  },
+  inlineNotifyButton: {
+    marginLeft: 12,
+    backgroundColor: '#6e56cf',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  inlineNotifyButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

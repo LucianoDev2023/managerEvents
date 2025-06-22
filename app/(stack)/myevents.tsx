@@ -51,6 +51,7 @@ import {
   getGuestParticipationsByEmail,
   getGuestParticipationsByEventId,
 } from '@/hooks/guestService';
+import { scheduleNotification } from '../utils/notifications';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
