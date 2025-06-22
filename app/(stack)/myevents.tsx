@@ -262,9 +262,7 @@ export default function MyEventsScreen() {
               }}
               style={[styles.mapBtn, { borderColor: colors.border }]}
             >
-              <Text
-                style={[styles.mapBtnText, { color: colors.textSecondary }]}
-              >
+              <Text style={[styles.mapBtnText, { color: colors.text2 }]}>
                 Convidados
               </Text>
             </Pressable>
@@ -289,7 +287,10 @@ export default function MyEventsScreen() {
               <ShareEventButton
                 title={item.title}
                 accessCode={item.accessCode}
-                showCopyLink={false}
+                onShowQRCode={(payload) => {
+                  setQrPayload(payload);
+                  setQrVisible(true);
+                }}
               />
             )}
 

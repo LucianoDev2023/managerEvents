@@ -70,6 +70,7 @@ export default function QRScannerScreen() {
     if (scanned) return;
 
     setScanned(true);
+    console.log(qrData);
     try {
       router.replace({
         pathname: '/(newevents)/search',
