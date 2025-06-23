@@ -34,7 +34,7 @@ const SIDE_SPACING = (SCREEN_WIDTH - MOCKUP_WIDTH) / 4;
 const features = [
   'Gerencie seus eventos',
   'Controle de convidados e presença',
-  'Compartilhamento por QR Code e WhatsApp',
+  'Compartilhamento por QR Code ou link',
   'Galeria privada de fotos por atividade',
   'Administração por múltiplos usuários',
   'Perfeito para todo tipo de evento: aniversários, casamentos, encontros sociais ou confraternizações',

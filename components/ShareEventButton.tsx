@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 6,
     paddingHorizontal: 14,
-    borderRadius: 14,
+    borderRadius: 10,
   },
   shareText: {
     color: '#fff',

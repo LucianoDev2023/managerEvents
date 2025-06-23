@@ -426,6 +426,15 @@ export default function ProfileScreen() {
               Conta
             </Text>
             <View style={styles.card}>
+              <Button
+                title="Apoiar o App 💜"
+                icon={<HeartHandshake size={20} color={textColor} />}
+                onPress={() => router.push('/donate')}
+                variant="ghost"
+                fullWidth
+                style={styles.menuButton}
+                textStyle={{ color: textColor }}
+              />
               {/* <Button
                 title="Limpar Tudo"
                 icon={<Trash2 size={20} color="#f44336" />}
@@ -445,15 +454,6 @@ export default function ProfileScreen() {
                 textStyle={{ color: '#f44336' }}
               />
             </View>
-            <Button
-              title="Apoiar o App 💜"
-              icon={<HeartHandshake size={20} color={textColor} />}
-              onPress={() => router.push('/donate')}
-              variant="ghost"
-              fullWidth
-              style={styles.menuButton}
-              textStyle={{ color: textColor }}
-            />
 
             <Text style={[styles.versionText, { color: textSecondary }]}>
               Versão 1.0.0

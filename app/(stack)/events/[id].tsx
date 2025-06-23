@@ -125,6 +125,28 @@ export default function EventDetailScreen() {
     }
   };
 
+  const handleDeleteEvent = () => {
+    Alert.alert(
+      'Excluir Evento',
+      'Tem certeza que deseja excluir este evento? Essa ação não poderá ser desfeita.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteEvent(event!.id);
+              router.replace('/'); // ou router.back(), dependendo do fluxo
+            } catch (error) {
+              Alert.alert('Erro', 'Não foi possível excluir o evento.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (!event || isLoading) {
     return (
       <Animated.View
@@ -184,7 +206,7 @@ export default function EventDetailScreen() {
                   <Edit size={20} color={colors.text} />
                 </TouchableOpacity>
                 {event.createdBy === userEmail && (
-                  <TouchableOpacity onPress={() => deleteEvent(event.id)}>
+                  <TouchableOpacity onPress={handleDeleteEvent}>
                     <Trash2 size={20} color={colors.error} />
                   </TouchableOpacity>
                 )}
