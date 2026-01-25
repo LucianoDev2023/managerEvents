@@ -188,7 +188,7 @@ export default function PermissionConfirmationScreen() {
 
       setGuestParts(normalized);
     } catch (e) {
-      console.error('loadGuests:', e);
+      console.error('loadGuestsaas', e);
       Alert.alert('Erro', 'Não foi possível carregar os convidados.');
       setGuestParts([]);
     } finally {
