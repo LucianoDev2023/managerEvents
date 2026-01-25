@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -20,6 +20,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { Calendar, CalendarRange, Info, MapPin } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import type { Href } from 'expo-router';
 
 import { useEvents } from '@/context/EventsContext';
 import Colors from '@/constants/Colors';
@@ -75,25 +76,26 @@ export default function EventFormScreen() {
       startDate: new Date(),
       endDate: new Date(new Date().setDate(new Date().getDate() + 1)),
       description: '',
-      accessCode: '',
       coverImage: '',
-      userId: '',
-      createdBy: '',
     },
   });
-  useEffect(() => {
-    if (user) {
-      reset((prev) => ({
-        ...prev,
-        userId: user.uid,
-        createdBy: user.email?.toLowerCase() ?? '',
-      }));
-    }
-  }, [user]);
+  // useEffect(() => {
+  //   if (user) {
+  //     reset((prev) => ({
+  //       ...prev,
+  //       userId: user.uid,
+  //       createdBy: user.email?.toLowerCase() ?? '',
+  //     }));
+  //   }
+  // }, [user]);
 
   const startDate = watch('startDate');
   const endDate = watch('endDate');
   const coverImage = watch('coverImage');
+
+  const onInvalid = (formErrors: any) => {
+    Alert.alert('Ops', 'Existem campos inválidos. Verifique os erros.');
+  };
 
   useEffect(() => {
     if (mode === 'edit' && id) {
@@ -119,6 +121,10 @@ export default function EventFormScreen() {
     });
 
   const onSubmit = async (data: EventFormValues) => {
+    if (isUploadingCover) {
+      Alert.alert('Aguarde', 'A imagem ainda está sendo enviada.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       if (mode === 'edit') {
@@ -139,15 +145,24 @@ export default function EventFormScreen() {
           id,
         });
 
-        Alert.alert('Sucesso', 'Evento atualizado com sucesso!');
-        router.replace(`/events/${id}`);
+        Alert.alert('Sucesso', 'Evento atualizado com sucesso!', [
+          { text: 'OK', onPress: () => handleNavigate(id) },
+        ]);
       } else {
-        const newEventId = await addEvent({
-          ...data,
-          description: data.description ?? '', // força ser string
-        });
-        Alert.alert('Sucesso', 'Evento criado com sucesso!');
-        router.replace(`/events/${newEventId}`);
+        const newId = await addEvent({
+          title: data.title,
+          location: data.location,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          description: data.description,
+
+          coverImage: data.coverImage ?? '',
+          userId: user.uid,
+        } as any);
+
+        Alert.alert('Sucesso', 'Evento criado com sucesso!', [
+          { text: 'OK', onPress: () => handleNavigate(newId) },
+        ]);
       }
     } catch (error) {
       console.error('Erro ao salvar evento:', error);
@@ -156,6 +171,16 @@ export default function EventFormScreen() {
       setIsSubmitting(false);
     }
   };
+
+  const handleNavigate = useCallback(
+    (eventId: string) => {
+      router.replace({
+        pathname: '/(stack)/events/[id]',
+        params: { id: eventId },
+      } as unknown as Href);
+    },
+    [router],
+  );
 
   return (
     <LinearGradient
@@ -168,20 +193,25 @@ export default function EventFormScreen() {
         contentContainerStyle={{
           padding: 24,
           paddingTop:
-            Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
+            Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 40) : 0,
         }}
         keyboardShouldPersistTaps="handled"
       >
         <Text style={[styles.heading, { color: colors.text }]}>
           {mode === 'edit' ? 'Editar Evento' : 'Criar Evento'}
         </Text>
+        {Object.keys(errors).length > 0 && (
+          <Text style={{ color: colors.error }}>
+            {JSON.stringify(errors, null, 2)}
+          </Text>
+        )}
         <Controller
           control={control}
           name="location"
           render={({ field }) => (
             <TouchableOpacity
               onPress={() =>
-                router.push({
+                router.replace({
                   pathname: '/selectLocationScreen',
                   params: {
                     redirectTo: '(newevents)/event-form',
@@ -200,6 +230,7 @@ export default function EventFormScreen() {
                 editable={false}
                 error={errors.location?.message}
                 icon={<MapPin size={18} color={colors.primary} />}
+                inputStyle={{ color: colors.textSecondary }}
               />
             </TouchableOpacity>
           )}
@@ -214,6 +245,7 @@ export default function EventFormScreen() {
               value={field.value}
               onChangeText={field.onChange}
               error={errors.title?.message}
+              inputStyle={{ color: colors.textSecondary }}
             />
           )}
         />
@@ -314,12 +346,13 @@ export default function EventFormScreen() {
               onChangeText={field.onChange}
               multiline
               numberOfLines={4}
-              // icon={<Info size={20} color={colors.primary} />}
+              icon={<Info size={20} color={colors.primary} />}
+              inputStyle={{ color: colors.textSecondary }}
             />
           )}
         />
 
-        <Controller
+        {/* <Controller
           control={control}
           name="accessCode"
           render={({ field }) => (
@@ -329,60 +362,103 @@ export default function EventFormScreen() {
               value={field.value}
               onChangeText={field.onChange}
               error={errors.accessCode?.message}
+              inputStyle={{ color: colors.textSecondary }}
             />
           )}
-        />
+        /> */}
 
-        <TouchableOpacity
-          style={[
-            styles.imageSelectorSmall,
-            {
-              borderColor: colors.border,
-            },
-          ]}
-          activeOpacity={0.7}
-          onPress={async () => {
-            const result = await ImagePicker.launchImageLibraryAsync({
-              allowsEditing: true,
-              quality: 0.8,
-              aspect: [2, 1], // proporção menor
-            });
+        {/* ======== Cover Image ======== */}
+        {!coverImage ? (
+          // Estado: sem imagem (dropzone grande)
+          <TouchableOpacity
+            style={[
+              styles.imageDropzone,
+              {
+                borderColor: colors.border,
+                opacity: isUploadingCover ? 0.6 : 1,
+              },
+            ]}
+            activeOpacity={0.7}
+            disabled={isUploadingCover}
+            onPress={async () => {
+              const result = await ImagePicker.launchImageLibraryAsync({
+                allowsEditing: true,
+                quality: 0.8,
+                aspect: [2, 1],
+              });
 
-            if (!result.canceled) {
-              try {
-                setIsUploadingCover(true);
-                const { uri } = await uploadImageToCloudinary(
-                  result.assets[0].uri
-                );
-                setValue('coverImage', uri);
-              } catch {
-                Alert.alert('Erro ao enviar imagem');
-              } finally {
-                setIsUploadingCover(false);
+              if (!result.canceled) {
+                try {
+                  setIsUploadingCover(true);
+                  const { uri } = await uploadImageToCloudinary(
+                    result.assets[0].uri,
+                  );
+                  setValue('coverImage', uri, { shouldValidate: true });
+                } catch {
+                  Alert.alert('Erro', 'Erro ao enviar imagem');
+                } finally {
+                  setIsUploadingCover(false);
+                }
               }
-            }
-          }}
-        >
-          <Text style={styles.imageSelectorSmallText}>
-            {isUploadingCover
-              ? 'Enviando...'
-              : coverImage
-              ? 'Alterar imagem'
-              : 'Selecionar foto'}
-          </Text>
-        </TouchableOpacity>
-
-        {coverImage && (
-          <Image
-            source={{ uri: coverImage }}
-            style={{
-              width: '100%',
-              height: 200,
-              marginVertical: 12,
-              borderRadius: 8,
             }}
-          />
+          >
+            <Text style={styles.imageDropzoneText}>
+              {isUploadingCover ? 'Enviando...' : 'Selecionar foto'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          // Estado: com imagem (preview + botão pequeno)
+          <View style={{ marginBottom: 12 }}>
+            <Image source={{ uri: coverImage }} style={styles.coverPreview} />
+
+            <TouchableOpacity
+              style={[
+                styles.changeImageBtn,
+                {
+                  borderColor: colors.border,
+                  backgroundColor:
+                    colorScheme === 'dark'
+                      ? 'rgba(0,0,0,0.45)'
+                      : 'rgba(255,255,255,0.75)',
+                  opacity: isUploadingCover ? 0.7 : 1,
+                },
+              ]}
+              activeOpacity={0.8}
+              disabled={isUploadingCover}
+              onPress={async () => {
+                const result = await ImagePicker.launchImageLibraryAsync({
+                  allowsEditing: true,
+                  quality: 0.8,
+                  aspect: [2, 1],
+                });
+
+                if (!result.canceled) {
+                  try {
+                    setIsUploadingCover(true);
+                    const { uri } = await uploadImageToCloudinary(
+                      result.assets[0].uri,
+                    );
+                    setValue('coverImage', uri, { shouldValidate: true });
+                  } catch {
+                    Alert.alert('Erro', 'Erro ao enviar imagem');
+                  } finally {
+                    setIsUploadingCover(false);
+                  }
+                }
+              }}
+            >
+              <Text
+                style={[
+                  styles.changeImageBtnText,
+                  { color: colorScheme === 'dark' ? '#fff' : '#111' },
+                ]}
+              >
+                {isUploadingCover ? 'Enviando...' : 'Alterar imagem'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
+
         {errors.coverImage && (
           <Text style={{ color: colors.error }}>
             {errors.coverImage.message}
@@ -398,14 +474,21 @@ export default function EventFormScreen() {
         >
           <Button
             title="Cancelar"
-            onPress={() => router.back()}
+            onPress={() => {
+              if (mode === 'edit' && id) {
+                router.replace(`/(stack)/events/${id}` as Href);
+              } else {
+                router.back();
+              }
+            }}
             variant="cancel"
             style={{ flex: 0.48 }}
           />
           <Button
             title={mode === 'edit' ? 'Salvar' : 'Criar evento'}
-            onPress={handleSubmit(onSubmit)}
+            onPress={handleSubmit(onSubmit, onInvalid)}
             style={{ flex: 0.48 }}
+            disabled={isSubmitting || isUploadingCover}
           />
         </View>
       </ScrollView>
@@ -476,5 +559,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     fontFamily: 'Inter_500Medium',
+  },
+  imageDropzone: {
+    width: '100%',
+    aspectRatio: 2,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    marginBottom: 12,
+  },
+  imageDropzoneText: {
+    fontSize: 14,
+    color: '#999',
+    fontFamily: 'Inter_500Medium',
+  },
+  coverPreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    backgroundColor: '#222',
+  },
+  changeImageBtn: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  changeImageBtnText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
   },
 });

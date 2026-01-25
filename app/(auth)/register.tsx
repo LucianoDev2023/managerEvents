@@ -7,12 +7,16 @@ import {
   Keyboard,
   StyleSheet,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { useRegistrationFlow } from '@/context/RegistrationFlowContext';
+import { doc, setDoc, Timestamp } from 'firebase/firestore';
+import { db } from '@/config/firebase';
+import { serverTimestamp } from 'firebase/firestore';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -22,7 +26,11 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const PRIVACY_VERSION = 'v1.0';
+  const TERMS_VERSION = 'v1.0';
 
   const handleRegister = async () => {
     Keyboard.dismiss();
@@ -37,11 +45,20 @@ export default function RegisterScreen() {
       return;
     }
 
+    // ✅ LGPD: bloqueio obrigatório
+    if (!acceptedTerms) {
+      alert(
+        'Você precisa aceitar a Política de Privacidade e os Termos de Uso.'
+      );
+      return;
+    }
+
     setLoading(true);
+
     try {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        email,
+        email.trim(),
         password
       );
 
@@ -49,7 +66,30 @@ export default function RegisterScreen() {
         displayName: name,
       });
 
-      // ✅ Marca que veio da tela de registro
+      // ✅ LGPD: salvar aceite no Firestore
+      await setDoc(
+        doc(db, 'users', userCredential.user.uid),
+        {
+          name,
+          privacyAcceptedAt: Timestamp.now(),
+          privacyVersion: PRIVACY_VERSION,
+          termsAcceptedAt: Timestamp.now(),
+          termsVersion: TERMS_VERSION,
+          createdAt: Timestamp.now(),
+        },
+        { merge: true }
+      );
+
+      await setDoc(
+        doc(db, 'publicUsers', userCredential.user.uid),
+        {
+          uid: userCredential.user.uid,
+          emailLower: email.trim().toLowerCase(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
       setCameFromRegister(true);
       router.replace('/accountCreatedScreen');
     } catch (error: any) {
@@ -103,6 +143,33 @@ export default function RegisterScreen() {
         secureTextEntry
       />
 
+      {/* ✅ LGPD: aceite explícito */}
+      <Pressable
+        style={styles.checkboxContainer}
+        onPress={() => setAcceptedTerms((prev) => !prev)}
+      >
+        <View
+          style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}
+        />
+        <Text style={styles.checkboxText}>
+          Li e aceito a{' '}
+          <Text
+            style={styles.link}
+            onPress={() => router.push('/(auth)/privacidade')}
+          >
+            Política de Privacidade
+          </Text>{' '}
+          e os{' '}
+          <Text
+            style={styles.link}
+            onPress={() => router.push('/(auth)/termos')}
+          >
+            Termos de Uso
+          </Text>
+          .
+        </Text>
+      </Pressable>
+
       <TouchableOpacity
         onPress={handleRegister}
         style={styles.registerButton}
@@ -141,7 +208,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '600',
     color: '#fff',
-    marginBottom: 32,
+    marginBottom: 28,
   },
   input: {
     backgroundColor: '#1f1f25',
@@ -150,8 +217,40 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 14,
   },
+
+  // ✅ LGPD checkbox
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 10,
+    marginBottom: 14,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#b18aff',
+    marginRight: 10,
+    marginTop: 3,
+  },
+  checkboxChecked: {
+    backgroundColor: '#b18aff',
+  },
+  checkboxText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    lineHeight: 16,
+    flex: 1,
+  },
+  link: {
+    color: '#b18aff',
+    textDecorationLine: 'underline',
+    fontWeight: '600',
+  },
+
   registerButton: {
     backgroundColor: '#b18aff',
     borderRadius: 25,
@@ -159,7 +258,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 14,
-    marginTop: 20,
+    marginTop: 6,
   },
   registerText: {
     color: '#fff',

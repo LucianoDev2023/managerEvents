@@ -17,20 +17,15 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.luciano_dev_2025.gerenciadordeeventos",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização para exibir o mapa corretamente.",
-        "NSLocationAlwaysUsageDescription": "Permita acesso à sua localização mesmo em segundo plano."
+        "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização para exibir o mapa corretamente."
       },
       "associatedDomains": ["applinks:planejeja.com.br"]
     },
     "android": {
       "permissions": [
         "CAMERA",
-        "RECORD_AUDIO",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "MEDIA_LIBRARY",
         "NOTIFICATIONS"
       ],
       "package": "com.luciano_dev_2025.gerenciadordeeventos",
@@ -46,15 +41,13 @@
         },
         {
           "action": "VIEW",
-          "data": {
-            "scheme": "planejeja"
-          },
+          "data": [{ "scheme": "planejeja" }],
           "category": ["BROWSABLE", "DEFAULT"]
         }
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyD_UKirzoq-kOOBaxo63sct1QbH-46zvTs"
+          "apiKey": "AIzaSyAUJ6vHju5u1F6h1Y_nRqx2aUSaRlpC7y4"
         }
       },
       "backgroundColor": "#3e1d73"
@@ -72,7 +65,7 @@
         {
           "cameraPermission": "Permissão para acessar a câmera é necessária",
           "microphonePermission": "Permissão para acessar o microfone é necessária",
-          "recordAudioAndroid": true
+          "recordAudioAndroid": false
         }
       ],
       "expo-font",

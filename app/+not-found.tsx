@@ -1,30 +1,61 @@
-import { useEffect } from 'react';
-import { Stack, router } from 'expo-router';
+import { useEffect, useRef } from 'react';
+import { Stack, router, usePathname, useSegments } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 
 export default function NotFoundScreen() {
-  useEffect(() => {
-    const redirectIfValid = async () => {
-      const url = await Linking.getInitialURL();
-      if (url) {
-        const parsed = Linking.parse(url);
-        const title = parsed.queryParams?.title as string;
-        const code = parsed.queryParams?.code as string;
+  const handledRef = useRef(false);
 
-        if (title && code) {
-          router.replace({
-            pathname: '/(newevents)/search',
-            params: { title, accessCode: code },
-          });
-        } else {
-          router.replace('/');
-        }
-      }
+  useEffect(() => {
+    const safeReplaceHome = () => {
+      if (handledRef.current) return;
+      handledRef.current = true;
+      router.replace('/');
     };
 
-    redirectIfValid();
+    const safeReplaceSearch = (title: string, accessCode: string) => {
+      if (handledRef.current) return;
+      handledRef.current = true;
+      router.replace({
+        pathname: '/(newevents)/search',
+        params: { title, accessCode },
+      });
+    };
+
+    const handleUrlOnce = (url: string) => {
+      if (handledRef.current) return;
+
+      const parsed = Linking.parse(url);
+
+      const titleRaw = parsed.queryParams?.title;
+      const codeRaw =
+        parsed.queryParams?.code ?? parsed.queryParams?.accessCode;
+
+      const title = typeof titleRaw === 'string' ? titleRaw.trim() : '';
+      const accessCode = typeof codeRaw === 'string' ? codeRaw.trim() : '';
+
+      if (title && accessCode) safeReplaceSearch(title, accessCode);
+      else safeReplaceHome();
+    };
+
+    // Timeout de segurança (não prende em loading)
+    const t = setTimeout(() => safeReplaceHome(), 1500);
+
+    Linking.getInitialURL()
+      .then((url) => {
+        if (url) handleUrlOnce(url);
+        else safeReplaceHome();
+      })
+      .catch(() => safeReplaceHome())
+      .finally(() => clearTimeout(t));
+
+    return () => clearTimeout(t);
   }, []);
+  const pathname = usePathname();
+  const segments = useSegments();
+
+  console.log('🧨 NOT FOUND pathname:', pathname);
+  console.log('🧨 NOT FOUND segments:', segments);
 
   return (
     <>
@@ -44,8 +75,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
-  text: {
-    fontSize: 18,
-    marginTop: 10,
-  },
+  text: { fontSize: 18, marginTop: 10 },
 });

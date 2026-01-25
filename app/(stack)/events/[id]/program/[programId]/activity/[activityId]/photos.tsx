@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { getAuth } from 'firebase/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEvents } from '@/context/EventsContext';
+import type { PermissionLevel } from '@/types';
 
 export default function ActivityPhotosScreen() {
   const { id, programId, activityId } = useLocalSearchParams<{
@@ -30,37 +31,77 @@ export default function ActivityPhotosScreen() {
   const { state, deletePhoto, refetchEventById } = useEvents();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const isFetchingRef = useRef(false);
 
-  useEffect(() => {
-    const fetchUpdatedEvent = async () => {
-      setIsLoading(true);
-      await refetchEventById(id);
-      setIsLoading(false);
-    };
-    fetchUpdatedEvent();
-  }, [id]);
+  const uid = getAuth().currentUser?.uid ?? '';
 
-  const event = state.events.find((e) => e.id === id);
-  const program = event?.programs.find((p) => p.id === programId);
-  const activity = program?.activities.find((a) => a.id === activityId);
+  const event = useMemo(
+    () => state.events.find((e) => e.id === id),
+    [state.events, id]
+  );
+  const program = useMemo(
+    () => event?.programs.find((p) => p.id === programId),
+    [event, programId]
+  );
+  const activity = useMemo(
+    () => program?.activities.find((a) => a.id === activityId),
+    [program, activityId]
+  );
   const photos = activity?.photos ?? [];
 
-  const authUser = getAuth().currentUser;
-  const userEmail = authUser?.email?.toLowerCase() ?? '';
-  const isCreator = event?.createdBy?.toLowerCase() === userEmail;
+  // ✅ novo padrão de permissão: UID
+  const myLevel: PermissionLevel | null = useMemo(() => {
+    if (!event || !uid) return null;
+    return (event.subAdminsByUid?.[uid] as PermissionLevel | undefined) ?? null;
+  }, [event, uid]);
 
-  if (isLoading) {
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchUpdatedEvent = async () => {
+      if (!id || isFetchingRef.current) return;
+
+      isFetchingRef.current = true;
+
+      try {
+        // 👇 só mostra loading se ainda não tem evento
+        if (!event) setInitialLoading(true);
+
+        await refetchEventById(id);
+      } finally {
+        if (!cancelled) {
+          setInitialLoading(false);
+          isFetchingRef.current = false;
+        }
+      }
+    };
+
+    fetchUpdatedEvent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]); // ⚠️ REMOVE refetchEventById daqui
+
+  const isCreator = !!event && !!uid && event.userId === uid;
+  const isSuperAdmin = isCreator || myLevel === 'Super Admin';
+
+  // regra de deleção (você pode ajustar)
+  const canDeletePhotos = isSuperAdmin;
+
+  const gradientColors =
+    colorScheme === 'dark'
+      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
+      : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
+
+  if (initialLoading && !event) {
     return (
       <View style={styles.centeredContent}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text
-          style={[
-            styles.emptyText,
-            { color: colors.textSecondary, marginTop: 12 },
-          ]}
-        >
+        <Text style={{ marginTop: 12, color: colors.textSecondary }}>
           Carregando fotos...
         </Text>
       </View>
@@ -70,15 +111,11 @@ export default function ActivityPhotosScreen() {
   if (!event || !program || !activity) {
     return (
       <LinearGradient
-        colors={
-          colorScheme === 'dark'
-            ? ['#0b0b0f', '#1b0033', '#3e1d73']
-            : ['#ffffff', '#f0f0ff', '#e9e6ff']
-        }
+        colors={gradientColors}
         style={{ flex: 1 }}
         locations={[0, 0.6, 1]}
       >
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.notFoundContainer}>
           <Text
             style={{ color: colors.text, textAlign: 'center', marginTop: 40 }}
           >
@@ -89,15 +126,42 @@ export default function ActivityPhotosScreen() {
     );
   }
 
-  const handleDeletePhoto = async (photo: { id: string; publicId: string }) => {
-    setDeletingPhotoId(photo.id);
+  const handleDeletePhoto = async (photoId: string, publicId?: string) => {
+    // ✅ Permissão robusta:
+    // - super admin
+    // - criador do evento
+    // - criador da foto (se conseguir localizar)
+    const photo = photos.find((p) => p.id === photoId);
+    const isPhotoCreator = !!photo && photo.createdBy === uid;
+    const isEventCreator = event.userId === uid;
+
+    const canDelete = isSuperAdmin || isEventCreator || isPhotoCreator;
+
+    if (!canDelete) {
+      Alert.alert(
+        'Sem permissão',
+        'Apenas o criador do evento, o criador da foto ou Super Admin pode excluir fotos.'
+      );
+      return;
+    }
+
+    setDeletingPhotoId(photoId);
+
     try {
-      // await deletePhoto(event.id, program.id, photo.id);
-      await refetchEventById(event.id); // atualiza a lista após exclusão
+      await deletePhoto(event.id, program.id, activity.id, photoId);
+
+      // (Opcional) se você também apaga no Cloudinary e tiver função pra isso, use publicId aqui.
+      // if (publicId) await deleteFromCloudinary(publicId);
+
+      Alert.alert('OK', 'Foto deletada com sucesso');
+      await refetchEventById(event.id);
+    } catch (e: any) {
+      Alert.alert('Erro ao deletar', e?.message ?? String(e));
     } finally {
       setDeletingPhotoId(null);
     }
   };
+  const isDeleting = !!deletingPhotoId;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -105,47 +169,50 @@ export default function ActivityPhotosScreen() {
         options={{
           headerShown: true,
           headerTitle: 'Fotos',
-          headerTitleStyle: { fontFamily: 'Inter-Bold', fontSize: 18 },
           headerLeft: () => (
             <TouchableOpacity
               onPress={() => router.back()}
               style={{ padding: 8 }}
             >
-              <ArrowLeft size={24} color={colors.text} />
+              <ArrowLeft size={24} color={colors.primary} />
             </TouchableOpacity>
           ),
         }}
       />
 
       <ScrollView
-        contentContainerStyle={{
-          padding: 0,
-          paddingBottom: 16,
-        }}
+        contentContainerStyle={{ paddingBottom: 16 }}
         showsVerticalScrollIndicator={false}
       >
         {photos.length > 0 ? (
           <PhotoGallery
+            eventId={id}
+            programId={programId}
+            activityId={activityId}
             photos={photos}
-            eventId={event.id}
-            programId={program.id}
-            activityId={activity.id}
-            editable
-            isCreator={isCreator}
             onDeletePhoto={handleDeletePhoto}
-            deletingPhotoId={deletingPhotoId}
-            refetchEventById={async () => {
-              await refetchEventById(event.id);
-            }}
+            eventCreatorId={event.userId} // ✅ dono do evento
+            currentUid={uid} // ✅ uid logado
+            isSuperAdmin={isSuperAdmin} // ✅ super admin calculado
           />
         ) : (
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Essa atividade ainda não possui fotos.
+              {isDeleting ? '' : 'Essa atividade ainda não possui fotos.'}
             </Text>
+
             <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
-              onPress={() =>
+              style={[
+                styles.addButton,
+                {
+                  backgroundColor: isDeleting ? colors.border : colors.primary,
+                  opacity: isDeleting ? 0.6 : 1,
+                },
+              ]}
+              disabled={isDeleting}
+              onPress={() => {
+                if (isDeleting) return;
+
                 router.push({
                   pathname:
                     '/(stack)/events/[id]/program/[programId]/activity/[activityId]/add-photo',
@@ -154,12 +221,16 @@ export default function ActivityPhotosScreen() {
                     programId: program.id,
                     activityId: activity.id,
                   },
-                })
-              }
+                });
+              }}
+              activeOpacity={0.9}
             >
-              {deletingPhotoId && <LoadingOverlay message="Excluindo..." />}
-              <Text style={styles.addButtonText}>Adicionar Foto</Text>
+              <Text style={styles.addButtonText}>
+                {isDeleting ? 'Excluindo foto...' : 'Adicionar Foto'}
+              </Text>
             </TouchableOpacity>
+
+            {isDeleting && <LoadingOverlay message="Excluindo..." />}
           </View>
         )}
       </ScrollView>
@@ -168,9 +239,10 @@ export default function ActivityPhotosScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  notFoundContainer: {
+    flex: 1,
     paddingVertical: 8,
-    backgroundColor: '#345677',
+    paddingHorizontal: 16,
   },
   emptyContainer: {
     flex: 1,

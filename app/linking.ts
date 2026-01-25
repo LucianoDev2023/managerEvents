@@ -2,16 +2,29 @@ const linking = {
   prefixes: ['planejeja://', 'https://planejeja.com.br'],
   config: {
     screens: {
+      '(auth)': {
+        screens: {
+          invite: 'invite', // ✅ adiciona o invite aqui
+        },
+      },
+
+      '(newevents)': {
+        screens: {
+          search: 'search',
+        },
+      },
+
       '(tabs)': {
         screens: {
           myevents: 'myevents',
         },
       },
+
       '(stack)': {
         screens: {
           events: {
             screens: {
-              '[id]': 'event', // corresponde a planejeja://event?title=...&code=...
+              '[id]': 'event',
               new: 'events/new',
             },
           },
@@ -23,18 +36,7 @@ const linking = {
           'qr-scanner': 'qr-scanner',
         },
       },
-      '(newevents)': {
-        screens: {
-          search: 'search',
-        },
-      },
-      '(auth)': {
-        // exemplo se tiver login
-      },
-      '(modulo)': {
-        // se tiver telas aqui também
-      },
-      // rota fallback para erro
+
       '+not-found': '*',
     },
   },

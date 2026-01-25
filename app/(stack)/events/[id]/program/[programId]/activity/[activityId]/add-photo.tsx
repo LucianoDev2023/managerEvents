@@ -119,7 +119,6 @@ export default function AddActivityPhotoScreen() {
     try {
       const { uri, publicId } = await uploadImageToCloudinary(selectedImage);
       await addPhoto(id, programId, activityId, publicId, uri, description);
-      await refetchEventById(id);
 
       Alert.alert(
         'Sucesso',
@@ -146,7 +145,7 @@ export default function AddActivityPhotoScreen() {
             headerTitle: 'Atividade não encontrada',
             headerLeft: () => (
               <TouchableOpacity onPress={() => router.back()}>
-                <ArrowLeft size={24} color={colors.text} />
+                <ArrowLeft size={24} color={colors.primary} />
               </TouchableOpacity>
             ),
           }}
@@ -177,7 +176,7 @@ export default function AddActivityPhotoScreen() {
               onPress={() => router.back()}
               style={styles.headerButton}
             >
-              <ArrowLeft size={24} color={colors.text} />
+              <ArrowLeft size={24} color={colors.primary} />
             </TouchableOpacity>
           ),
         }}

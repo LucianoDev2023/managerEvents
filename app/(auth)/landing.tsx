@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,16 +8,16 @@ import {
   StatusBar as RNStatusBar,
   Pressable,
   Dimensions,
-  AccessibilityRole,
 } from 'react-native';
 import { useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import LottieView from 'lottie-react-native';
+
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Colors from '@/constants/Colors';
 import { Check } from 'lucide-react-native';
+import LottieView from 'lottie-react-native';
 
 const mockups = [
   require('@/assets/kup/mockup1.png'),
@@ -32,12 +32,13 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const SIDE_SPACING = (SCREEN_WIDTH - MOCKUP_WIDTH) / 4;
 
 const features = [
-  'Gerencie seus eventos',
-  'Controle de convidados e presença',
-  'Compartilhamento por QR Code ou link',
-  'Galeria privada de fotos por atividade',
-  'Administração por múltiplos usuários',
-  'Perfeito para todo tipo de evento: aniversários, casamentos, encontros sociais ou confraternizações',
+  'Recebeu um convite? O cadastro é rápido, gratuito e sem complicação',
+  'Organize seus eventos em um só lugar',
+  'Gerencie convidados, presenças e acompanhantes com facilidade',
+  'Convites rápidos via QR Code ou link compartilhável',
+  'Fotos privadas organizadas por atividade do evento',
+  'Permissões inteligentes para múltiplos administradores',
+  'Perfeito para festas, casamentos, encontros e eventos sociais',
 ];
 
 export default function LandingScreen() {
@@ -61,12 +62,13 @@ export default function LandingScreen() {
         animated: true,
       });
     }, 3000);
+
     return () => clearInterval(interval);
   }, []);
 
   const handleNavigate = useCallback(() => {
     router.push('/(auth)/login');
-  }, []);
+  }, [router]);
 
   return (
     <LinearGradient colors={gradientColors} style={styles.gradient}>
@@ -114,7 +116,9 @@ export default function LandingScreen() {
             contentContainerStyle={{
               paddingHorizontal: SIDE_SPACING,
             }}
-            snapToInterval={10}
+            // ⚠️ seu snapToInterval=10 não faz sentido pra largura do card
+            // o correto é snapToInterval={MOCKUP_WIDTH + 10}
+            snapToInterval={MOCKUP_WIDTH + 10}
             decelerationRate="fast"
             scrollEventThrottle={16}
           >
@@ -124,7 +128,7 @@ export default function LandingScreen() {
                 source={img}
                 style={[
                   styles.mockupImage,
-                  index === mockups.length - 1 && { marginRight: 0 }, // remove margem do último
+                  index === mockups.length - 1 && { marginRight: 0 },
                 ]}
                 entering={FadeInDown.delay(300 + index * 100)}
               />
@@ -166,6 +170,7 @@ export default function LandingScreen() {
               loop
               style={styles.lottieButton}
             />
+
             <View style={styles.textOverlay}>
               <Text style={styles.overlayText}>Comece agora</Text>
             </View>
@@ -204,22 +209,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
-  subtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-    fontFamily: 'Inter-Regular',
-    paddingHorizontal: 12,
-  },
   lottieBox: { marginVertical: 20, alignItems: 'center' },
   lottie: { width: 300, height: 150 },
   mockupGallery: { width: '100%' },
-  mockupScroll: { paddingHorizontal: 10, gap: 10 },
   mockupImage: {
     width: MOCKUP_WIDTH,
     height: 380,
     resizeMode: 'contain',
     borderRadius: 16,
-    marginRight: 10, // consistente com o SNAP_INTERVAL
+    marginRight: 10,
   },
   featureList: { width: '100%', paddingHorizontal: 6, marginBottom: 32 },
   featureItem: {
@@ -227,9 +225,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  featureIcon: {
-    marginRight: 10,
-  },
+  featureIcon: { marginRight: 10 },
   featureText: {
     fontSize: 15,
     fontFamily: 'Inter-Regular',

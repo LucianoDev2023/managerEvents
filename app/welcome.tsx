@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,37 +8,43 @@ import {
   StatusBar as RNStatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getAuth } from 'firebase/auth';
-import Colors from '@/constants/Colors';
-import LottieView from 'lottie-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import LottieView from 'lottie-react-native';
+
+import Colors from '@/constants/Colors';
+import { auth } from '@/config/firebase';
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const user = getAuth().currentUser;
-  const name = user?.displayName || user?.email || 'Usuário';
-  const scheme = useColorScheme() ?? 'dark';
+
+  const scheme = (useColorScheme() ?? 'dark') as 'light' | 'dark';
   const theme = Colors[scheme];
 
-  const gradientColors: [string, string, ...string[]] =
-    scheme === 'dark'
+  const gradientColors = useMemo<[string, string, string]>(() => {
+    return scheme === 'dark'
       ? ['#0b0b0f', '#1b0033', '#3e1d73']
       : ['#ffffff', '#f0f0ff', '#e9e6ff'];
+  }, [scheme]);
+
+  const user = auth.currentUser;
+  const name = (user?.displayName?.trim() || 'Usuário').toUpperCase();
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
+    const t = setTimeout(() => {
       router.replace('/(tabs)');
-    }, 6000);
+    }, 2500);
 
-    return () => clearTimeout(timeout);
-  }, []);
+    return () => clearTimeout(t);
+  }, [router]);
+
+  const topPad = Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 0 : 0;
 
   return (
     <LinearGradient
       colors={gradientColors}
       locations={[0, 0.7, 1]}
-      style={styles.container}
+      style={styles.gradient}
     >
       <StatusBar
         translucent
@@ -46,28 +52,21 @@ export default function WelcomeScreen() {
         style={scheme === 'dark' ? 'light' : 'dark'}
       />
 
-      <View
-        style={[
-          styles.content,
-          {
-            paddingTop:
-              Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
-          },
-        ]}
-      >
+      <View style={[styles.container, { paddingTop: topPad }]}>
         <View style={styles.textBlock}>
           <Text style={[styles.welcomeText, { color: theme.text }]}>
             BEM-VINDO!
           </Text>
 
           <Text style={[styles.userName, { color: theme.primary }]}>
-            {name.toUpperCase()}
+            {name}
           </Text>
 
           <Text style={[styles.subtitle, { color: theme.text }]}>
             Esse é seu gerenciador de
           </Text>
-          <Text style={[styles.userName, { color: theme.text }]}>EVENTOS</Text>
+
+          <Text style={[styles.highlight, { color: theme.text }]}>EVENTOS</Text>
         </View>
 
         <LottieView
@@ -82,10 +81,10 @@ export default function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  gradient: {
     flex: 1,
   },
-  content: {
+  container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -93,40 +92,39 @@ const styles = StyleSheet.create({
   },
   textBlock: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 28,
   },
 
   welcomeText: {
     fontSize: 26,
-    fontWeight: 'bold',
     fontFamily: 'Inter-Bold',
-    marginBottom: 8,
     letterSpacing: 1,
     textAlign: 'center',
+    marginBottom: 8,
   },
 
   userName: {
     fontSize: 22,
     fontFamily: 'Inter-SemiBold',
-    marginBottom: 6,
     textAlign: 'center',
+    marginBottom: 10,
   },
 
   subtitle: {
     fontSize: 16,
     fontFamily: 'Inter',
-    opacity: 0.8,
+    opacity: 0.85,
     textAlign: 'center',
   },
 
-  text: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  highlight: {
+    fontSize: 22,
+    fontFamily: 'Inter-Bold',
     textAlign: 'center',
-    lineHeight: 38,
-    marginBottom: 40,
-    fontFamily: 'Inter',
+    marginTop: 6,
+    letterSpacing: 0.5,
   },
+
   lottie: {
     width: 150,
     height: 150,

@@ -1,11 +1,14 @@
 // components/LoadingOverlay.tsx
+import Colors from '@/constants/Colors';
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 
 export default function LoadingOverlay({ message = 'Carregando...' }) {
+  const colorScheme = 'light';
+  const colors = Colors[colorScheme];
   return (
     <View style={styles.overlay}>
-      <ActivityIndicator size="large" color="#fff" />
+      <ActivityIndicator size="large" color={colors.primary} />
       <Text style={styles.text}>{message}</Text>
     </View>
   );

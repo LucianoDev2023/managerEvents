@@ -1,526 +1,518 @@
-import React, { useState, useEffect } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   View,
-  Text,
-  StyleSheet,
-  Pressable,
   ActivityIndicator,
-  Modal,
-  ImageBackground,
-  Alert,
-  TextInput,
+  Text,
+  Pressable,
+  Image,
+  ScrollView,
 } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
-import { useEvents } from '@/context/EventsContext';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useColorScheme } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
 import Colors from '@/constants/Colors';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useEventAccessByShareKey } from '@/hooks/useEventAccessByShareKey';
 import { getAuth } from 'firebase/auth';
+import { upsertGuestParticipation } from '@/hooks/guestService';
 import LottieView from 'lottie-react-native';
-import { MapPin, CalendarDays, QrCode } from 'lucide-react-native';
-import { BlurView } from 'expo-blur';
-import { useEventAccess } from '@/hooks/useEventAccess';
+import * as Haptics from 'expo-haptics';
 
-export default function FoundEventScreen() {
-  const [guestFamily, setGuestFamily] = useState<string[]>([]);
-  const [familyInput, setFamilyInput] = useState('');
-  const { accessCode, title } = useLocalSearchParams<{
-    accessCode?: string;
-    title?: string;
-  }>();
-  const { isLoading, eventFound, guestStatus, refetchAccess } = useEventAccess(
-    title,
-    accessCode
+type ChooseMode = 'confirmado' | 'acompanhando';
+type NormalizedStatus = 'none' | 'confirmado' | 'acompanhando';
+
+export default function SearchScreen() {
+  const { k } = useLocalSearchParams<{ k?: string }>();
+  const scheme = useColorScheme() ?? 'dark';
+  const colors = Colors[scheme];
+
+  const auth = getAuth();
+  const uid = auth.currentUser?.uid ?? '';
+
+  const [thanks, setThanks] = useState(false);
+  const [busy, setBusy] = useState<ChooseMode | null>(null);
+
+  // Mantido por compatibilidade com seu fluxo (mesmo com botão removido)
+  const [wantsPreview, setWantsPreview] = useState(false);
+
+  const lottieRef = useRef<LottieView>(null);
+  const redirectRef = useRef<string | null>(null);
+  const chooseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resolvedKey = useMemo(
+    () => (typeof k === 'string' ? k.trim() : ''),
+    [k],
   );
-  const { confirmPresence } = useEvents();
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [modeSelected, setModeSelected] = useState<
-    'confirmado' | 'acompanhando' | null
-  >(null);
+  const { isLoading, eventFound, guestStatus, requiresAuth } =
+    useEventAccessByShareKey(resolvedKey);
 
-  const colorScheme = useColorScheme() ?? 'dark';
-  const colors = Colors[colorScheme];
-  const user = getAuth().currentUser;
-  const userEmail = user?.email ?? 'convidado@anonimo.com';
-  const userName = user?.displayName ?? 'Convidado';
+  const normalizedStatus: NormalizedStatus = useMemo(
+    () => (guestStatus || 'none') as NormalizedStatus,
+    [guestStatus],
+  );
 
-  const gradientColors: [string, string, ...string[]] =
-    colorScheme === 'dark'
-      ? ['#0b0b0f', '#1b0033', '#3e1d73']
-      : ['#ffffff', '#f0f0ff', '#e9e6ff'];
+  const canChoose = useMemo(() => {
+    return (
+      !isLoading &&
+      !!eventFound &&
+      normalizedStatus === 'none' &&
+      !!uid &&
+      !thanks
+    );
+  }, [isLoading, eventFound, normalizedStatus, uid, thanks]);
 
-  const handlePresence = async (mode: 'confirmado' | 'acompanhando') => {
-    if (!eventFound) return;
+  // Quando thanks liga, toca animação
+  useEffect(() => {
+    if (!thanks) return;
     try {
-      setIsSubmitting(true);
-      setModeSelected(mode);
-      await confirmPresence(
-        userEmail,
-        eventFound.id,
-        userName,
+      lottieRef.current?.reset();
+      lottieRef.current?.play();
+    } catch {}
+  }, [thanks]);
+
+  // cleanup timer
+  useEffect(() => {
+    return () => {
+      if (chooseTimerRef.current) clearTimeout(chooseTimerRef.current);
+    };
+  }, []);
+
+  // sem key → landing
+  useEffect(() => {
+    if (wantsPreview) return;
+    if (resolvedKey) return;
+
+    if (redirectRef.current === 'landing') return;
+    redirectRef.current = 'landing';
+
+    router.replace('/(auth)/landing');
+  }, [resolvedKey, wantsPreview]);
+
+  // precisa logar → invite-gate
+  useEffect(() => {
+    if (wantsPreview) return;
+    if (!resolvedKey) return;
+    if (!requiresAuth || uid) return;
+
+    const mark = `gate:${resolvedKey}`;
+    if (redirectRef.current === mark) return;
+    redirectRef.current = mark;
+    router.replace({
+      pathname: '/(auth)/invite-gate',
+      params: { k: resolvedKey },
+    } as any);
+  }, [requiresAuth, resolvedKey, uid, wantsPreview]);
+
+  // é criador do evento → entra direto
+  useEffect(() => {
+    const eventId = eventFound?.id as string | undefined;
+    const ownerUid = (eventFound as any)?.userId as string | undefined;
+
+    if (!resolvedKey) return;
+    if (isLoading) return;
+    if (!eventId) return;
+    if (!uid) return;
+    if (wantsPreview) return;
+
+    if (ownerUid && ownerUid === uid) {
+      const mark = `owner:${eventId}`;
+      if (redirectRef.current === mark) return;
+      redirectRef.current = mark;
+
+      router.replace({
+        pathname: '/(stack)/events/[id]',
+        params: { id: eventId },
+      } as any);
+    }
+  }, [resolvedKey, isLoading, eventFound?.id, uid, wantsPreview, eventFound]);
+
+  // já é participante → entra direto no evento
+  useEffect(() => {
+    const eventId = eventFound?.id;
+
+    if (!resolvedKey) return;
+    if (isLoading) return;
+    if (!eventId) return;
+
+    if (wantsPreview) return;
+
+    if (normalizedStatus !== 'none') {
+      const mark = `event:${eventId}`;
+      if (redirectRef.current === mark) return;
+      redirectRef.current = mark;
+
+      router.replace({
+        pathname: '/(stack)/events/[id]',
+        params: { id: eventId },
+      } as any);
+    }
+  }, [
+    resolvedKey,
+    isLoading,
+    eventFound?.id,
+    normalizedStatus,
+    wantsPreview,
+    eventFound,
+  ]);
+
+  // Ao voltar para essa tela, destrava redirects
+  useFocusEffect(
+    useCallback(() => {
+      setWantsPreview(false);
+      return () => {};
+    }, []),
+  );
+
+  // Logs de estado
+  useEffect(() => {}, [
+    resolvedKey,
+    uid,
+    isLoading,
+    eventFound?.id,
+    normalizedStatus,
+    requiresAuth,
+    thanks,
+    canChoose,
+  ]);
+
+  const handleChoose = useCallback(
+    async (mode: ChooseMode) => {
+      if (!eventFound || !uid) return;
+
+      setBusy(mode);
+      console.log('🟩 [SearchScreen] choose start', {
         mode,
-        guestFamily
-      );
+        userId: uid,
+        eventId: eventFound.id,
+      });
 
-      setShowConfetti(true);
-    } catch (error) {
-      console.error('Erro ao confirmar presença:', error);
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleAddFamily = () => {
-    const trimmed = familyInput.trim();
-    if (!trimmed) return;
-    if (guestFamily.includes(trimmed)) {
-      Alert.alert('Este nome já foi adicionado.');
-      return;
-    }
-    setGuestFamily([...guestFamily, trimmed]);
-    setFamilyInput('');
-  };
-
-  const handleRemoveFamily = (index: number) => {
-    const updated = guestFamily.filter((_, i) => i !== index);
-    setGuestFamily(updated);
-  };
-
-  const handleConfettiFinish = () => {
-    setTimeout(() => {
-      setIsSubmitting(false);
-      if (eventFound) {
-        router.replace(`/events/${eventFound.id}`);
+      if (mode === 'confirmado') {
+        setThanks(true);
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {}
       }
-    }, 1000);
-  };
 
-  if (isLoading) {
-    return (
-      <View
-        style={[styles.loadingOverlay, { backgroundColor: colors.background }]}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.text }]}>
-          Carregando evento...
-        </Text>
-      </View>
-    );
-  }
+      try {
+        await upsertGuestParticipation({
+          userId: uid,
+          eventId: eventFound.id,
+          mode,
+        });
 
-  if (!eventFound) {
-    return (
-      <View
-        style={[styles.loadingOverlay, { backgroundColor: colors.background }]}
-      >
-        {/* <LottieView
-    source={require('@/assets/images/error.json')} // você pode usar um lottie animado de erro
-    autoPlay
-    loop={false}
-    style={{ width: 180, height: 180 }}
-  /> */}
+        console.log('🟩 [SearchScreen] choose success', {
+          mode,
+          eventId: eventFound.id,
+        });
 
-        <Text
-          style={[
-            styles.loadingText,
-            {
-              color: colors.text,
-              fontSize: 18,
-              textAlign: 'center',
-              marginTop: 16,
-            },
-          ]}
-        >
-          Nenhum evento localizado com o código informado.
-        </Text>
+        if (redirectRef.current?.startsWith('event:')) return;
+        const id = eventFound.id;
+        redirectRef.current = `event:${id}`;
 
-        <Pressable
-          onPress={() => router.replace('/(stack)/qr-scanner')}
-          style={[styles.retryBtn, { backgroundColor: colors.primary }]}
-        >
-          <QrCode size={20} color="#fff" />
-          <Text style={styles.retryBtnText}>Ler outro QR Code</Text>
-        </Pressable>
-      </View>
-    );
-  }
+        router.replace({
+          pathname: '/(stack)/events/[id]',
+          params: { id },
+        } as any);
+      } catch (err) {
+        console.error('🟥 [SearchScreen] choose error', err);
+        if (mode === 'confirmado') setThanks(false);
+      } finally {
+        setBusy(null);
+      }
+    },
+    [eventFound, uid],
+  );
 
-  return (
-    <View style={{ flex: 1 }}>
-      <LinearGradient colors={gradientColors} style={styles.container}>
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-
-        {(isSubmitting || showConfetti) && (
-          <Modal visible transparent animationType="fade">
-            <View style={styles.overlayDimmed}>
-              {showConfetti && (
-                <LottieView
-                  source={require('@/assets/images/confetti.json')}
-                  autoPlay
-                  loop={false}
-                  style={{ width: '100%', height: '100%' }}
-                  onAnimationFinish={handleConfettiFinish}
-                />
-              )}
-              {modeSelected === 'confirmado' && (
-                <View style={styles.confettiMessageContainer}>
-                  <Text
-                    style={[styles.confettiMessage, { color: colors.text }]}
-                  >
-                    🎉 Presença confirmada com sucesso!
-                  </Text>
-                </View>
-              )}
-            </View>
-          </Modal>
-        )}
-
-        <View style={styles.content}>
-          <View style={[styles.card, { backgroundColor: colors.background }]}>
-            <ImageBackground
-              source={
-                eventFound.coverImage
-                  ? { uri: eventFound.coverImage }
-                  : require('../../assets/images/favicon.png')
-              }
-              style={styles.image}
-              imageStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
-            />
-            <BlurView
-              intensity={40}
-              tint={colorScheme}
-              style={styles.blurOverlay}
-            >
-              <Text style={[styles.eventTitle, { color: colors.text }]}>
-                {eventFound.title}
-              </Text>
-              <View style={styles.row}>
-                <CalendarDays size={16} color={colors.text} />
-                <Text style={[styles.meta, { color: colors.text }]}>
-                  {' '}
-                  {new Date(eventFound.startDate).toLocaleDateString(
-                    'pt-BR'
-                  )}{' '}
-                  até {new Date(eventFound.endDate).toLocaleDateString('pt-BR')}{' '}
-                </Text>
-              </View>
-              <View style={styles.row}>
-                <MapPin size={16} color={colors.text} />
-                <Text style={[styles.meta, { color: colors.text }]}>
-                  {eventFound.location}
-                </Text>
-              </View>
-            </BlurView>
-          </View>
-        </View>
-
-        <Modal
-          visible={guestStatus === 'none' && !isSubmitting && !showConfetti}
-          transparent
-          animationType="fade"
-        >
-          <View style={styles.modalOverlay}>
-            <Animated.View
-              entering={FadeIn}
-              exiting={FadeOut}
-              style={styles.animatedContainer}
-            >
-              <LinearGradient
-                colors={gradientColors}
-                locations={[0, 0.7, 1]}
-                style={[styles.modalContent, { borderColor: colors.primary }]}
-              >
-                <Text
-                  style={[
-                    styles.modalText,
-                    {
-                      color: colors.text,
-                      fontSize: 16,
-                      textAlign: 'center',
-                      marginTop: 8,
-                    },
-                  ]}
-                >
-                  💫 Seja muito bem-vindo(a)
-                </Text>
-                <Text
-                  style={[
-                    styles.modalTitle,
-                    { color: colors.primary, fontSize: 22 },
-                  ]}
-                >
-                  Você é meu convidado!
-                </Text>
-                <Text
-                  style={[
-                    styles.modalText,
-                    {
-                      color: colors.text,
-                      fontSize: 15,
-                      textAlign: 'center',
-                      marginTop: 12,
-                    },
-                  ]}
-                >
-                  Escolha como deseja participar deste momento especial.{' '}
-                  <Text style={{ fontStyle: 'italic' }}>
-                    Você poderá alterar sua escolha a qualquer momento.
-                  </Text>
-                </Text>
-
-                {/* Acompanhantes */}
-                <Text
-                  style={[
-                    styles.modalTitle,
-                    { color: colors.primary, fontSize: 16, marginTop: 24 },
-                  ]}
-                >
-                  Acompanhantes (opcional)
-                </Text>
-
-                {guestFamily.map((name, index) => (
-                  <View
-                    key={index}
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: 8,
-                    }}
-                  >
-                    <Text style={{ flex: 1, color: colors.text }}>
-                      • {name}
-                    </Text>
-                    <Pressable onPress={() => handleRemoveFamily(index)}>
-                      <Text style={{ color: '#ff3b30', fontWeight: '600' }}>
-                        Remover
-                      </Text>
-                    </Pressable>
-                  </View>
-                ))}
-
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <TextInput
-                      placeholder="Nome do acompanhante"
-                      placeholderTextColor={
-                        colorScheme === 'dark' ? '#aaa' : '#666'
-                      }
-                      value={familyInput}
-                      onChangeText={setFamilyInput}
-                      style={{
-                        margin: 20,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        padding: 10,
-                        borderRadius: 8,
-                        color: colors.text,
-                      }}
-                    />
-                  </View>
-                  <Pressable
-                    onPress={handleAddFamily}
-                    style={{ justifyContent: 'center' }}
-                  >
-                    <Text style={{ color: colors.primary, fontWeight: '600' }}>
-                      + Adicionar
-                    </Text>
-                  </Pressable>
-                </View>
-
-                {/* Botões */}
-                <View style={styles.modalButtons}>
-                  <Pressable
-                    onPress={() =>
-                      Alert.alert(
-                        'Confirmar presença?',
-                        'Você deseja confirmar presença neste evento?',
-                        [
-                          { text: 'Cancelar', style: 'cancel' },
-                          {
-                            text: 'Confirmar',
-                            onPress: () => handlePresence('confirmado'),
-                          },
-                        ]
-                      )
-                    }
-                    style={[
-                      styles.confirmBtn,
-                      { backgroundColor: colors.primary },
-                    ]}
-                  >
-                    <Text style={[styles.confirmText, { color: '#fff' }]}>
-                      Confirmar Presença
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() =>
-                      Alert.alert(
-                        'Acompanhar evento?',
-                        'Você deseja apenas acompanhar este evento por enquanto?',
-                        [
-                          { text: 'Cancelar', style: 'cancel' },
-                          {
-                            text: 'Sim',
-                            onPress: () => handlePresence('acompanhando'),
-                          },
-                        ]
-                      )
-                    }
-                    style={[
-                      styles.secondaryBtn,
-                      { backgroundColor: colors.backgroundComents },
-                    ]}
-                  >
-                    <Text style={[styles.confirmText, { color: '#fff' }]}>
-                      Acompanhar Evento
-                    </Text>
-                  </Pressable>
-                </View>
-
-                <Pressable
-                  onPress={() => router.replace('/')}
-                  style={[
-                    styles.cancelBtn,
-                    {
-                      backgroundColor:
-                        colorScheme === 'dark' ? '#ffffff22' : '#00000011',
-                    },
-                  ]}
-                >
-                  <Text style={[styles.cancelText, { color: colors.text }]}>
-                    Voltar
-                  </Text>
-                </Pressable>
-              </LinearGradient>
-            </Animated.View>
-          </View>
-        </Modal>
-      </LinearGradient>
+  // UI helpers
+  const ScreenShell = ({ children }: { children: React.ReactNode }) => (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+        paddingHorizontal: 24,
+        paddingTop: 24,
+        paddingBottom: 24,
+      }}
+    >
+      <View style={{ flex: 1, justifyContent: 'center' }}>{children}</View>
     </View>
   );
-}
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { flex: 1, paddingHorizontal: 20, paddingTop: 24 },
-  overlayDimmed: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 999,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-  },
-  confettiMessageContainer: {
-    position: 'absolute',
-    top: '60%',
-    width: '100%',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  confettiMessage: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-  },
-  card: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 4,
-  },
-  image: { height: 180, width: '100%' },
-  blurOverlay: { padding: 16, backgroundColor: 'rgba(0,0,0,0.25)' },
-  eventTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  meta: { fontSize: 13 },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    zIndex: 100,
-  },
-  animatedContainer: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  modalContent: {
-    padding: 24,
-    borderWidth: 1.5,
-    borderRadius: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  modalText: { fontSize: 15, textAlign: 'center', marginBottom: 24 },
-  modalButtons: { flexDirection: 'row', gap: 12 },
-  confirmBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  secondaryBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  confirmText: { fontSize: 14, fontWeight: '600' },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    zIndex: 999,
-  },
-  loadingText: { fontSize: 16, fontWeight: '500', marginTop: 12 },
-  cancelBtn: {
-    marginTop: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignSelf: 'center',
-    justifyContent: 'center',
-  },
-  cancelText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  retryBtn: {
-    marginTop: 24,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
+  // 1) Carregando / resolvendo convite (suprimir preview para owner)
+  const ownerUid = (eventFound as any)?.userId as string | undefined;
+  if (
+    isLoading ||
+    (!eventFound && !requiresAuth) ||
+    (ownerUid && uid && ownerUid === uid)
+  ) {
+    return (
+      <ScreenShell>
+        <View style={{ alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text
+            style={{ marginTop: 12, color: colors.textSecondary, fontSize: 14 }}
+          >
+            Localizando seu convite...
+          </Text>
+        </View>
+      </ScreenShell>
+    );
+  }
 
-  retryBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter_600SemiBold',
-  },
-});
-function refetchAccess() {
-  throw new Error('Function not implemented.');
+  // 2) Convite inválido
+  if (!isLoading && !eventFound) {
+    return (
+      <ScreenShell>
+        <View style={{ alignItems: 'center' }}>
+          <Text
+            style={{
+              color: colors.text,
+              fontSize: 16,
+              fontWeight: '700',
+              marginBottom: 8,
+              textAlign: 'center',
+            }}
+          >
+            Convite inválido ou evento indisponível
+          </Text>
+
+          <Pressable
+            onPress={() => router.replace('/')}
+            style={{
+              paddingVertical: 10,
+              paddingHorizontal: 16,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
+            <Text style={{ color: colors.textSecondary }}>
+              Ir para a página inicial
+            </Text>
+          </Pressable>
+        </View>
+      </ScreenShell>
+    );
+  }
+
+  // 3) Obrigado (após confirmar)
+  if (thanks) {
+    return (
+      <ScreenShell>
+        <View style={{ alignItems: 'center' }}>
+          <LottieView
+            ref={lottieRef}
+            source={require('@/assets/images/tks.json')}
+            autoPlay
+            loop={busy !== null}
+            speed={1}
+            style={{ width: 220, height: 220 }}
+          />
+          <Text
+            style={{
+              color: colors.text,
+              fontSize: 18,
+              fontWeight: '800',
+              marginBottom: 8,
+            }}
+          >
+            Obrigado!
+          </Text>
+          <Text style={{ color: colors.textSecondary }}>
+            Redirecionando para o evento...
+          </Text>
+        </View>
+      </ScreenShell>
+    );
+  }
+
+  // A partir daqui eventFound existe (type-safe)
+  if (!eventFound) {
+    return (
+      <ScreenShell>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </ScreenShell>
+    );
+  }
+
+  const event = eventFound;
+
+  // 4) Pode escolher (com preview embutido)
+  if (canChoose) {
+    const startLabel =
+      typeof (event as any).startDate?.toDate === 'function'
+        ? (event as any).startDate.toDate().toLocaleString()
+        : (event.startDate?.toLocaleString?.() ?? '');
+
+    const endLabel =
+      typeof (event as any).endDate?.toDate === 'function'
+        ? (event as any).endDate.toDate().toLocaleString()
+        : (event.endDate?.toLocaleString?.() ?? '');
+
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: 24,
+            paddingTop: 24,
+            paddingBottom: 28,
+          }}
+        >
+          {/* Capa */}
+          {!!(event as any).coverImage && (
+            <View
+              style={{
+                width: '100%',
+                height: 190,
+                borderRadius: 18,
+                overflow: 'hidden',
+                marginBottom: 14,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+            >
+              <Image
+                source={{ uri: (event as any).coverImage }}
+                resizeMode="cover"
+                style={{ width: '100%', height: '100%' }}
+              />
+            </View>
+          )}
+
+          {/* Título */}
+          <Text
+            style={{
+              color: colors.text,
+              fontSize: 20,
+              fontWeight: '900',
+              marginBottom: 6,
+              textAlign: 'center',
+            }}
+          >
+            {(event as any).title ?? 'Evento'}
+          </Text>
+
+          {/* Local */}
+          {!!(event as any).location && (
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontSize: 14,
+                marginBottom: 8,
+                textAlign: 'center',
+              }}
+            >
+              📍 {(event as any).location}
+            </Text>
+          )}
+
+          {/* Datas */}
+          {!!(startLabel || endLabel) && (
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontSize: 13,
+                marginBottom: 14,
+                textAlign: 'center',
+              }}
+            >
+              🗓️ {startLabel} {endLabel ? `— ${endLabel}` : ''}
+            </Text>
+          )}
+
+          {/* Descrição (se existir no summary) */}
+          {!!(event as any).description && (
+            <Text
+              style={{
+                color: colors.text,
+                opacity: 0.9,
+                fontSize: 14,
+                marginBottom: 18,
+                textAlign: 'center',
+              }}
+            >
+              {(event as any).description}
+            </Text>
+          )}
+
+          {/* Ações */}
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: 14,
+              marginBottom: 12,
+              textAlign: 'center',
+            }}
+          >
+            Como deseja participar?
+          </Text>
+
+          <View
+            style={{ flexDirection: 'row', gap: 12, justifyContent: 'center' }}
+          >
+            <Pressable
+              onPress={() => handleChoose('confirmado')}
+              disabled={busy !== null}
+              style={{
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.primary,
+                backgroundColor:
+                  busy === 'confirmado' ? colors.primary : 'transparent',
+                opacity: busy !== null && busy !== 'confirmado' ? 0.6 : 1,
+              }}
+            >
+              <Text
+                style={{ color: busy === 'confirmado' ? '#fff' : colors.text }}
+              >
+                Confirmar presença
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => handleChoose('acompanhando')}
+              disabled={busy !== null}
+              style={{
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor:
+                  busy === 'acompanhando' ? colors.backgroundC : 'transparent',
+                opacity: busy !== null && busy !== 'acompanhando' ? 0.6 : 1,
+              }}
+            >
+              <Text
+                style={{
+                  color:
+                    busy === 'acompanhando'
+                      ? colors.text
+                      : colors.textSecondary,
+                }}
+              >
+                Acompanhar
+              </Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // 5) fallback (se nada bater)
+  return (
+    <ScreenShell>
+      <View style={{ alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    </ScreenShell>
+  );
 }

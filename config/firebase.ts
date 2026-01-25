@@ -1,10 +1,12 @@
-import { initializeApp } from 'firebase/app';
+// config/firebase.ts
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAuth } from 'firebase/auth'; // ✅ Importa o auth
-import Constants from 'expo-constants';
+import { getAuth, initializeAuth } from 'firebase/auth';
+import ReactNativeAsyncStorage, {
+  AsyncStorageStatic,
+} from '@react-native-async-storage/async-storage';
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: 'AIzaSyD_UKirzoq-kOOBaxo63sct1QbH-46zvTs',
   authDomain: 'wpfg-2025.firebaseapp.com',
@@ -14,9 +16,8 @@ const firebaseConfig = {
   appId: '1:1036526058558:web:37897f3d04ec1efd30e56f',
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-export const auth = getAuth(app); // ✅ Exporta o auth
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+export const auth = getAuth(app); //

@@ -50,8 +50,9 @@ export default function AddEventWithAutocomplete() {
           }
         }}
         query={{
-          key: 'AIzaSyD_UKirzoq-kOOBaxo63sct1QbH-46zvTs',
+          key: 'AIzaSyD_UKirzoq-kOOBaxo63sct1QbH-',
           language: 'pt-BR',
+          components: 'country:br',
         }}
         styles={{
           container: styles.autocompleteContainer,

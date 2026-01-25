@@ -1,18 +1,24 @@
-import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { User, Star, Shield, Wrench } from 'lucide-react-native';
+import { Star, Shield, Wrench, User } from 'lucide-react-native';
+
+export type RoleBadgeRole =
+  | 'Criador'
+  | 'Super Admin'
+  | 'Adm parcial'
+  | 'Convidado';
 
 interface RoleBadgeProps {
-  role: 'Super Admin' | 'Admin' | 'Adm parcial';
+  role: RoleBadgeRole;
+  label?: string;
 }
 
-const RoleBadge = ({ role }: RoleBadgeProps) => {
+const RoleBadge = ({ role, label }: RoleBadgeProps) => {
   const config = {
     'Super Admin': {
       color: '#892091',
       icon: <Star size={12} color="#fff" />,
     },
-    Admin: {
+    Criador: {
       color: '#3b82f6',
       icon: <Shield size={12} color="#fff" />,
     },
@@ -20,12 +26,18 @@ const RoleBadge = ({ role }: RoleBadgeProps) => {
       color: '#f97316',
       icon: <Wrench size={12} color="#fff" />,
     },
-  }[role];
+    Convidado: {
+      color: '#0aa6b8ff',
+      icon: <User size={12} color="#fff" />, // ✅ melhor que Wrench
+    },
+  } as const;
+
+  const { color, icon } = config[role];
 
   return (
-    <View style={[styles.badge, { backgroundColor: config.color }]}>
-      {config.icon}
-      <Text style={styles.text}>{role}</Text>
+    <View style={[styles.badge, { backgroundColor: color }]}>
+      {icon}
+      <Text style={styles.text}>{label ?? role}</Text>
     </View>
   );
 };

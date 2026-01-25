@@ -1,15 +1,8 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
-import {
-  Calendar,
-  Camera,
-  HeartPulse,
-  Home,
-  SquarePlus as PlusSquare,
-  User,
-} from 'lucide-react-native';
+import Colors from '../../constants/Colors';
+import { Calendar, HeartPulse, Home, User } from 'lucide-react-native';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'dark';
@@ -32,14 +25,11 @@ export default function TabLayout() {
         headerStyle: {
           backgroundColor: colors.background,
         },
-
         headerTitleStyle: {
           fontFamily: 'Inter-Bold',
           fontSize: 20,
           flex: 1,
           color: colors.primary,
-          textAlign: 'center',
-          marginTop: 20,
         },
         headerTintColor: colors.text,
         headerShadowVisible: false,
@@ -64,6 +54,7 @@ export default function TabLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
         name="seguidos"
         options={{
@@ -73,6 +64,7 @@ export default function TabLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
         name="profile"
         options={{

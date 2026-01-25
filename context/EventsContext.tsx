@@ -1,9 +1,19 @@
-// Versão 100% COMPLETA, REFINADA E ESCALÁVEL do EventsContext.tsx com Lazy Loading e Firebase
-
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { Event, Program, Activity, Photo } from '@/types';
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useEffect,
+  useCallback,
+} from 'react';
+import type {
+  Event,
+  Program,
+  Activity,
+  Photo,
+  Guest,
+  PermissionLevel,
+} from '@/types';
 import { db } from '@/config/firebase';
-import { Guest } from '@/types';
 
 import {
   collection,
@@ -13,17 +23,41 @@ import {
   deleteDoc,
   doc,
   getDocs,
-  setDoc,
   query,
-  orderBy,
   Timestamp,
+  type DocumentSnapshot,
+  type QueryDocumentSnapshot,
+  type DocumentData,
   where,
+  documentId,
+  serverTimestamp,
+  setDoc,
 } from 'firebase/firestore';
+
 import { getAuth } from 'firebase/auth';
+import {
+  getGuestParticipation as getGuestParticipationService,
+  getGuestParticipationsByUserId as getGuestParticipationsByUserIdService,
+  getGuestParticipationsByEventId as getGuestParticipationsByEventIdService,
+  updateGuestParticipation as updateGuestParticipationService,
+  upsertGuestParticipation as upsertGuestParticipationService,
+} from '@/hooks/guestService';
+
+import { normalizeSubAdminsByUid } from '@/src/helpers/eventPermissions';
+import {
+  buildEventCreateDoc,
+  buildEventUpdateDoc,
+} from '@/src/helpers/eventDocBuilders';
+import { GuestParticipation } from '@/types/guestParticipation';
+import { EventVM } from '@/types/eventView';
+import { pickUniqueShareKey } from '@/lib/utils/shareKey';
+import { createInviteSummary } from '@/hooks/inviteService';
+
+type GuestMode = GuestParticipation['mode'];
 
 // --- Types ---
 type EventsState = {
-  events: Event[];
+  events: EventVM[];
   programsByEventId: Record<string, Program[]>;
   activitiesByProgramId: Record<string, Activity[]>;
   photosByActivityId: Record<string, Photo[]>;
@@ -42,7 +76,7 @@ const initialState: EventsState = {
 
 type EventsAction =
   | { type: 'FETCH_EVENTS_START' }
-  | { type: 'FETCH_EVENTS_SUCCESS'; payload: Event[] }
+  | { type: 'FETCH_EVENTS_SUCCESS'; payload: EventVM[] }
   | { type: 'FETCH_EVENTS_ERROR'; payload: string }
   | { type: 'SET_PROGRAMS'; payload: { eventId: string; programs: Program[] } }
   | {
@@ -50,21 +84,13 @@ type EventsAction =
       payload: { programId: string; activities: Activity[] };
     }
   | { type: 'SET_PHOTOS'; payload: { activityId: string; photos: Photo[] } }
-  | { type: 'ADD_EVENT'; payload: Event }
-  | { type: 'UPDATE_EVENT'; payload: Event }
+  | { type: 'ADD_EVENT'; payload: EventVM }
+  | { type: 'UPDATE_EVENT'; payload: EventVM }
   | { type: 'DELETE_EVENT'; payload: string };
-
-type GuestParticipation = {
-  userEmail: string;
-  eventId: string;
-  name: string;
-  mode: 'confirmado' | 'acompanhando';
-  family?: string[];
-};
 
 const eventsReducer = (
   state: EventsState,
-  action: EventsAction
+  action: EventsAction,
 ): EventsState => {
   switch (action.type) {
     case 'FETCH_EVENTS_START':
@@ -79,7 +105,7 @@ const eventsReducer = (
       return {
         ...state,
         events: state.events.map((e) =>
-          e.id === action.payload.id ? action.payload : e
+          e.id === action.payload.id ? action.payload : e,
         ),
       };
     case 'DELETE_EVENT':
@@ -117,6 +143,7 @@ const eventsReducer = (
 };
 
 // --- Context Type ---
+// ✅ Atualizado: guests por UID e docId = `${eventId}_${userId}`
 type EventsContextType = {
   state: EventsState;
   fetchEvents: () => Promise<void>;
@@ -127,21 +154,20 @@ type EventsContextType = {
   deleteProgram: (eventId: string, programId: string) => Promise<void>;
   refetchEventById: (eventId: string) => Promise<Event | null>;
 
-  deleteGuest: (eventId: string, guestEmail: string) => Promise<void>;
   addActivity: (
     eventId: string,
     programId: string,
-    data: Omit<Activity, 'id'>
+    data: Omit<Activity, 'id'>,
   ) => Promise<void>;
   updateActivity: (
     eventId: string,
     programId: string,
-    activity: Activity
+    activity: Activity,
   ) => Promise<void>;
   deleteActivity: (
     eventId: string,
     programId: string,
-    activityId: string
+    activityId: string,
   ) => Promise<void>;
   addPhoto: (
     eventId: string,
@@ -149,52 +175,49 @@ type EventsContextType = {
     activityId: string,
     publicId: string,
     uri: string,
-    description: string
+    description: string,
   ) => Promise<void>;
   deletePhoto: (
     eventId: string,
     programId: string,
     activityId: string,
-    photoId: string
+    photoId: string,
   ) => Promise<void>;
-  getGuestParticipationsByEmail: (
-    userEmail: string
+
+  // ✅ guestParticipations
+  getGuestParticipationsByUserId: (
+    userId: string,
   ) => Promise<GuestParticipation[]>;
-
-  confirmPresence: (
-    userEmail: string,
+  getGuestParticipationsByEventId: (
     eventId: string,
-    name: string,
-    mode: 'confirmado' | 'acompanhando',
-    family?: string[]
-  ) => Promise<void>;
-
+  ) => Promise<GuestParticipation[]>;
   getGuestParticipation: (
     eventId: string,
-    userEmail: string
+    userId: string,
   ) => Promise<GuestParticipation | null>;
   updateGuestParticipation: (
     eventId: string,
-    userEmail: string,
-    updates: Partial<GuestParticipation>
+    userId: string,
+    updates: Partial<GuestParticipation>,
   ) => Promise<void>;
-  addGuestParticipation: (participation: GuestParticipation) => Promise<void>;
-  updateParticipation: (
-    userEmail: string,
+  confirmPresence: (
     eventId: string,
-    updates: Partial<GuestParticipation>
+    userName: string,
+    mode: GuestMode,
+    family?: string[],
   ) => Promise<void>;
 
   loadProgramsByEventId: (eventId: string) => Promise<void>;
   loadActivitiesByProgramId: (
     eventId: string,
-    programId: string
+    programId: string,
   ) => Promise<void>;
   loadPhotosByActivityId: (
     eventId: string,
     programId: string,
-    activityId: string
+    activityId: string,
   ) => Promise<void>;
+
   getGuestsByEventId: (eventId: string) => Promise<Guest[]>;
 };
 
@@ -205,45 +228,284 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [state, dispatch] = useReducer(eventsReducer, initialState);
 
-  const fetchEvents = async () => {
+  // ---------------------------
+  // Events
+  // ---------------------------
+  const mapEvent = useCallback(
+    (
+      docSnap:
+        | QueryDocumentSnapshot<DocumentData>
+        | DocumentSnapshot<DocumentData>,
+    ): Event => {
+      const data = docSnap.data() || {};
+      return {
+        id: docSnap.id,
+        title: data.title ?? '',
+        location: data.location ?? '',
+        description: data.description ?? '',
+        startDate: data.startDate?.toDate?.() ?? new Date(),
+        endDate: data.endDate?.toDate?.() ?? new Date(),
+        coverImage: data.coverImage ?? '',
+        shareKey: (data.shareKey ?? undefined) as string | undefined,
+        userId: data.userId ?? '',
+        subAdminsByUid: (data.subAdminsByUid ?? {}) as Record<string, any>,
+        programs: [],
+      };
+    },
+    [],
+  );
+
+  // ✅ Helper: sempre virar Date e pegar time
+  function toMillis(value: any): number {
+    if (!value) return 0;
+    // Firestore Timestamp tem toDate()
+    if (typeof value?.toDate === 'function') return value.toDate().getTime();
+    if (value instanceof Date) return value.getTime();
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+  }
+
+  // ✅ Helper: chunk de 10 para where(documentId(), 'in', ...)
+  function chunk<T>(arr: T[], size: number) {
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  }
+
+  // ✅ Tipagem útil pro mapEvent aceitar ambos
+  type FireDoc = QueryDocumentSnapshot | DocumentSnapshot;
+
+  const fetchEvents = useCallback(async () => {
     dispatch({ type: 'FETCH_EVENTS_START' });
+
     try {
-      const eventsSnap = await getDocs(
-        query(collection(db, 'events'), orderBy('startDate', 'desc'))
+      const user = getAuth().currentUser;
+      const uid = user?.uid;
+
+      if (!uid) {
+        dispatch({ type: 'FETCH_EVENTS_SUCCESS', payload: [] });
+        return;
+      }
+
+      // 1) Eventos do criador + 2) Eventos onde é subadmin
+      const eventsRef = collection(db, 'events');
+
+      const [ownerSnap, subadminSnap] = await Promise.all([
+        getDocs(query(eventsRef, where('userId', '==', uid))),
+        getDocs(query(eventsRef, where('subAdminUids', 'array-contains', uid))),
+      ]);
+
+      const eventsMap = new Map<string, Event>();
+
+      ownerSnap.docs.forEach((d) =>
+        eventsMap.set(d.id, mapEvent(d as FireDoc)),
       );
-      const events: Event[] = eventsSnap.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          title: data.title,
-          location: data.location,
-          description: data.description,
-          startDate: data.startDate.toDate(),
-          endDate: data.endDate.toDate(),
-          accessCode: data.accessCode ?? '',
-          coverImage: data.coverImage ?? '',
-          userId: data.userId,
-          createdBy: data.createdBy ?? '',
-          subAdmins: data.subAdmins ?? [],
-          programs: [],
-        };
-      });
-      dispatch({ type: 'FETCH_EVENTS_SUCCESS', payload: events });
+      subadminSnap.docs.forEach((d) =>
+        eventsMap.set(d.id, mapEvent(d as FireDoc)),
+      );
+
+      // 3) Eventos onde é convidado (guestParticipations)
+      const participations = await getGuestParticipationsByUserId(uid);
+
+      const partsByEventId = new Map<string, 'confirmado' | 'acompanhando'>(
+        participations
+          .filter((p) => !!p.eventId)
+          .map((p) => [p.eventId as string, p.mode]),
+      );
+
+      const eventIds = Array.from(
+        new Set(
+          participations
+            .map((p) => p.eventId)
+            .filter((id): id is string => !!id && typeof id === 'string'),
+        ),
+      );
+
+      // ✅ Remove IDs que já vieram como owner/subadmin (evita busca repetida)
+      const missingIds = eventIds.filter((id) => !eventsMap.has(id));
+
+      if (missingIds.length) {
+        const batches = chunk(missingIds, 10);
+
+        const snaps = await Promise.all(
+          batches.map((ids) =>
+            getDocs(query(eventsRef, where(documentId(), 'in', ids))),
+          ),
+        );
+
+        snaps.forEach((qs) => {
+          qs.docs.forEach((d) => {
+            const ev = mapEvent(d as FireDoc);
+            eventsMap.set(ev.id, ev);
+          });
+        });
+      }
+
+      const merged: EventVM[] = Array.from(eventsMap.values())
+        .map((ev) => ({
+          ...ev,
+          myGuestMode: partsByEventId.get(ev.id),
+        }))
+        .sort((a, b) => toMillis(b.startDate) - toMillis(a.startDate));
+
+      dispatch({ type: 'FETCH_EVENTS_SUCCESS', payload: merged });
     } catch (err: any) {
-      dispatch({ type: 'FETCH_EVENTS_ERROR', payload: err.message });
+      console.error('fetchEvents error:', err);
+      dispatch({
+        type: 'FETCH_EVENTS_ERROR',
+        payload: err?.message ?? 'Erro ao buscar eventos',
+      });
     }
+  }, [mapEvent, dispatch, db]);
+
+  const fetchEventsRef = React.useRef<() => Promise<void>>(async () => {});
+
+  useEffect(() => {
+    fetchEventsRef.current = fetchEvents;
+  }, [fetchEvents]);
+
+  useEffect(() => {
+    const unsub = getAuth().onAuthStateChanged((user) => {
+      if (user) fetchEventsRef.current();
+      else dispatch({ type: 'FETCH_EVENTS_SUCCESS', payload: [] });
+    });
+
+    return () => unsub();
+  }, []);
+
+  const addEvent = async (data: Omit<Event, 'id' | 'programs'>) => {
+    const user = getAuth().currentUser;
+    if (!user) throw new Error('Usuário não autenticado');
+
+    const { subAdminsByUid } = normalizeSubAdminsByUid(data);
+
+    // 1) shareKey (sem reserva)
+    let shareKey = '';
+    try {
+      shareKey = await pickUniqueShareKey();
+    } catch (e) {
+      throw e;
+    }
+
+    // 2) createDoc
+    let createDoc: any;
+    try {
+      createDoc = buildEventCreateDoc(
+        { ...data, subAdminsByUid, shareKey },
+        { userId: user.uid },
+      );
+    } catch (e) {
+      throw e;
+    }
+
+    // 3) cria events/{eventId}
+    let eventId = '';
+    try {
+      const created = await addDoc(collection(db, 'events'), createDoc);
+      eventId = created.id;
+    } catch (e) {
+      throw e;
+    }
+
+    // 4) cria mapping eventShareKeys/{shareKey}
+    // Observação: sem createdAt pra evitar conflitos com rules + serverTimestamp
+    try {
+      await setDoc(
+        doc(db, 'eventShareKeys', shareKey),
+        { eventId },
+        { merge: false },
+      );
+
+      try {
+        await createInviteSummary(shareKey, eventId);
+      } catch (e) {}
+    } catch (e) {
+      // 4.1) fallback: tenta outra key e atualiza o event (mantém consistência)
+      // Se você quiser só debugar e NÃO fazer fallback, comente este bloco inteiro.
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const newKey = await pickUniqueShareKey();
+
+          // atualiza evento com a nova key
+          await setDoc(
+            doc(db, 'events', eventId),
+            { shareKey: newKey },
+            { merge: true },
+          );
+
+          // tenta criar mapping com a nova key
+          await setDoc(
+            doc(db, 'eventShareKeys', newKey),
+            { eventId },
+            { merge: false },
+          );
+
+          try {
+            await createInviteSummary(newKey, eventId);
+          } catch (e) {}
+
+          shareKey = newKey;
+
+          break;
+        } catch (fallbackErr) {
+          if (attempt === 2) throw e; // lança o erro original do mapping
+        }
+      }
+    }
+
+    // 5) dispatch
+    try {
+      dispatch({
+        type: 'ADD_EVENT',
+        payload: {
+          ...data,
+          id: eventId,
+          userId: user.uid,
+          subAdminsByUid,
+          shareKey,
+          programs: [],
+        },
+      });
+    } catch (e) {}
+
+    return eventId;
   };
+
+  const updateEvent = async (event: Event) => {
+    const { subAdminsByUid } = normalizeSubAdminsByUid(event);
+
+    const updateDocPayload = buildEventUpdateDoc({
+      ...event,
+      subAdminsByUid,
+    });
+
+    await updateDoc(doc(db, 'events', event.id), updateDocPayload);
+
+    dispatch({
+      type: 'UPDATE_EVENT',
+      payload: { ...event, subAdminsByUid },
+    });
+  };
+
+  const deleteEvent = async (eventId: string) => {
+    await deleteDoc(doc(db, 'events', eventId));
+    dispatch({ type: 'DELETE_EVENT', payload: eventId });
+  };
+
+  // ---------------------------
+  // Lazy loading: Programs/Activities/Photos
+  // ---------------------------
 
   const loadProgramsByEventId = async (eventId: string) => {
     try {
       const snap = await getDocs(collection(db, 'events', eventId, 'programs'));
 
-      const programs: Program[] = snap.docs.map((doc) => {
-        const data = doc.data();
+      const programs: Program[] = snap.docs.map((d) => {
+        const data = d.data();
         return {
-          id: doc.id,
+          id: d.id,
           eventId,
-          date: data.date?.toDate?.() ?? new Date(), // evita quebra se 'date' estiver undefined
+          date: data.date?.toDate?.() ?? new Date(),
           activities: [],
           photos: [],
         };
@@ -257,26 +519,28 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const loadActivitiesByProgramId = async (
     eventId: string,
-    programId: string
+    programId: string,
   ) => {
     const snap = await getDocs(
-      collection(db, 'events', eventId, 'programs', programId, 'activities')
+      collection(db, 'events', eventId, 'programs', programId, 'activities'),
     );
-    const activities: Activity[] = snap.docs.map((doc) => ({
-      id: doc.id,
+
+    const activities: Activity[] = snap.docs.map((d) => ({
+      id: d.id,
       programId,
-      title: doc.data().title,
-      time: doc.data().time,
-      description: doc.data().description,
+      title: d.data().title,
+      time: d.data().time,
+      description: d.data().description,
       photos: [],
     }));
+
     dispatch({ type: 'SET_ACTIVITIES', payload: { programId, activities } });
   };
 
   const loadPhotosByActivityId = async (
     eventId: string,
     programId: string,
-    activityId: string
+    activityId: string,
   ) => {
     const snap = await getDocs(
       collection(
@@ -287,13 +551,14 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         programId,
         'activities',
         activityId,
-        'photos'
-      )
+        'photos',
+      ),
     );
-    const photos: Photo[] = snap.docs.map((doc) => {
-      const data = doc.data();
+
+    const photos: Photo[] = snap.docs.map((d) => {
+      const data = d.data();
       return {
-        id: doc.id,
+        id: d.id,
         activityId,
         programId,
         uri: data.uri,
@@ -303,178 +568,272 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         createdBy: data.createdBy ?? '',
       };
     });
+
     dispatch({ type: 'SET_PHOTOS', payload: { activityId, photos } });
   };
 
-  const refetchEventById = async (eventId: string): Promise<Event | null> => {
+  // Dentro do seu EventsContext (ou onde estiver)
+  // ✅ versão completa com logs + identificação do "ponto" que falhou
+  // helper opcional: log bonito
+  function logStep(tag: string, data?: any) {
     try {
-      // 1. Buscar evento principal
-      const eventSnap = await getDoc(doc(db, 'events', eventId));
-      if (!eventSnap.exists()) throw new Error('Evento não encontrado');
-      const eventData = eventSnap.data();
+    } catch {
+      // ignore
+    }
+  }
 
-      // 2. Buscar todos os programas do evento
-      const programsSnap = await getDocs(
-        collection(db, 'events', eventId, 'programs')
-      );
+  const refetchLocksRef = { current: new Map<string, Promise<Event | null>>() };
+  // Se preferir, declare isso no topo do EventsContext:
+  // const refetchLocksRef = useRef<Map<string, Promise<Event | null>>>(new Map());
 
-      const programs: Program[] = [];
+  const refetchEventById = async (eventId: string): Promise<Event | null> => {
+    // ✅ se já tem uma chamada em andamento para o MESMO eventId, reaproveita
+    const existing = refetchLocksRef.current.get(eventId);
+    if (existing) {
+      logStep('JOIN in-flight refetch', { eventId });
+      return existing;
+    }
 
-      for (const programDoc of programsSnap.docs) {
-        const programId = programDoc.id;
-        const programData = programDoc.data();
+    const task = (async () => {
+      console.log('🧭 [refetchEventById] CALLED FROM:\n', new Error().stack);
 
-        const activitiesSnap = await getDocs(
-          collection(db, 'events', eventId, 'programs', programId, 'activities')
-        );
+      const auth = getAuth();
+      const uid = auth.currentUser?.uid ?? null;
+      const startedAt = Date.now();
 
-        const activities: Activity[] = [];
+      logStep('START', { eventId, uid });
 
-        for (const activityDoc of activitiesSnap.docs) {
-          const activityId = activityDoc.id;
-          const activityData = activityDoc.data();
+      // ✅ retry/backoff apenas para permission-denied (race condition)
+      const delays = [0, 250, 600, 1200]; // 4 tentativas (0 + 3 retries)
 
-          const activityPhotosSnap = await getDocs(
-            collection(
+      let lastErr: any = null;
+
+      for (let attempt = 0; attempt < delays.length; attempt++) {
+        const delay = delays[attempt];
+
+        if (delay > 0) {
+          logStep('retry wait', { eventId, delay, attempt: attempt + 1 });
+          await new Promise((r) => setTimeout(r, delay));
+        }
+
+        try {
+          // 1) EVENT DOC
+          const eventPath = `events/${eventId}`;
+          logStep('READ event doc ->', eventPath);
+
+          const eventRef = doc(db, 'events', eventId);
+          const eventSnap = await getDoc(eventRef);
+
+          logStep('event doc read OK', {
+            exists: eventSnap.exists(),
+            id: eventSnap.id,
+          });
+
+          if (!eventSnap.exists()) throw new Error('Evento não encontrado');
+
+          const eventData: any = eventSnap.data();
+
+          logStep('event.userId check', {
+            eventUserId: eventData.userId ?? null,
+            uid,
+            isOwner: uid ? eventData.userId === uid : false,
+            hasSubAdmin: uid ? !!eventData.subAdminsByUid?.[uid] : false,
+          });
+
+          // 2) PROGRAMS
+          const programsPath = `events/${eventId}/programs`;
+          logStep('READ programs ->', programsPath);
+
+          const programsRef = collection(db, 'events', eventId, 'programs');
+          const programsSnap = await getDocs(programsRef);
+
+          logStep('programs read OK', { count: programsSnap.size });
+
+          const programs: Program[] = [];
+
+          for (const programDoc of programsSnap.docs) {
+            const programId = programDoc.id;
+            const programData: any = programDoc.data();
+
+            logStep('PROGRAM', { programId });
+
+            // 3) ACTIVITIES
+            const activitiesPath = `events/${eventId}/programs/${programId}/activities`;
+            logStep('READ activities ->', activitiesPath);
+
+            const activitiesRef = collection(
               db,
               'events',
               eventId,
               'programs',
               programId,
               'activities',
-              activityId,
-              'photos'
-            )
-          );
+            );
+            const activitiesSnap = await getDocs(activitiesRef);
 
-          const activityPhotos: Photo[] = activityPhotosSnap.docs.map(
-            (photoDoc) => {
-              const p = photoDoc.data();
-              return {
-                id: photoDoc.id,
-                activityId,
+            logStep('activities read OK', {
+              programId,
+              count: activitiesSnap.size,
+            });
+
+            const activities: Activity[] = [];
+
+            for (const activityDoc of activitiesSnap.docs) {
+              const activityId = activityDoc.id;
+              const activityData: any = activityDoc.data();
+
+              logStep('ACTIVITY', { programId, activityId });
+
+              // 4) PHOTOS
+              const photosPath = `events/${eventId}/programs/${programId}/activities/${activityId}/photos`;
+              logStep('READ photos ->', photosPath);
+
+              const photosRef = collection(
+                db,
+                'events',
+                eventId,
+                'programs',
                 programId,
-                uri: p.uri,
-                publicId: p.publicId,
-                description: p.description ?? '',
-                timestamp: p.timestamp?.toDate?.() ?? new Date(),
-                createdBy: p.createdBy ?? '',
-              };
+                'activities',
+                activityId,
+                'photos',
+              );
+
+              const activityPhotosSnap = await getDocs(photosRef);
+
+              logStep('photos read OK', {
+                programId,
+                activityId,
+                count: activityPhotosSnap.size,
+              });
+
+              const activityPhotos: Photo[] = activityPhotosSnap.docs.map(
+                (photoDoc) => {
+                  const p: any = photoDoc.data();
+                  return {
+                    id: photoDoc.id,
+                    activityId,
+                    programId,
+                    uri: p.uri,
+                    publicId: p.publicId,
+                    description: p.description ?? '',
+                    timestamp: p.timestamp?.toDate?.() ?? new Date(),
+                    createdBy: p.createdBy ?? '',
+                  };
+                },
+              );
+
+              activities.push({
+                id: activityId,
+                programId,
+                title: activityData.title,
+                time: activityData.time,
+                description: activityData.description,
+                photos: activityPhotos,
+              });
             }
-          );
 
-          activities.push({
-            id: activityId,
-            programId,
-            title: activityData.title,
-            time: activityData.time,
-            description: activityData.description,
-            photos: activityPhotos,
+            programs.push({
+              id: programId,
+              eventId,
+              date: programData.date?.toDate?.() ?? new Date(),
+              activities,
+              photos: [],
+            });
+          }
+
+          const updatedEvent: Event = {
+            id: eventSnap.id,
+            title: eventData.title,
+            location: eventData.location,
+            description: eventData.description,
+            startDate: eventData.startDate?.toDate?.() ?? new Date(),
+            endDate: eventData.endDate?.toDate?.() ?? new Date(),
+            coverImage: eventData.coverImage ?? '',
+            userId: eventData.userId ?? '',
+            subAdminsByUid: (eventData.subAdminsByUid ?? {}) as Record<
+              string,
+              PermissionLevel
+            >,
+            programs,
+            shareKey: eventData.shareKey ?? '',
+          };
+
+          dispatch({ type: 'UPDATE_EVENT', payload: updatedEvent });
+
+          logStep('DONE', {
+            ms: Date.now() - startedAt,
+            programs: programs.length,
+            attempt: attempt + 1,
           });
+
+          return updatedEvent;
+        } catch (error: any) {
+          lastErr = error;
+
+          const errInfo = {
+            name: error?.name,
+            code: error?.code,
+            message: error?.message,
+            eventId,
+            uid,
+            ms: Date.now() - startedAt,
+            attempt: attempt + 1,
+          };
+
+          // ✅ se for permission-denied, vamos tentar de novo (até acabar)
+          if (
+            error?.code === 'permission-denied' &&
+            attempt < delays.length - 1
+          ) {
+            logStep('permission-denied (will retry)', errInfo);
+            continue;
+          }
+
+          // ❌ aqui acabou (ou não é permission-denied)
+          console.error('❌ [refetchEventById] FAILED', {
+            ...errInfo,
+            stack: error?.stack,
+          });
+          return null;
         }
-
-        const programPhotos: Photo[] = [];
-
-        programs.push({
-          id: programId,
-          eventId,
-          date: programData.date?.toDate?.() ?? new Date(),
-          activities,
-          photos: programPhotos,
-        });
       }
 
-      const updatedEvent: Event = {
-        id: eventSnap.id,
-        title: eventData.title,
-        location: eventData.location,
-        description: eventData.description,
-        startDate: eventData.startDate.toDate(),
-        endDate: eventData.endDate.toDate(),
-        accessCode: eventData.accessCode ?? '',
-        coverImage: eventData.coverImage ?? '',
-        userId: eventData.userId,
-        createdBy: eventData.createdBy ?? '',
-        subAdmins: eventData.subAdmins ?? [],
-        programs,
-      };
+      // fallback (não deveria chegar aqui)
+      console.error('❌ [refetchEventById] FAILED (exhausted retries)', {
+        code: lastErr?.code,
+        message: lastErr?.message,
+        eventId,
+        uid,
+        ms: Date.now() - startedAt,
+      });
+      return null;
+    })();
 
-      dispatch({ type: 'UPDATE_EVENT', payload: updatedEvent });
+    refetchLocksRef.current.set(eventId, task);
 
-      return updatedEvent; // ✅ Adicionado
-    } catch (error) {
-      console.error('Erro ao refetchEventById:', error);
-      return null; // ✅ Retorno seguro em caso de erro
+    try {
+      return await task;
+    } finally {
+      // ✅ libera lock
+      refetchLocksRef.current.delete(eventId);
     }
   };
 
-  useEffect(() => {
-    const unsubscribe = getAuth().onAuthStateChanged((user) => {
-      if (user) fetchEvents();
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const addEvent = async (data: Omit<Event, 'id' | 'programs'>) => {
-    const user = getAuth().currentUser;
-    if (!user) throw new Error('Usuário não autenticado');
-    const userEmail = user.email?.toLowerCase() ?? '';
-    const docRef = await addDoc(collection(db, 'events'), {
-      ...data,
-      userId: user.uid,
-      createdBy: userEmail,
-      subAdmins: data.subAdmins ?? [],
-      startDate: Timestamp.fromDate(data.startDate),
-      endDate: Timestamp.fromDate(data.endDate),
-      createdAt: Timestamp.now(),
-    });
-    dispatch({
-      type: 'ADD_EVENT',
-      payload: {
-        ...data,
-        id: docRef.id,
-        userId: user.uid,
-        createdBy: userEmail,
-        programs: [],
-      },
-    });
-    return docRef.id;
-  };
-
-  const updateEvent = async (event: Event) => {
-    await updateDoc(doc(db, 'events', event.id), {
-      title: event.title,
-      location: event.location,
-      description: event.description,
-      startDate: Timestamp.fromDate(event.startDate),
-      endDate: Timestamp.fromDate(event.endDate),
-      coverImage: event.coverImage || '',
-      userId: event.userId,
-      subAdmins: event.subAdmins ?? [],
-    });
-    dispatch({ type: 'UPDATE_EVENT', payload: event });
-  };
-
-  const deleteEvent = async (eventId: string) => {
-    await deleteDoc(doc(db, 'events', eventId));
-    dispatch({ type: 'DELETE_EVENT', payload: eventId });
-  };
+  // ---------------------------
+  // CRUD Programs/Activities/Photos
+  // ---------------------------
 
   const addProgram = async (eventId: string, date: Date) => {
-    try {
-      const programRef = collection(db, 'events', eventId, 'programs');
+    const programRef = collection(db, 'events', eventId, 'programs');
 
-      await addDoc(programRef, {
-        eventId,
-        date: Timestamp.fromDate(date),
-      });
+    await addDoc(programRef, {
+      eventId,
+      date: Timestamp.fromDate(date),
+    });
 
-      await refetchEventById(eventId); // Atualiza os dados com novos programas
-      await loadProgramsByEventId(eventId); // Opcional, se necessário para seu estado
-    } catch (error) {
-      console.error('Erro ao adicionar programa:', error);
-      throw error;
-    }
+    await refetchEventById(eventId);
+    await loadProgramsByEventId(eventId);
   };
 
   const deleteProgram = async (eventId: string, programId: string) => {
@@ -486,7 +845,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
   const addActivity = async (
     eventId: string,
     programId: string,
-    data: Omit<Activity, 'id'>
+    data: Omit<Activity, 'id'>,
   ) => {
     const activityRef = collection(
       db,
@@ -494,7 +853,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       eventId,
       'programs',
       programId,
-      'activities'
+      'activities',
     );
 
     await addDoc(activityRef, {
@@ -510,7 +869,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
   const updateActivity = async (
     eventId: string,
     programId: string,
-    activity: Activity
+    activity: Activity,
   ) => {
     const activityRef = doc(
       db,
@@ -519,7 +878,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       'programs',
       programId,
       'activities',
-      activity.id
+      activity.id,
     );
 
     await updateDoc(activityRef, {
@@ -534,7 +893,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
   const deleteActivity = async (
     eventId: string,
     programId: string,
-    activityId: string
+    activityId: string,
   ) => {
     const activityRef = doc(
       db,
@@ -543,7 +902,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       'programs',
       programId,
       'activities',
-      activityId
+      activityId,
     );
     await deleteDoc(activityRef);
     await refetchEventById(eventId);
@@ -555,7 +914,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     activityId: string,
     publicId: string,
     uri: string,
-    description: string
+    description: string,
   ) => {
     const photoRef = collection(
       db,
@@ -565,7 +924,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       programId,
       'activities',
       activityId,
-      'photos'
+      'photos',
     );
 
     const user = getAuth().currentUser;
@@ -587,7 +946,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     eventId: string,
     programId: string,
     activityId: string,
-    photoId: string
+    photoId: string,
   ) => {
     const photoRef = doc(
       db,
@@ -598,128 +957,67 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       'activities',
       activityId,
       'photos',
-      photoId
+      photoId,
     );
     await deleteDoc(photoRef);
     await refetchEventById(eventId);
   };
 
-  const deleteGuest = async (
-    eventId: string,
-    guestEmail: string
-  ): Promise<void> => {
-    const guestRef = doc(db, 'events', eventId, 'guests', guestEmail);
-    await deleteDoc(guestRef);
+  // ---------------------------
+  // ✅ Guest Participations
+  // ---------------------------
+
+  const getGuestParticipationsByUserId = async (userId: string) => {
+    return getGuestParticipationsByUserIdService(userId);
   };
 
-  // Adicionar participação do convidado na coleção global
-
-  const addGuestParticipation = async (participation: GuestParticipation) => {
-    try {
-      const docId = `${participation.userEmail}_${participation.eventId}`;
-      const guestRef = doc(db, 'guestParticipations', docId);
-      await setDoc(guestRef, participation, { merge: true });
-    } catch (error) {
-      console.error('Erro ao adicionar participação:', error);
-      throw error;
-    }
+  const getGuestParticipationsByEventId = async (eventId: string) => {
+    return getGuestParticipationsByEventIdService(eventId);
   };
 
-  // Buscar participações do usuário por email
-  const getGuestParticipationsByEmail = async (userEmail: string) => {
-    try {
-      const q = query(
-        collection(db, 'guestParticipations'),
-        where('userEmail', '==', userEmail)
-      );
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc) => doc.data() as GuestParticipation);
-    } catch (error) {
-      console.error('Erro ao buscar participações:', error);
-      throw error;
-    }
-  };
-  // Buscar participação específica de usuário em evento
-  const getGuestParticipation = async (eventId: string, userEmail: string) => {
-    try {
-      const safeEmail = userEmail.toLowerCase().trim();
-      const docId = `${eventId}_${safeEmail}`;
-      const ref = doc(db, 'guestParticipations', docId);
-      const snapshot = await getDoc(ref);
-      return snapshot.exists() ? (snapshot.data() as GuestParticipation) : null;
-    } catch (error) {
-      console.error('Erro ao buscar participação:', error);
-      throw error;
-    }
+  const getGuestParticipation = async (eventId: string, userId: string) => {
+    return getGuestParticipationService(userId, eventId);
   };
 
-  // Atualizar modo de participação e familiares
   const updateGuestParticipation = async (
     eventId: string,
-    userEmail: string,
-    updates: Partial<GuestParticipation>
+    userId: string,
+    updates: Partial<Pick<GuestParticipation, 'mode' | 'family' | 'userName'>>,
   ) => {
-    try {
-      const docId = `${userEmail}_${eventId}`;
-      const ref = doc(db, 'guestParticipations', docId);
-      await updateDoc(ref, updates);
-    } catch (error) {
-      console.error('Erro ao atualizar participação:', error);
-      throw error;
-    }
+    await updateGuestParticipationService({
+      userId,
+      eventId,
+      updates,
+    });
   };
 
-  // Função de confirmação de presença com nova estrutura
   async function confirmPresence(
-    userEmail: string,
     eventId: string,
     userName: string,
-    mode: 'confirmado' | 'acompanhando',
-    family: string[] = []
-  ): Promise<void> {
-    const docRef = doc(db, 'guestParticipations', `${eventId}_${userEmail}`);
-    await setDoc(docRef, {
+    mode: GuestMode,
+    family: string[] = [],
+  ) {
+    const user = getAuth().currentUser;
+    if (!user?.uid) throw new Error('Usuário não autenticado');
+
+    await upsertGuestParticipationService({
+      userId: user.uid,
       eventId,
-      userEmail,
-      userName,
       mode,
+      userName, // pode ser string, o service transforma em null se for inválido
       family,
-      timestamp: new Date(),
     });
   }
 
-  const updateParticipation = async (
-    userEmail: string,
-    eventId: string,
-    updates: Partial<GuestParticipation>
-  ) => {
-    try {
-      const docId = `${userEmail}_${eventId}`;
-      const ref = doc(db, 'guestParticipations', docId);
-      await updateDoc(ref, updates);
-    } catch (error) {
-      console.error('Erro ao atualizar dados da participação:', error);
-      throw error;
-    }
-  };
-
   const getGuestsByEventId = async (eventId: string): Promise<Guest[]> => {
-    const snapshot = await getDocs(
-      query(
-        collection(db, 'guestParticipations'),
-        where('eventId', '==', eventId)
-      )
-    );
+    const participations = await getGuestParticipationsByEventId(eventId);
 
-    return snapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        name: data.userName ?? data.name ?? '',
-        email: data.userEmail ?? data.email ?? '',
-        mode: data.mode,
-        family: data.family ?? [],
-      } satisfies Guest;
-    });
+    return participations.map((p) => ({
+      userId: p.userId,
+      name: p.userName ?? '',
+      mode: p.mode,
+      family: p.family ?? [],
+    }));
   };
 
   return (
@@ -741,13 +1039,13 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         loadActivitiesByProgramId,
         loadPhotosByActivityId,
         refetchEventById,
-        getGuestParticipationsByEmail,
+
+        // ✅ guests (UID)
+        getGuestParticipationsByUserId,
+        getGuestParticipationsByEventId,
         getGuestParticipation,
         updateGuestParticipation,
         confirmPresence,
-        addGuestParticipation,
-        updateParticipation,
-        deleteGuest,
         getGuestsByEventId,
       }}
     >

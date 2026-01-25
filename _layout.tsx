@@ -25,6 +25,8 @@ export default function RootLayout() {
       if (!user && !inAuthGroup) {
         router.replace('/landing'); // redireciona para login se não autenticado
       }
+
+      useEffect(() => {}, [segments, authLoading, user]);
     }
   }, [authLoading, user, segments]);
 

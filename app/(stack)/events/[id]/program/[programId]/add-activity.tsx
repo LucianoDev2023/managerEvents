@@ -31,7 +31,7 @@ export default function AddActivityScreen() {
     programId: string;
   }>();
   const { addActivity, refetchEventById } = useEvents();
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
   const [formValues, setFormValues] = useState<ActivityFormValues>({
@@ -111,16 +111,13 @@ export default function AddActivityScreen() {
         options={{
           headerShown: true,
           headerTitle: 'Add atividade',
-          headerTitleStyle: {
-            fontFamily: 'Inter-Bold',
-            fontSize: 18,
-          },
+          headerTitleStyle: {},
           headerLeft: () => (
             <TouchableOpacity
               onPress={() => router.back()}
               style={styles.headerButton}
             >
-              <ArrowLeft size={24} color={colors.text} />
+              <ArrowLeft size={24} color={colors.primary} />
             </TouchableOpacity>
           ),
         }}
@@ -142,7 +139,15 @@ export default function AddActivityScreen() {
 
           <TouchableOpacity
             style={[styles.timeButton, { borderColor: colors.border }]}
-            onPress={() => setShowTimePicker(true)}
+            onPress={() => {
+              const parts = (formValues.time || '').split(':');
+              const h = Number(parts[0]) || 0;
+              const m = Number(parts[1]) || 0;
+              const base = new Date();
+              base.setHours(h, m, 0, 0);
+              setPickerTime(base);
+              setShowTimePicker(true);
+            }}
           >
             <Clock size={20} color={colors.primary} />
             <Text style={[styles.timeText, { color: colors.text }]}>
@@ -173,6 +178,7 @@ export default function AddActivityScreen() {
           value={formValues.title}
           onChangeText={(text) => updateFormValue('title', text)}
           error={errors.title}
+          inputStyle={{ color: colors.textSecondary }}
         />
 
         <TextInput
@@ -182,6 +188,7 @@ export default function AddActivityScreen() {
           onChangeText={(text) => updateFormValue('description', text)}
           multiline
           numberOfLines={4}
+          inputStyle={{ color: colors.textSecondary }}
         />
 
         <View style={styles.buttonsContainer}>

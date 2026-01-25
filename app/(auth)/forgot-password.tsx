@@ -30,19 +30,22 @@ export default function ForgotPasswordScreen() {
   const handleResetPassword = async () => {
     Keyboard.dismiss();
 
-    if (!email) {
-      alert('Digite seu e-mail.');
-      return;
-    }
+    const cleanEmail = email.trim().toLowerCase();
+    const isValidEmail = /\S+@\S+\.\S+/.test(cleanEmail);
+
+    if (!cleanEmail) return alert('Digite seu e-mail.');
+    if (!isValidEmail) return alert('Digite um e-mail válido.');
 
     setLoading(true);
     try {
-      await sendPasswordResetEmail(auth, email);
-      alert('Email de recuperação enviado!');
-      router.push('/login');
+      await sendPasswordResetEmail(auth, cleanEmail);
+      alert('E-mail de recuperação enviado!');
+      router.replace('/(auth)/login'); // ajuste se sua rota for essa
     } catch (error: any) {
-      console.error(error);
-      alert('Erro ao enviar email: ' + error.message);
+      const code = error?.code;
+      if (code === 'auth/user-not-found') alert('E-mail não encontrado.');
+      else if (code === 'auth/invalid-email') alert('E-mail inválido.');
+      else alert('Não foi possível enviar o e-mail de recuperação.');
     } finally {
       setLoading(false);
     }

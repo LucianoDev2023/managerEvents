@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+// app/(stack)/events/[id]/edit-participation.tsx
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,108 +11,160 @@ import {
   ScrollView,
   ActivityIndicator,
   Pressable,
+  BackHandler,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuthListener } from '@/hooks/useAuthListener';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import Button from '@/components/ui/Button';
-import { BackHandler } from 'react-native';
+import { Trash2 } from 'lucide-react-native';
 import {
   getGuestParticipation,
-  updateParticipation,
-} from '@/config/guestParticipation.ts';
-import { Trash2 } from 'lucide-react-native';
+  updateGuestParticipation,
+} from '@/hooks/guestService';
 
 export default function EditParticipationScreen() {
-  const { id, guestId } = useLocalSearchParams<{
-    id: string;
-    guestId?: string;
-  }>();
-
+  const { id: eventId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { user } = useAuthListener();
-  const userEmail = user?.email?.toLowerCase();
-  const targetEmail = guestId ? guestId : userEmail?.toLowerCase();
 
-  const [family, setFamily] = useState<string[]>([]);
-  const [newName, setNewName] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [initializing, setInitializing] = useState(true);
+  const { user } = useAuthListener();
+  const uid = user?.uid;
 
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
-  useEffect(() => {
-    const fetchParticipation = async () => {
-      if (!id || !targetEmail) return;
-      try {
-        const guest = await getGuestParticipation(id, targetEmail);
-        if (guest?.family) setFamily(guest.family);
-      } catch (error) {
-        Alert.alert('Erro', 'Não foi possível carregar sua participação.');
-      } finally {
-        setInitializing(false);
-      }
-    };
-    fetchParticipation();
-  }, [id, targetEmail]);
+  const [family, setFamily] = useState<string[]>([]);
+  const [newName, setNewName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [initializing, setInitializing] = useState(true);
 
+  // ========================
+  // 🔐 Load participation
+  // ========================
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      if (!eventId || !uid) {
+        if (mounted) setInitializing(false);
+        return;
+      }
+
+      try {
+        const guest = await getGuestParticipation(uid!, eventId);
+
+        if (!mounted) return;
+
+        if (!guest) {
+          Alert.alert('Erro', 'Participação não encontrada.');
+          router.replace('/(tabs)/profile');
+          return;
+        }
+
+        setFamily(Array.isArray(guest.family) ? guest.family : []);
+      } catch (error: any) {
+        console.log(
+          'Erro ao carregar participação:',
+          error?.code,
+          error?.message
+        );
+        Alert.alert('Erro', 'Não foi possível carregar a participação.');
+      } finally {
+        if (mounted) setInitializing(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [eventId, uid]);
+
+  // ========================
+  // 🔙 Android back handling
+  // ========================
   useEffect(() => {
     const onBackPress = () => {
-      router.push('/(tabs)/profile'); // força o retorno
+      router.replace('/(tabs)/profile');
       return true;
     };
 
-    BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [router]);
 
-    return () => {
-      BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-    };
-  }, []);
-
+  // ========================
+  // 🧠 Handlers
+  // ========================
   const handleAdd = () => {
     const trimmed = newName.trim();
     if (!trimmed) return;
-    if (family.includes(trimmed)) {
+
+    if (family.some((n) => n.toLowerCase() === trimmed.toLowerCase())) {
       Alert.alert('Atenção', 'Esse nome já está na lista.');
       return;
     }
+
     setFamily((prev) => [...prev, trimmed]);
     setNewName('');
   };
 
   const handleRemove = (name: string) => {
-    Alert.alert(
-      'Remover acompanhante',
-      `Tem certeza que deseja remover "${name}" da lista?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Remover',
-          style: 'destructive',
-          onPress: () => {
-            setFamily((prev) => prev.filter((n) => n !== name));
-          },
-        },
-      ]
-    );
+    Alert.alert('Remover acompanhante', `Remover "${name}" da lista?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Remover',
+        style: 'destructive',
+        onPress: () => setFamily((prev) => prev.filter((n) => n !== name)),
+      },
+    ]);
+  };
+
+  const handleClearAll = () => {
+    if (family.length === 0) return;
+
+    Alert.alert('Limpar lista', 'Remover todos os acompanhantes?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Remover tudo',
+        style: 'destructive',
+        onPress: () => setFamily([]),
+      },
+    ]);
   };
 
   const handleSave = async () => {
-    if (!targetEmail || !id) return;
-    setLoading(true);
+    if (!eventId || !uid) return;
+
+    setSaving(true);
     try {
-      await updateParticipation(id, targetEmail, { family });
+      await updateGuestParticipation({
+        userId: uid!,
+        eventId,
+        updates: { family },
+      });
+
       Alert.alert('✅ Sucesso', 'Participação atualizada!');
-      router.back();
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível atualizar sua participação.');
+
+      router.replace({
+        pathname: '/events/[id]/confirmed-guests',
+        params: { id: eventId },
+      } as any);
+    } catch (error: any) {
+      console.log(
+        'Erro ao atualizar participação:',
+        error?.code,
+        error?.message
+      );
+      Alert.alert('Erro', 'Não foi possível atualizar a participação.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
+  // ========================
+  // ⏳ Loading
+  // ========================
   if (initializing) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -120,6 +173,9 @@ export default function EditParticipationScreen() {
     );
   }
 
+  // ========================
+  // 🎨 UI
+  // ========================
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -129,6 +185,7 @@ export default function EditParticipationScreen() {
         <Text style={[styles.label, { color: colors.textSecondary }]}>
           Nome do acompanhante
         </Text>
+
         <View style={styles.inputRow}>
           <TextInput
             value={newName}
@@ -137,37 +194,44 @@ export default function EditParticipationScreen() {
             placeholderTextColor={colors.textSecondary}
             style={[
               styles.input,
-              {
-                flex: 1,
-                borderColor: colors.border,
-                color: colors.text,
-              },
+              { flex: 1, borderColor: colors.border, color: colors.text },
             ]}
+            returnKeyType="done"
+            onSubmitEditing={handleAdd}
           />
-          <Pressable style={styles.addButton} onPress={handleAdd}>
-            <Text style={{ color: '#fff', fontWeight: '600' }}>Adicionar</Text>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.addButton,
+              { opacity: pressed ? 0.7 : 1, backgroundColor: colors.primary },
+            ]}
+            onPress={handleAdd}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Adicionar</Text>
           </Pressable>
         </View>
 
-        {family.length > 0 && (
+        {family.length > 0 ? (
           <View style={{ marginVertical: 16 }}>
-            <Text
-              style={{
-                fontSize: 16,
-                fontFamily: 'Inter_500Medium',
-                color: colors.text,
-                marginBottom: 8,
-              }}
-            >
-              Lista atual:
-            </Text>
+            <View style={styles.listHeader}>
+              <Text style={[styles.listTitle, { color: colors.text }]}>
+                Lista atual ({family.length})
+              </Text>
+
+              <Pressable onPress={handleClearAll}>
+                <Text style={{ color: colors.error, fontWeight: '700' }}>
+                  Limpar
+                </Text>
+              </Pressable>
+            </View>
+
             {family.map((name, index) => (
               <View
-                key={index}
+                key={`${name}-${index}`}
                 style={[
                   styles.nameRow,
                   {
-                    backgroundColor: colors.background,
+                    backgroundColor: colors.backGroundSecondary,
                     borderColor: colors.border,
                   },
                 ]}
@@ -175,26 +239,26 @@ export default function EditParticipationScreen() {
                 <Text style={[styles.nameText, { color: colors.text }]}>
                   • {name}
                 </Text>
-                <Pressable
-                  onPress={() => handleRemove(name)}
-                  style={({ pressed }) => [
-                    styles.removeButton,
-                    { opacity: pressed ? 0.6 : 1 },
-                  ]}
-                >
-                  <Trash2 size={18} color="red" />
+
+                <Pressable onPress={() => handleRemove(name)}>
+                  <Trash2 size={18} color={colors.error} />
                 </Pressable>
               </View>
             ))}
           </View>
+        ) : (
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            Nenhum acompanhante cadastrado.
+          </Text>
         )}
 
         <Button
-          title="Salvar alterações"
+          title={saving ? 'Salvando...' : 'Salvar alterações'}
           onPress={handleSave}
-          disabled={loading}
+          disabled={saving}
         />
-        {loading && (
+
+        {saving && (
           <ActivityIndicator style={{ marginTop: 16 }} color={colors.primary} />
         )}
       </ScrollView>
@@ -203,28 +267,21 @@ export default function EditParticipationScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    padding: 24,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 24,
-    fontFamily: 'Inter_700Bold',
-  },
+  container: { flex: 1 },
+  content: { padding: 24 },
+
   label: {
     fontSize: 16,
     marginBottom: 8,
     fontFamily: 'Inter_500Medium',
   },
+
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
+
   input: {
     borderWidth: 1,
     borderRadius: 8,
@@ -233,17 +290,24 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     marginBottom: 12,
   },
+
   addButton: {
-    backgroundColor: '#6c47ff',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+  },
+
+  listHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+
+  listTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
   },
 
   nameRow: {
@@ -267,5 +331,12 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     padding: 6,
     borderRadius: 6,
+  },
+
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 16,
+    fontSize: 15,
+    fontFamily: 'Inter_400Regular',
   },
 });

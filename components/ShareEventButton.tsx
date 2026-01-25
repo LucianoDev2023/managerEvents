@@ -7,43 +7,60 @@ import {
   Share,
   Modal,
   useColorScheme,
+  Alert,
 } from 'react-native';
 import { SendHorizontalIcon } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
 import { LinearGradient } from 'expo-linear-gradient';
 
-interface ShareEventButtonProps {
-  title: string;
-  accessCode: string;
+type ShareEventButtonProps = {
+  shareKey: string; // ✅ único identificador de convite
+  onEnsureInvite?: () => Promise<string>;
   onShowQRCode: (payload: string) => void;
-}
+  // opcional: facilita trocar o domínio sem mexer no componente
+  baseUrl?: string; // default: https://planejeja.com.br/app.html
+};
 
 const ShareEventButton: React.FC<ShareEventButtonProps> = ({
-  title,
-  accessCode,
+  shareKey,
+  onEnsureInvite,
   onShowQRCode,
+  baseUrl = 'https://planejeja.com.br/app.html',
 }) => {
   const [showOptions, setShowOptions] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
-  const encodedTitle = encodeURIComponent(title);
-  const encodedCode = encodeURIComponent(accessCode);
-  const link = `https://planejeja.com.br/app.html?title=${encodedTitle}&code=${encodedCode}`;
+  const normalizedKey = shareKey?.trim() ?? '';
+
+  const getKey = async () => {
+    if (normalizedKey) return normalizedKey;
+    if (!onEnsureInvite) {
+      throw new Error('no-invite-generator');
+    }
+    return await onEnsureInvite();
+  };
 
   const handleShare = async () => {
     try {
+      const key = await getKey();
+      const url = `${baseUrl}?k=${encodeURIComponent(key)}`;
       await Share.share({
-        message: `🎉 Você está convidado! Veja no app Plannix: ${link}`,
-        url: link,
+        message: `🎉 Você está convidado! Abra no app Plannix: ${url}`,
+        url,
       });
     } catch {
-      alert('Erro ao compartilhar o link.');
+      Alert.alert('Erro', 'Erro ao gerar ou compartilhar o link.');
     }
   };
 
-  const handleQRCode = () => {
-    onShowQRCode(JSON.stringify({ eventTitle: title, accessCode }));
+  const handleQRCode = async () => {
+    try {
+      const key = await getKey();
+      onShowQRCode(JSON.stringify({ shareKey: key, v: 1 }));
+    } catch {
+      Alert.alert('Erro', 'Erro ao gerar QR Code.');
+    }
   };
 
   const gradientColors: [string, string, string] =
@@ -51,14 +68,18 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({
       ? ['#0b0b0f', '#1b0033', '#3e1d73']
       : ['#ffffff', '#f0f0ff', '#e9e6ff'];
 
+  const disabled = normalizedKey.length === 0;
+
   return (
     <View style={styles.container}>
       <Pressable
+        disabled={disabled}
         onPress={() => setShowOptions(true)}
         style={({ pressed }) => [
           styles.shareBtn,
-          { backgroundColor: '#09960C' },
-          pressed && { opacity: 0.8 },
+          { backgroundColor: disabled ? '#5f6b5f' : '#09960C' },
+          pressed && !disabled && { opacity: 0.8 },
+          disabled && { opacity: 0.7 },
         ]}
       >
         <SendHorizontalIcon size={16} color="#fff" />
@@ -73,10 +94,10 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({
             locations={[0, 0.7, 1]}
           >
             <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Compartilhar evento
+              Compartilhar seu evento
             </Text>
             <Text style={[styles.modalSubtitle, { color: colors.text2 }]}>
-              Escolha o método:
+              Escolha a forma:
             </Text>
 
             <Pressable
@@ -140,9 +161,7 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({
 export default ShareEventButton;
 
 const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-  },
+  container: { alignItems: 'center' },
   shareBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -156,6 +175,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontSize: 14,
     marginLeft: 6,
+    padding: 2,
   },
   modalOverlay: {
     flex: 1,
@@ -172,16 +192,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
+  modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  modalSubtitle: { fontSize: 14, marginBottom: 16, textAlign: 'center' },
   optionBtn: {
     paddingVertical: 12,
     paddingHorizontal: 20,
@@ -190,16 +202,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
-  optionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  optionIcon: {
-    fontSize: 18,
-  },
-  optionText: {
-    fontWeight: '600',
-    fontSize: 15,
-  },
+  optionContent: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  optionIcon: { fontSize: 18 },
+  optionText: { fontWeight: '600', fontSize: 15 },
 });

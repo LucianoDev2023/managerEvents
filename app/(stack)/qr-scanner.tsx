@@ -41,10 +41,10 @@ export default function QRScannerScreen() {
     pulse.value = withRepeat(
       withSequence(
         withTiming(1.05, { duration: 500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 500, easing: Easing.inOut(Easing.ease) })
+        withTiming(1, { duration: 500, easing: Easing.inOut(Easing.ease) }),
       ),
       -1,
-      true
+      true,
     );
 
     scannerY.value = withRepeat(
@@ -53,7 +53,7 @@ export default function QRScannerScreen() {
         easing: Easing.inOut(Easing.linear),
       }),
       -1,
-      true
+      true,
     );
   }, []);
 
@@ -70,15 +70,14 @@ export default function QRScannerScreen() {
     if (scanned) return;
 
     setScanned(true);
-    console.log(qrData);
     try {
-      router.replace({
-        pathname: '/(newevents)/search',
-        params: {
-          accessCode: qrData.accessCode,
-          title: qrData.eventTitle,
-        },
-      });
+      const k =
+        typeof qrData.shareKey === 'string' ? qrData.shareKey.trim() : '';
+      if (!k) {
+        Alert.alert('Erro', 'QR Code inválido');
+      } else {
+        router.replace({ pathname: '/(newevents)/search', params: { k } });
+      }
     } catch (error) {
       Alert.alert('Erro', 'QR Code inválido');
     } finally {
@@ -96,7 +95,7 @@ export default function QRScannerScreen() {
           clearTimeout(scanTimeoutRef.current);
         }
       };
-    }, [])
+    }, []),
   );
 
   if (!permission) return <View style={styles.container} />;
@@ -118,7 +117,9 @@ export default function QRScannerScreen() {
             styles.permissionContent,
             {
               paddingTop:
-                Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
+                Platform.OS === 'android'
+                  ? (RNStatusBar.currentHeight ?? 40)
+                  : 0,
             },
           ]}
         >

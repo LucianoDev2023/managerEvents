@@ -8,7 +8,7 @@ import {
   query,
   serverTimestamp,
 } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import { db } from '@/config/firebase';
 
@@ -26,13 +26,17 @@ interface UsePhotoCommentsParams {
   programId: string;
   activityId: string;
   photoId: string;
+
   currentUser: {
     uid: string;
     email: string;
     isSuperAdmin: boolean;
     name: string;
   };
-  eventCreatorId: string;
+
+  // ✅ Moderadores
+  eventCreatorId: string; // event.userId
+  photoCreatorId: string; // photo.createdBy
 }
 
 export function usePhotoComments({
@@ -42,6 +46,7 @@ export function usePhotoComments({
   photoId,
   currentUser,
   eventCreatorId,
+  photoCreatorId,
 }: UsePhotoCommentsParams) {
   const [comments, setComments] = useState<PhotoComment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -51,6 +56,8 @@ export function usePhotoComments({
   );
 
   useEffect(() => {
+    if (!eventId || !programId || !activityId || !photoId) return;
+
     const commentsRef = collection(
       db,
       'events',
@@ -67,19 +74,39 @@ export function usePhotoComments({
     const q = query(commentsRef, orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data: PhotoComment[] = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        text: doc.data().text,
-        email: doc.data().email,
-        userId: doc.data().userId,
-        createdAt: doc.data().createdAt,
-        name: doc.data().name,
-      }));
+      const data: PhotoComment[] = snapshot.docs.map((d) => {
+        const raw = d.data() as any;
+        return {
+          id: d.id,
+          text: raw.text ?? '',
+          email: raw.email ?? '',
+          userId: raw.userId ?? '',
+          createdAt: raw.createdAt,
+          name: raw.name,
+        };
+      });
+
       setComments(data);
     });
 
     return () => unsubscribe();
   }, [eventId, programId, activityId, photoId]);
+
+  const canDeleteComment = useMemo(() => {
+    return (comment: PhotoComment) => {
+      const isAuthor = comment.userId === currentUser.uid;
+      const isEventCreator = currentUser.uid === eventCreatorId;
+      const isPhotoCreator = currentUser.uid === photoCreatorId;
+      const isSuperAdmin = currentUser.isSuperAdmin;
+
+      return isAuthor || isEventCreator || isPhotoCreator || isSuperAdmin;
+    };
+  }, [
+    currentUser.uid,
+    currentUser.isSuperAdmin,
+    eventCreatorId,
+    photoCreatorId,
+  ]);
 
   const addComment = async () => {
     if (!newComment.trim() || isAddingComment) return;
@@ -113,14 +140,6 @@ export function usePhotoComments({
     } finally {
       setIsAddingComment(false);
     }
-  };
-
-  const canDeleteComment = (comment: PhotoComment) => {
-    return (
-      comment.userId === currentUser.uid ||
-      currentUser.uid === eventCreatorId ||
-      currentUser.isSuperAdmin
-    );
   };
 
   const deleteComment = async (comment: PhotoComment) => {
@@ -185,7 +204,7 @@ export function usePhotoComments({
     setNewComment,
     addComment,
     deleteComment,
-    confirmDeleteComment, // <-- incluído aqui
+    confirmDeleteComment,
     canDeleteComment,
     isAddingComment,
     isDeletingCommentIds,

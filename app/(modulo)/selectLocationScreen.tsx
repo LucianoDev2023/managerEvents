@@ -9,7 +9,11 @@ import {
   StatusBar as RNStatusBar,
   Image,
 } from 'react-native';
-import MapView, { Marker, MapPressEvent } from 'react-native-maps';
+import MapView, {
+  Marker,
+  MapPressEvent,
+  PROVIDER_GOOGLE,
+} from 'react-native-maps';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import Constants from 'expo-constants';
@@ -18,13 +22,15 @@ import Colors from '@/constants/Colors';
 import { LocateFixed } from 'lucide-react-native';
 import 'react-native-get-random-values';
 
-const GOOGLE_PLACES_API_KEY = 'AIzaSyD_UKirzoq-kOOBaxo63sct1QbH-46zvTs';
+const GOOGLE_PLACES_API_KEY = 'AIzaSyAUJ6vHju5u1F6h1Y_nRqx2aUSaRlpC7y4';
 
 export default function SelectLocationScreen() {
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
   const colorScheme = 'light';
   const colors = Colors[colorScheme];
+  const [mapReady, setMapReady] = useState(false);
+
   const {
     id,
     mode = 'create',
@@ -83,7 +89,11 @@ export default function SelectLocationScreen() {
             latitude,
             longitude,
           });
-          const name = reverse?.[0]?.name || 'Minha localização atual';
+          const addr = reverse?.[0];
+          const name =
+            [addr?.street, addr?.name, addr?.district, addr?.city]
+              .filter(Boolean)
+              .join(', ') || 'Minha localização atual';
 
           setSelected({ latitude, longitude, name });
           setMapRegion({
@@ -106,19 +116,15 @@ export default function SelectLocationScreen() {
   }, []);
 
   const handleMapPress = (e: MapPressEvent) => {
-    setSelected({
-      latitude: e.nativeEvent.coordinate.latitude,
-      longitude: e.nativeEvent.coordinate.longitude,
-      name: 'Local no Mapa',
-    });
-    mapRef.current?.animateToRegion(
-      {
-        ...e.nativeEvent.coordinate,
-        latitudeDelta: mapRegion.latitudeDelta,
-        longitudeDelta: mapRegion.longitudeDelta,
-      },
-      500
-    );
+    const { latitude, longitude } = e.nativeEvent.coordinate;
+
+    setSelected({ latitude, longitude, name: 'Local no Mapa' });
+
+    setMapRegion((prev) => ({
+      ...prev,
+      latitude,
+      longitude,
+    }));
   };
 
   const handlePlaceSelect = (data: any, details: any | null = null) => {
@@ -132,7 +138,7 @@ export default function SelectLocationScreen() {
           latitudeDelta: 0.005,
           longitudeDelta: 0.005,
         },
-        500
+        500,
       );
     }
   };
@@ -160,14 +166,18 @@ export default function SelectLocationScreen() {
     if (status !== 'granted') {
       Alert.alert(
         'Permissão negada',
-        'Ative a localização para usar essa funcionalidade.'
+        'Ative a localização para usar essa funcionalidade.',
       );
       return;
     }
     const location = await Location.getCurrentPositionAsync({});
     const { latitude, longitude } = location.coords;
     const reverse = await Location.reverseGeocodeAsync({ latitude, longitude });
-    const name = reverse?.[0]?.name || 'Minha localização';
+    const addr = reverse?.[0];
+    const name =
+      [addr?.street, addr?.name, addr?.district, addr?.city]
+        .filter(Boolean)
+        .join(', ') || 'Minha localização';
 
     setSelected({ latitude, longitude, name });
 
@@ -271,14 +281,19 @@ export default function SelectLocationScreen() {
 
       <MapView
         ref={mapRef}
+        provider={PROVIDER_GOOGLE}
         style={styles.map}
         onPress={handleMapPress}
-        initialRegion={mapRegion}
-        showsUserLocation={true}
+        region={mapRegion}
+        showsUserLocation
+        onMapReady={() => setMapReady(true)}
       >
         {selected && (
           <Marker
-            coordinate={selected}
+            coordinate={{
+              latitude: selected.latitude,
+              longitude: selected.longitude,
+            }}
             title={selected.name || 'Local Selecionado'}
           />
         )}

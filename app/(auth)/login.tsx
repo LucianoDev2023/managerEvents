@@ -13,29 +13,13 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Eye, EyeOff } from 'lucide-react-native';
-import { useColorScheme } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/config/firebase';
-import Colors from '@/constants/Colors';
-
-import { db } from '@/config/firebase';
-import {
-  addDoc,
-  collection,
-  deleteField,
-  doc,
-  getDocs,
-  setDoc,
-  Timestamp,
-  updateDoc,
-} from 'firebase/firestore';
-import { Guest } from '@/types';
 
 export default function LoginScreen() {
-  const scheme = useColorScheme() ?? 'dark';
-  const theme = Colors[scheme];
   const router = useRouter();
+  const { k } = useLocalSearchParams<{ k?: string }>();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -52,7 +36,15 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      const resolvedKey =
+        typeof k === 'string' && k.trim() ? (k as string).trim() : '';
+      if (resolvedKey) {
+        router.replace({
+          pathname: '/(newevents)/search',
+          params: { k: resolvedKey },
+        } as any);
+      }
     } catch (error: any) {
       alert('Erro no login: Confirme email e/ou senha');
     } finally {
@@ -132,6 +124,27 @@ export default function LoginScreen() {
               Cadastre-se
             </Text>
           </Text>
+
+          {/* ✅ LGPD: links obrigatórios no login */}
+          <View style={styles.legalBox}>
+            <Text style={styles.legalText}>
+              Ao usar o app, você concorda com nossa{' '}
+              <Text
+                style={styles.legalLink}
+                onPress={() => router.push('/(auth)/privacidade')}
+              >
+                Política de Privacidade
+              </Text>{' '}
+              e{' '}
+              <Text
+                style={styles.legalLink}
+                onPress={() => router.push('/(auth)/termos')}
+              >
+                Termos de Uso
+              </Text>
+              .
+            </Text>
+          </View>
         </KeyboardAvoidingView>
       </LinearGradient>
     </TouchableWithoutFeedback>
@@ -207,5 +220,23 @@ const styles = StyleSheet.create({
   },
   signUpText: {
     color: '#b18aff',
+  },
+
+  // ✅ bloco LGPD
+  legalBox: {
+    marginTop: 18,
+    width: '100%',
+    paddingHorizontal: 6,
+  },
+  legalText: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
+  },
+  legalLink: {
+    color: '#b18aff',
+    textDecorationLine: 'underline',
+    fontWeight: '600',
   },
 });

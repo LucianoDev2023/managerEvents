@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Abrindo convite</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <style>
+      body {
+        margin: 0;
+        font-family: 'Segoe UI', sans-serif;
+        background: linear-gradient(to bottom, #0b0b0f, #1b0033, #3e1d73);
+        color: #ffffff;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 24px;
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+      }
+
+      h1 {
+        font-size: 24px;
+        margin-bottom: 10px;
+      }
+
+      p {
+        color: #cccccc;
+        font-size: 16px;
+      }
+
+      .logo {
+        width: 64px;
+        height: 64px;
+        margin-bottom: 16px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="container">
+      <img class="logo" src="logo.png" alt="PlanejeJá" />
+      <h1 id="status">Abrindo convite…</h1>
+      <p id="description">Aguarde enquanto redirecionamos você.</p>
+    </div>
+
+    <script>
+      function isMobile() {
+        return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const shareKey = (params.get('k') || params.get('shareKey') || '').trim();
+
+      const apkDownload = 'https://planejeja.com.br/down';
+      const deepLink = shareKey
+        ? `planejeja://invite?k=${encodeURIComponent(shareKey)}`
+        : null;
+
+      const statusEl = document.getElementById('status');
+      const descEl = document.getElementById('description');
+
+      // Cria um botão caso o auto-redirect seja bloqueado
+      function showOpenButton() {
+        const btn = document.createElement('button');
+        btn.textContent = 'Abrir no app';
+        btn.style.marginTop = '16px';
+        btn.style.padding = '12px 16px';
+        btn.style.borderRadius = '12px';
+        btn.style.border = '0';
+        btn.style.cursor = 'pointer';
+        btn.style.fontWeight = '600';
+        btn.style.background = '#09960C';
+        btn.style.color = '#fff';
+        btn.onclick = () => {
+          window.location.href = deepLink;
+        };
+        document.getElementById('container').appendChild(btn);
+
+        const small = document.createElement('p');
+        small.style.marginTop = '10px';
+        small.style.fontSize = '14px';
+        small.style.color = '#cccccc';
+        small.textContent =
+          'Se não tiver o app instalado, você será direcionado para baixar.';
+        document.getElementById('container').appendChild(small);
+      }
+
+      // Só faz fallback se a página ainda estiver visível (ou seja, app não abriu)
+      function scheduleFallback(ms) {
+        setTimeout(() => {
+          // Se o app abriu, normalmente o browser perde foco/visibilidade
+          if (document.visibilityState === 'visible') {
+            window.location.href = apkDownload;
+          }
+        }, ms);
+      }
+
+      setTimeout(() => {
+        if (!shareKey) {
+          statusEl.innerText = 'CONVITE INVÁLIDO';
+          descEl.innerText = 'O link não contém um convite válido.';
+          return;
+        }
+
+        if (!isMobile()) {
+          statusEl.innerText = 'Abra no celular';
+          descEl.innerText =
+            'Este convite abre pelo aplicativo. Você pode baixar o app abaixo.';
+          window.location.href = apkDownload;
+          return;
+        }
+
+        statusEl.innerText = 'Abrindo no app…';
+        descEl.innerText =
+          'Se não abrir automaticamente, toque no botão abaixo.';
+
+        // Alguns browsers bloqueiam redirect automático → mostra botão sempre
+        showOpenButton();
+
+        // tenta abrir o app
+        window.location.href = deepLink;
+
+        // fallback (Android costuma precisar de 1200–2500ms)
+        scheduleFallback(1800);
+      }, 400);
+    </script>
+  </body>
+</html>

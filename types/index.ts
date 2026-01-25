@@ -3,8 +3,8 @@ export type PermissionLevel = 'Super Admin' | 'Admin parcial';
 export type GuestStatus = 'confirmed' | 'interested';
 
 export type Guest = {
+  userId: string;
   name: string;
-  email: string;
   mode: 'confirmado' | 'acompanhando';
   family?: string[];
 };
@@ -16,18 +16,19 @@ export type Event = {
   startDate: Date;
   endDate: Date;
   description: string;
-  accessCode?: string;
   coverImage?: string;
-  userId: string;
-  createdBy: string;
-  subAdmins?: SubAdmin[];
+  userId: string; // ✅ dono
+  subAdminsByUid?: Record<string, PermissionLevel>; // ✅ novo
   programs: Program[];
+  shareKey?: string;
 };
 
 export type SubAdmin = {
   email: string;
   level: PermissionLevel;
 };
+
+export type GuestMode = 'confirmado' | 'acompanhando';
 
 export type Program = {
   id: string;
@@ -64,11 +65,10 @@ export type FormValues = {
   startDate: Date;
   endDate: Date;
   description: string;
-  accessCode: string;
   coverImage?: string;
   userId: string;
   createdBy: string;
-  searchKey: string; // ✅ nova chave indexada para buscas
+  searchKey: string;
 };
 
 type LocationScreenParams = {

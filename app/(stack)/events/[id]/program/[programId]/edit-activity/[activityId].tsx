@@ -209,7 +209,7 @@ export default function EditActivityScreen() {
             headerTitle: 'Atividade não encontrada',
             headerLeft: () => (
               <TouchableOpacity onPress={() => router.back()}>
-                <ArrowLeft size={24} color={colors.text} />
+                <ArrowLeft size={24} color={colors.primary} />
               </TouchableOpacity>
             ),
           }}
@@ -234,16 +234,16 @@ export default function EditActivityScreen() {
         options={{
           headerShown: true,
           headerTitle: 'Editar atividade',
-          headerTitleStyle: {
-            fontFamily: 'Inter-Bold',
-            fontSize: 18,
-          },
+          // headerTitleStyle: {
+          //   fontFamily: 'Inter-Bold',
+          //   fontSize: 18,
+          // },
           headerLeft: () => (
             <TouchableOpacity
               onPress={() => router.back()}
               style={styles.headerButton}
             >
-              <ArrowLeft size={24} color={colors.text} />
+              <ArrowLeft size={24} color={colors.primary} />
             </TouchableOpacity>
           ),
           headerRight: () => (

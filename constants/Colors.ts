@@ -2,6 +2,7 @@ export default {
   light: {
     background: '#ffffff',
     backgroundC: '#B9B6FF',
+    backgroundd: '#6a66abff',
     backGroundSecondary: '#fff',
     backgroundComents: '#fff',
     text: '#111',

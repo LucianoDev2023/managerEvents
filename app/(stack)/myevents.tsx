@@ -1,5 +1,10 @@
-// app/(tabs)/my-events.tsx
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   View,
   Text,
@@ -13,194 +18,134 @@ import {
   Image,
   TextInput,
   BackHandler,
-  Linking,
   ActivityIndicator,
+  Share,
 } from 'react-native';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import { useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import ShareEventButton from '@/components/ShareEventButton';
-
-import {
-  MapPin,
-  Share2,
-  QrCode,
-  KeyRound,
-  HeartOff,
-  Heart,
-} from 'lucide-react-native';
-import LoadingOverlay from '@/components/LoadingOverlay';
-import QRCode from 'react-native-qrcode-svg';
-import ViewShot from 'react-native-view-shot';
+import { Share2, KeyRound, Heart } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import QRCode from 'react-native-qrcode-svg';
+import ViewShot from 'react-native-view-shot';
+import ShareEventButton from '@/components/ShareEventButton';
+
 import Colors from '@/constants/Colors';
 import Button from '@/components/ui/Button';
 import RoleBadge from '@/components/ui/RoleBadge';
-import type { Event, PermissionLevel } from '@/types/index';
-import LottieView from 'lottie-react-native';
+import type { Event, GuestMode, PermissionLevel } from '@/types/index';
 import { useFollowedEvents } from '@/hooks/useFollowedEvents';
 import { useEvents } from '@/context/EventsContext';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/config/firebase';
-
-import {
-  getGuestParticipationsByEmail,
-  getGuestParticipationsByEventId,
-} from '@/hooks/guestService';
-import { scheduleNotification } from '../utils/notifications';
+import { createInviteForEvent } from '@/hooks/inviteService';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function MyEventsScreen() {
-  const [invitedEvents, setInvitedEvents] = useState<Event[]>([]);
-  const [allUserEvents, setAllUserEvents] = useState<Event[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
+  const router = useRouter();
 
   const {
-    toggleFollowEvent,
-    isFollowing,
-    followedEvents,
-    removeFollowedEvent,
-  } = useFollowedEvents();
+    state,
+    updateEvent,
+    getGuestParticipationsByEventId,
+    getGuestParticipationsByUserId,
+    fetchEvents,
+  } = useEvents();
 
-  const router = useRouter();
-  const { state, updateEvent } = useEvents();
+  const { toggleFollowEvent, isFollowing } = useFollowedEvents();
+
   const auth = getAuth();
-  const userEmail = auth.currentUser?.email?.toLowerCase();
+  const userUid = auth.currentUser?.uid ?? '';
+  const [myGuestModeByEventId, setMyGuestModeByEventId] = useState<
+    Record<string, GuestMode>
+  >({});
+
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
-  // const [isLoading, setIsLoading] = useState(false);
-
-  // useEffect(() => {
-  //   const timeout = setTimeout(() => {
-  //     setIsLoading(false); // garante encerramento após X tempo
-  //   }, 8000);
-
-  //   if (state.events) {
-  //     setIsLoading(false);
-  //     clearTimeout(timeout);
-  //   }
-
-  //   return () => clearTimeout(timeout);
-  // }, [state.events]);
-
-  const [qrVisible, setQrVisible] = useState(false);
-  const [qrPayload, setQrPayload] = useState('');
-  const qrRef = useRef<ViewShot>(null);
-
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [permissionEmail, setPermissionEmail] = useState('');
-  const [permissionLevel, setPermissionLevel] =
-    useState<PermissionLevel>('Admin parcial');
 
   const gradientColors: [string, string, ...string[]] =
     colorScheme === 'dark'
       ? ['#0b0b0f', '#1b0033', '#3e1d73']
       : ['#ffffff', '#f0f0ff', '#e9e6ff'];
 
-  // Event handlers
-  const handleNavigate = (id: string) => {
-    router.push({ pathname: '/events/[id]', params: { id } });
-  };
-  const handleOpenGuests = async (eventId: string) => {
-    try {
-      const guests = await getGuestParticipationsByEventId(eventId);
-      // se quiser salvar no contexto:
-      // dispatch({ type: 'SET_EVENT_GUESTS', payload: { eventId, guests } });
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível carregar os convidados.');
-    }
-  };
+  const isFetchingRef = useRef(false);
+  const [allUserEvents, setAllUserEvents] = useState<Event[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
 
-  const handleShareQR = async () => {
-    if (!qrRef.current) return;
+  const [qrVisible, setQrVisible] = useState(false);
+  const [qrPayload, setQrPayload] = useState('');
+  const qrRef = useRef<any>(null);
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+
+  const [permissionUid, setPermissionUid] = useState('');
+  const [permissionLevel, setPermissionLevel] =
+    useState<PermissionLevel>('Admin parcial');
+
+  // ---------- Navigation (sem "any") ----------
+  const goToEvent = useCallback(
+    (eventId: string) => {
+      const href = {
+        pathname: '/(stack)/events/[id]',
+        params: { id: eventId },
+      } as const satisfies Href;
+
+      router.push(href);
+    },
+    [router]
+  );
+
+  const goToGuests = useCallback(
+    async (eventId: string) => {
+      try {
+        await getGuestParticipationsByEventId(eventId);
+
+        const href = {
+          pathname: '/events/[id]/confirmed-guests',
+          params: { id: eventId },
+        } as const satisfies Href;
+
+        router.push(href);
+      } catch {
+        Alert.alert('Erro', 'Não foi possível carregar os convidados.');
+      }
+    },
+    [getGuestParticipationsByEventId, router]
+  );
+
+  // ---------- QR Share ----------
+  const handleShareQR = useCallback(async () => {
+    if (!qrRef.current?.capture) return;
 
     try {
-      const uri = await qrRef.current.capture?.();
+      const uri = await qrRef.current.capture();
       if (!uri) return;
 
       const fileUri = `${FileSystem.cacheDirectory}qr_${Date.now()}.png`;
       await FileSystem.copyAsync({ from: uri, to: fileUri });
 
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri);
-      } else {
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
         Alert.alert('Compartilhamento não disponível');
+        return;
       }
+
+      await Sharing.shareAsync(fileUri);
     } catch (error) {
       console.error('QR Share Error:', error);
       Alert.alert('Erro', 'Não foi possível compartilhar o QR Code.');
     }
-  };
+  }, []);
 
-  const openPermissionModal = (eventId: string) => {
-    setSelectedEventId(eventId);
-    setModalVisible(true);
-  };
-
-  const savePermission = () => {
-    if (!permissionEmail.trim() || !selectedEventId) {
-      Alert.alert('Atenção', 'Insira um email válido.');
-      return;
-    }
-
-    const selectedEvent = state.events.find(
-      (event) => event.id === selectedEventId
-    );
-    if (!selectedEvent) return;
-
-    const creatorEmail = selectedEvent.createdBy?.toLowerCase();
-    const enteredEmail = permissionEmail.trim().toLowerCase();
-
-    if (enteredEmail === creatorEmail) {
-      Alert.alert(
-        'Email inválido',
-        'O email inserido é o mesmo do criador do evento. Não é necessário conceder permissão.'
-      );
-      return;
-    }
-
-    const existingAdmin = selectedEvent.subAdmins?.find(
-      (admin) => admin.email.toLowerCase() === enteredEmail
-    );
-
-    if (existingAdmin) {
-      Alert.alert('Atenção', 'Este usuário já tem permissão para este evento.');
-      return;
-    }
-
-    const updatedEvents = state.events.map((event) => {
-      if (event.id === selectedEventId) {
-        return {
-          ...event,
-          subAdmins: [
-            ...(event.subAdmins ?? []),
-            {
-              email: enteredEmail,
-              level: permissionLevel,
-            },
-          ],
-        };
-      }
-      return event;
-    });
-
-    const updatedEvent = updatedEvents.find((e) => e.id === selectedEventId);
-    if (updatedEvent) updateEvent(updatedEvent);
-
-    setPermissionEmail('');
-    setModalVisible(false);
-  };
-
+  // ---------- Android back ----------
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        router.push('/');
+        router.push('/' as Href);
         return true;
       };
 
@@ -210,203 +155,257 @@ export default function MyEventsScreen() {
     }, [router])
   );
 
-  const renderEventItem = ({ item }: { item: Event }) => {
-    const isCreator = item.createdBy?.toLowerCase() === userEmail;
-    const subAdmin = item.subAdmins?.find(
-      (admin) => admin.email.toLowerCase() === userEmail
-    );
-    const isAdm = subAdmin?.level === 'Super Admin';
-
-    return (
-      <AnimatedPressable
-        entering={FadeIn.duration(300)}
-        exiting={FadeOut.duration(200)}
-        onPress={() => handleNavigate(item.id)}
-      >
-        <Animated.View style={styles.card}>
-          <View style={styles.imageWrapper}>
-            <Image
-              source={{ uri: item.coverImage }}
-              style={styles.image}
-              resizeMode="cover"
-            />
-            <View style={styles.overlay}>
-              {isCreator && <RoleBadge role="Super Admin" />}
-              {subAdmin && !isCreator && (
-                <RoleBadge role={isAdm ? 'Super Admin' : 'Adm parcial'} />
-              )}
-
-              <Text style={styles.overlayTitle} numberOfLines={1}>
-                {item.title}
-              </Text>
-              <Text style={styles.overlayLocation} numberOfLines={1}>
-                {item.location}
-              </Text>
-              <View style={styles.eventCard}>
-                <Text style={styles.overlayDesc} numberOfLines={2}>
-                  {`${new Date(item.startDate).toLocaleDateString(
-                    'pt-BR'
-                  )} - ${new Date(item.endDate).toLocaleDateString('pt-BR')}`}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.buttonsRow}>
-            <Pressable
-              onPress={async () => {
-                await handleOpenGuests(item.id);
-                router.push({
-                  pathname: '/events/[id]/confirmed-guests',
-                  params: { id: item.id },
-                });
-              }}
-              style={[styles.mapBtn, { borderColor: colors.border }]}
-            >
-              <Text style={[styles.mapBtnText, { color: colors.text2 }]}>
-                Convidados
-              </Text>
-            </Pressable>
-
-            {/* <Pressable
-              onPress={() => {
-                setQrPayload(
-                  JSON.stringify({
-                    eventTitle: item.title,
-                    accessCode: item.accessCode,
-                  })
-                );
-                setQrVisible(true);
-              }}
-              style={styles.shareBtn}
-            >
-              {<Share2 size={16} color="white" />}
-              <Text style={styles.shareBtnText}> {'Enviar '}</Text>
-              <QrCode size={16} color="white" />
-            </Pressable> */}
-            {item.accessCode && (
-              <ShareEventButton
-                title={item.title}
-                accessCode={item.accessCode}
-                onShowQRCode={(payload) => {
-                  setQrPayload(payload);
-                  setQrVisible(true);
-                }}
-              />
-            )}
-
-            {isCreator || isAdm ? (
-              <Button
-                title="Permissão"
-                size="small"
-                onPress={() => openPermissionModal(item.id)}
-                icon={<KeyRound size={14} color="white" />}
-                style={styles.permissionBtn}
-                textStyle={styles.permissionText}
-              />
-            ) : (
-              <Pressable
-                onPress={() => {
-                  const wasFollowing = isFollowing(item.id);
-                  toggleFollowEvent(item);
-
-                  if (wasFollowing) {
-                    Alert.alert('Removido', 'Você deixou de seguir o evento.');
-                  } else {
-                    Alert.alert(
-                      'Sucesso',
-                      'Você está agora seguindo este evento e poderá acompanhar no menu principal,"Seguindo"'
-                    );
-                  }
-                }}
-                style={styles.permissionBtn}
-              >
-                <View style={styles.btnseguir}>
-                  <Heart size={16} color={colors.primary} />
-                  <Text
-                    style={[styles.mapBtnText, { color: colors.textSecondary }]}
-                  >
-                    {isFollowing(item.id) ? 'Seguindo' : 'Seguir'}
-                  </Text>
-                </View>
-              </Pressable>
-            )}
-          </View>
-        </Animated.View>
-      </AnimatedPressable>
-    );
-  };
-
+  // ---------- Fetch & Filter ----------
   useEffect(() => {
-    const fetchUserEvents = async () => {
-      if (!userEmail) return;
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    let active = true;
 
+    const load = async () => {
       setLoadingEvents(true);
-      const start = Date.now(); // marca o início
 
       try {
-        const participations = await getGuestParticipationsByEmail(userEmail);
-        const eventIdsFromGuests = participations.map((p) => p.eventId);
+        // garante eventos no state (se seu contexto já faz cache, ok)
+        if (!state.events.length) {
+          await fetchEvents();
+        }
+
+        // se não logado, mostra o que tiver no state
+        if (!userUid) {
+          if (!active) return;
+          setAllUserEvents(state.events);
+          return;
+        }
+
+        const participations = await getGuestParticipationsByUserId(userUid);
+
+        const modeMap: Record<string, GuestMode> = {};
+
+        for (const p of participations) {
+          if (
+            p?.eventId &&
+            (p.mode === 'confirmado' || p.mode === 'acompanhando')
+          ) {
+            modeMap[p.eventId] = p.mode;
+          }
+        }
+
+        setMyGuestModeByEventId(modeMap);
+
+        const guestEventIds = new Set(Object.keys(modeMap));
 
         const result = state.events.filter((event) => {
-          const isCreator = event.createdBy?.toLowerCase() === userEmail;
-          const isSubAdmin = event.subAdmins?.some(
-            (admin) => admin.email.toLowerCase() === userEmail
-          );
-          const isGuest = eventIdsFromGuests.includes(event.id);
+          const isCreator = event.userId === userUid;
+          const isSubAdmin = !!event.subAdminsByUid?.[userUid];
+          const isGuest = guestEventIds.has(event.id);
 
           return isCreator || isSubAdmin || isGuest;
         });
 
-        const uniqueEvents = Array.from(
-          new Map(result.map((e) => [e.id, e])).values()
+        const finalList = (result.length ? result : state.events).filter(
+          Boolean
         );
 
-        setAllUserEvents(uniqueEvents);
+        // remove duplicados
+        const unique = Array.from(
+          new Map(finalList.map((e) => [e.id, e])).values()
+        );
+
+        if (!active) return;
+        setAllUserEvents(unique);
       } catch (err) {
         console.error('Erro ao buscar eventos relacionados:', err);
+        if (!active) return;
+        // fallback: pelo menos mostra algo
+        setAllUserEvents(state.events);
       } finally {
-        // garante ao menos 1 segundo de exibição do loading
-        const elapsed = Date.now() - start;
-        const delay = Math.max(0, 1000 - elapsed);
-
-        setTimeout(() => setLoadingEvents(false), delay);
+        if (!active) return;
+        setLoadingEvents(false);
       }
     };
 
-    fetchUserEvents();
-  }, [state.events, userEmail]);
+    load();
 
-  // if (isLoading) {
-  //   return (
-  //     <View style={styles.centeredContent}>
-  //       <ActivityIndicator size="large" color={colors.primary} />
-  //       <Text
-  //         style={[
-  //           styles.emptyText,
-  //           { color: colors.textSecondary, marginTop: 12 },
-  //         ]}
-  //       >
-  //         Carregando programação...
-  //       </Text>
-  //     </View>
-  //   );
-  // }
-  // if (loadingEvents) {
-  //   return (
-  //     <View style={styles.centeredContent}>
-  //       <ActivityIndicator size="large" color={colors.primary} />
-  //       <Text
-  //         style={[
-  //           styles.emptyText,
-  //           { color: colors.textSecondary, marginTop: 12 },
-  //         ]}
-  //       >
-  //         Carregando eventos...
-  //       </Text>
-  //     </View>
-  //   );
-  // }
+    return () => {
+      active = false;
+      isFetchingRef.current = false;
+    };
+  }, [userUid, state.events.length]);
+
+  const ensureInviteForEvent = useCallback(
+    async (event: Event) => {
+      if (event.shareKey?.trim()) return event.shareKey.trim();
+
+      // cria no Firestore: eventShareKeys + eventInviteSummaries
+      const newKey = await createInviteForEvent(event.id);
+
+      // salva no próprio evento para não gerar outro depois
+      await updateEvent({
+        ...event,
+        shareKey: newKey,
+      });
+
+      return newKey;
+    },
+    [updateEvent]
+  );
+
+  const renderEventItem = useCallback(
+    ({ item }: { item: Event }) => {
+      const isCreator = item.userId === userUid;
+      const myLevel = userUid ? item.subAdminsByUid?.[userUid] ?? null : null;
+      const isSuperAdmin = isCreator || myLevel === 'Super Admin';
+      const myGuestMode = myGuestModeByEventId[item.id] ?? null;
+      const isGuest = !!myGuestMode;
+
+      return (
+        <AnimatedPressable
+          entering={FadeIn.duration(250)}
+          exiting={FadeOut.duration(180)}
+          onPress={() => goToEvent(item.id)}
+        >
+          <Animated.View style={styles.card}>
+            <View style={styles.imageWrapper}>
+              {!!item.coverImage ? (
+                <Image
+                  source={{ uri: item.coverImage }}
+                  style={styles.image}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.image, { backgroundColor: '#111' }]} />
+              )}
+
+              <View style={styles.overlay}>
+                {isCreator && <RoleBadge role="Criador" />}
+
+                {!isCreator && myLevel && (
+                  <RoleBadge
+                    role={
+                      myLevel === 'Super Admin' ? 'Super Admin' : 'Adm parcial'
+                    }
+                  />
+                )}
+
+                {!isCreator && !myLevel && isGuest && (
+                  <RoleBadge
+                    role="Convidado"
+                    label={
+                      myGuestMode === 'confirmado'
+                        ? 'Convidado ✅'
+                        : 'Convidado 👀'
+                    }
+                  />
+                )}
+
+                <Text style={styles.overlayTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
+
+                <Text style={styles.overlayLocation} numberOfLines={1}>
+                  {item.location}
+                </Text>
+
+                <View style={styles.eventCard}>
+                  <Text style={styles.overlayDesc} numberOfLines={2}>
+                    {`${new Date(item.startDate).toLocaleDateString(
+                      'pt-BR'
+                    )} - ${new Date(item.endDate).toLocaleDateString('pt-BR')}`}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.buttonsRow}>
+              <Pressable
+                onPress={() => goToGuests(item.id)}
+                style={[styles.mapBtn, { borderColor: colors.primary }]}
+              >
+                <Text style={[styles.mapBtnText, { color: colors.text2 }]}>
+                  Convidados
+                </Text>
+              </Pressable>
+
+              {isCreator || isSuperAdmin ? (
+                <>
+                  <View style={{ marginRight: 8 }}>
+                    <ShareEventButton
+                      shareKey={item.shareKey ?? ''}
+                      onEnsureInvite={() => ensureInviteForEvent(item)}
+                      onShowQRCode={(payload) => {
+                        setQrPayload(payload);
+                        setQrVisible(true);
+                      }}
+                    />
+                  </View>
+
+                  <Button
+                    title="Permissão"
+                    size="small"
+                    onPress={() => {
+                      router.push({
+                        pathname: '/(stack)/events/[id]/permissions',
+                        params: { id: item.id },
+                      });
+                    }}
+                    icon={<KeyRound size={14} color="white" />}
+                    style={styles.permissionBtn}
+                    textStyle={styles.permissionText}
+                  />
+                </>
+              ) : (
+                <Pressable
+                  onPress={() => {
+                    const wasFollowing = isFollowing(item.id);
+                    toggleFollowEvent(item);
+
+                    Alert.alert(
+                      wasFollowing ? 'Removido' : 'Sucesso',
+                      wasFollowing
+                        ? 'Você deixou de seguir o evento.'
+                        : 'Você está seguindo este evento.'
+                    );
+                  }}
+                  style={styles.permissionBtn}
+                >
+                  <View
+                    style={[styles.btnseguir, { borderColor: colors.primary }]}
+                  >
+                    <Heart
+                      size={16}
+                      color={colors.primary}
+                      fill={
+                        isFollowing(item.id) ? colors.primary : 'transparent'
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.mapBtnText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {isFollowing(item.id) ? 'Seguindo' : 'Seguir'}
+                    </Text>
+                  </View>
+                </Pressable>
+              )}
+            </View>
+          </Animated.View>
+        </AnimatedPressable>
+      );
+    },
+    [
+      colors.border,
+      colors.primary,
+      colors.text2,
+      colors.textSecondary,
+      goToEvent,
+      goToGuests,
+      isFollowing,
+      toggleFollowEvent,
+      userUid,
+    ]
+  );
 
   return (
     <LinearGradient
@@ -420,31 +419,33 @@ export default function MyEventsScreen() {
         style={colorScheme === 'dark' ? 'light' : 'dark'}
       />
 
-      <SafeAreaView style={styles.container}>
+      <ScreenSafeArea style={styles.container}>
         <Text style={[styles.title, { color: colors.text }]}>Meus Eventos</Text>
 
         <FlatList
           data={allUserEvents}
           keyExtractor={(item) => item.id}
-          ListEmptyComponent={
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Nenhum evento relacionado a você encontrado.
-            </Text>
-          }
           renderItem={renderEventItem}
           contentContainerStyle={styles.listContent}
-        />
-
-        <PermissionModal
-          visible={modalVisible}
-          onClose={() => setModalVisible(false)}
-          colors={colors}
-          gradientColors={gradientColors}
-          permissionEmail={permissionEmail}
-          setPermissionEmail={setPermissionEmail}
-          permissionLevel={permissionLevel}
-          setPermissionLevel={setPermissionLevel}
-          onSave={savePermission}
+          ListEmptyComponent={
+            loadingEvents ? (
+              <View style={styles.centeredContent}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text
+                  style={[
+                    styles.emptyText,
+                    { color: colors.textSecondary, marginTop: 12 },
+                  ]}
+                >
+                  Carregando eventos...
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                Nenhum evento relacionado a você encontrado.
+              </Text>
+            )
+          }
         />
 
         <QRModal
@@ -454,18 +455,20 @@ export default function MyEventsScreen() {
           qrPayload={qrPayload}
           onShare={handleShareQR}
         />
-      </SafeAreaView>
+      </ScreenSafeArea>
     </LinearGradient>
   );
 }
+
+// -------------------- Modals --------------------
 
 const PermissionModal = ({
   visible,
   onClose,
   colors,
   gradientColors,
-  permissionEmail,
-  setPermissionEmail,
+  permissionUid,
+  setPermissionUid,
   permissionLevel,
   setPermissionLevel,
   onSave,
@@ -474,8 +477,8 @@ const PermissionModal = ({
   onClose: () => void;
   colors: typeof Colors.dark | typeof Colors.light;
   gradientColors: [string, string, ...string[]];
-  permissionEmail: string;
-  setPermissionEmail: (email: string) => void;
+  permissionUid: string;
+  setPermissionUid: (uid: string) => void;
   permissionLevel: PermissionLevel;
   setPermissionLevel: (level: PermissionLevel) => void;
   onSave: () => void;
@@ -500,30 +503,28 @@ const PermissionModal = ({
             <Text style={[styles.roleHighlight, { color: colors.primary }]}>
               Super admin:
             </Text>{' '}
-            Controle total sobre todos os recursos. Pode criar, editar,
-            gerenciar permissões de todos os outros usuários. Não pode excluir o
-            evento principal. Permissão exclusiva do criador.
+            Controle total (inclusive gerenciar permissões).
           </Text>
 
           <Text style={[styles.modalText, { color: colors.text }]}>
             <Text style={[styles.roleHighlight, { color: colors.primary }]}>
               Admin parcial:
             </Text>{' '}
-            Com algumas restrições, pode adicionar programas, atividades e
-            fotos. Só pode deletar o que criou.
+            Pode adicionar programas/atividades/fotos e deletar apenas o que
+            criou.
           </Text>
 
           <Text style={[styles.modalSubtitle, { color: colors.text }]}>
-            👥 Adicionar Permissão
+            👥 Adicionar permissão por UID
           </Text>
 
           <TextInput
-            placeholder="Digite o Email"
-            value={permissionEmail}
-            onChangeText={setPermissionEmail}
+            placeholder="Digite o UID do usuário (Firebase Auth UID)"
+            value={permissionUid}
+            onChangeText={setPermissionUid}
             placeholderTextColor={colors.textSecondary}
-            keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
             style={[
               styles.input,
               {
@@ -569,7 +570,7 @@ const PermissionModal = ({
             <Button
               title="Cancelar"
               variant="cancel"
-              onPress={onClose ?? (() => {})}
+              onPress={onClose}
               style={{ flex: 1, marginRight: 8 }}
               textStyle={{ color: 'white' }}
             />
@@ -595,39 +596,86 @@ const QRModal = ({
 }: {
   visible: boolean;
   onClose: () => void;
-  qrRef: React.RefObject<ViewShot>;
+  qrRef: React.RefObject<any>;
   qrPayload: string;
   onShare: () => void;
-}) => (
-  <Modal visible={visible} transparent animationType="fade">
-    <View style={styles.modalOverlay}>
-      <Animated.View
-        entering={FadeIn.duration(300)}
-        exiting={FadeOut.duration(200)}
-        style={styles.qrBox}
-      >
-        <Text style={styles.qrTitle}>Compartilhe seu evento!</Text>
-        <ViewShot ref={qrRef} options={{ format: 'png', quality: 1 }}>
-          <QRCode
-            value={qrPayload}
-            size={200}
-            backgroundColor="white"
-            color="black"
-          />
-        </ViewShot>
-        <Button
-          title="Enviar QR Code"
-          onPress={onShare}
-          style={styles.qrShareBtn}
-          icon={<Share2 size={16} color="white" />}
-        />
-        <Button title="Fechar" onPress={onClose} style={styles.qrCloseBtn} />
-      </Animated.View>
-    </View>
-  </Modal>
-);
+}) => {
+  const isLinkPayload =
+    typeof qrPayload === 'string' && /^https?:\/\//i.test(qrPayload);
 
-const SafeAreaView = ({
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <Animated.View
+          entering={FadeIn.duration(300)}
+          exiting={FadeOut.duration(200)}
+          style={styles.qrBox}
+        >
+          {/* ✅ Tudo isso é só UI do modal (não entra na imagem) */}
+          <Text style={styles.qrTitle}>Compartilhe seu evento!</Text>
+
+          {/* ✅ Tudo dentro do ViewShot entra no PNG compartilhado */}
+          <ViewShot
+            ref={qrRef}
+            options={{ format: 'png', quality: 1, result: 'tmpfile' }}
+          >
+            <View style={styles.qrShotCard}>
+              <Text style={styles.qrWelcomeTitle}>Bem-vindo(a) 👋</Text>
+              <Text style={styles.qrWelcomeSubtitle}>
+                Você é meu convidado!
+              </Text>
+              <Text style={styles.qrWelcomeSubtitle}>
+                Aponte a câmera para entrar no evento
+              </Text>
+
+              <View style={styles.qrCodeWrap}>
+                <QRCode
+                  value={qrPayload}
+                  size={150} // ✅ menor (mude aqui: 130-180)
+                  quietZone={10} // ✅ margem pro leitor
+                  backgroundColor="white"
+                  color="black"
+                />
+              </View>
+
+              {/* opcional: uma dica pequena no rodapé da imagem */}
+              <Text style={styles.qrHint}>
+                Se preferir, peça o link pelo organizador.
+              </Text>
+            </View>
+          </ViewShot>
+
+          {isLinkPayload && (
+            <Button
+              title="Enviar Link"
+              onPress={async () => {
+                try {
+                  await Share.share({ message: qrPayload });
+                } catch {
+                  Alert.alert('Erro', 'Não foi possível compartilhar o link');
+                }
+              }}
+              style={styles.qrShareBtn}
+            />
+          )}
+
+          <Button
+            title="Enviar QR Code"
+            onPress={onShare}
+            style={styles.qrShareBtn}
+            icon={<Share2 size={16} color="white" />}
+          />
+
+          <Button title="Fechar" onPress={onClose} style={styles.qrCloseBtn} />
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+};
+
+// -------------------- Safe Area wrapper --------------------
+
+const ScreenSafeArea = ({
   children,
   style,
 }: {
@@ -636,7 +684,6 @@ const SafeAreaView = ({
 }) => (
   <View
     style={[
-      styles.container,
       style,
       Platform.OS === 'android' && {
         paddingTop: RNStatusBar.currentHeight ?? 40,
@@ -649,17 +696,7 @@ const SafeAreaView = ({
 
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
-
-  container: {
-    flex: 1,
-    paddingHorizontal: 6,
-  },
-
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
+  container: { flex: 1, paddingHorizontal: 6 },
 
   title: {
     fontSize: 24,
@@ -676,9 +713,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
   },
 
-  listContent: {
-    paddingBottom: 20,
-  },
+  listContent: { paddingBottom: 20 },
 
   card: {
     backgroundColor: '#1f1f25',
@@ -707,14 +742,8 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: 180,
-    resizeMode: 'cover',
     borderRadius: 12,
     justifyContent: 'flex-end',
-  },
-
-  blurOverlay: {
-    padding: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
 
   overlay: {
@@ -744,38 +773,24 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
   },
 
-  eventTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 8,
-  },
+  eventCard: { flexDirection: 'column' },
 
-  row: {
+  buttonsRow: {
     flexDirection: 'row',
+    marginTop: 4,
+    gap: 10,
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
+    justifyContent: 'center',
   },
 
-  meta: {
-    color: 'white',
-    fontSize: 13,
-    fontFamily: 'Inter-Regular',
-  },
-
-  animatedContainer: {
-    width: '100%',
-    maxWidth: 420,
-  },
+  animatedContainer: { width: '100%', maxWidth: 420 },
 
   mapBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
   },
@@ -784,33 +799,15 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontSize: 13,
     fontFamily: 'Inter_500Medium',
+    padding: 1.5,
   },
 
-  shareBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: '#25D366',
-    alignItems: 'center',
-    justifyContent: 'space-evenly',
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-
-  shareBtnText: {
-    fontSize: 13,
-    color: 'white',
-    fontFamily: 'Inter_500Medium',
-  },
-
-  permissionBtn: {
-    flex: 1,
-    borderRadius: 10,
-    paddingVertical: 6,
-  },
+  permissionBtn: { flex: 1, borderRadius: 10, paddingVertical: 3 },
 
   permissionText: {
     fontSize: 13,
     fontWeight: '600',
+    paddingVertical: 6,
     color: 'white',
     fontFamily: 'Inter_600SemiBold',
   },
@@ -820,39 +817,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#444',
   },
 
-  button: {
-    backgroundColor: '#5838AD',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginBottom: 16,
+  centeredContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
   },
 
-  buttonSecondary: {
-    backgroundColor: '#aaa',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  buttonRow: {
-    flexDirection: 'row',
-    marginTop: 8,
-  },
-
-  // Modal (mantido o mais completo e por último)
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -861,11 +837,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
 
-  modalContent: {
-    borderRadius: 18,
-    padding: 20,
-    borderWidth: 1,
-  },
+  modalContent: { borderRadius: 18, padding: 20, borderWidth: 1 },
 
   modalTitle: {
     fontSize: 20,
@@ -881,15 +853,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  modalText: {
-    fontSize: 14,
-    marginBottom: 12,
-    lineHeight: 20,
-  },
+  modalText: { fontSize: 14, marginBottom: 12, lineHeight: 20 },
 
-  roleHighlight: {
-    fontWeight: 'bold',
-  },
+  roleHighlight: { fontWeight: 'bold' },
 
   input: {
     borderWidth: 1,
@@ -900,11 +866,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  modalLabel: {
-    fontSize: 14,
-    marginBottom: 8,
-    fontWeight: '600',
-  },
+  modalLabel: { fontSize: 14, marginBottom: 8, fontWeight: '600' },
 
   toggleRow: {
     flexDirection: 'row',
@@ -920,6 +882,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 8,
   },
+
+  buttonRow: { flexDirection: 'row', marginTop: 8 },
+
   qrBox: {
     backgroundColor: '#fff',
     padding: 24,
@@ -928,6 +893,7 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 300,
   },
+
   qrTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -935,30 +901,50 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
   },
 
-  qrShareBtn: {
-    marginTop: 16,
-    backgroundColor: '#25D366',
-    width: '100%',
-  },
-  qrCloseBtn: {
-    marginTop: 12,
-    backgroundColor: '#333',
-    width: '100%',
-  },
-  eventCard: {
-    flexDirection: 'column',
-  },
-  buttonsRow: {
-    flexDirection: 'row',
-    marginTop: 4,
-    gap: 10,
+  qrShareBtn: { marginTop: 16, backgroundColor: '#25D366', width: '100%' },
+  qrCloseBtn: { marginTop: 12, backgroundColor: '#333', width: '100%' },
+  qrShotCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 14,
     alignItems: 'center',
-    justifyContent: 'center',
+    width: 260, // ✅ tamanho “fixo” da imagem do QR (fica bonito no WhatsApp)
   },
-  centeredContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
+
+  qrWelcomeTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
+    fontFamily: 'Inter_600SemiBold',
+  },
+
+  qrWelcomeSubtitle: {
+    fontSize: 12,
+    opacity: 0.75,
+    textAlign: 'center',
+    marginBottom: 12,
+    fontFamily: 'Inter_400Regular',
+  },
+
+  qrCodeWrap: {
+    padding: 10,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    // sombra leve (iOS)
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    // sombra (Android)
+    elevation: 2,
+  },
+
+  qrHint: {
+    marginTop: 10,
+    fontSize: 10,
+    opacity: 0.65,
+    textAlign: 'center',
+    fontFamily: 'Inter_400Regular',
   },
 });

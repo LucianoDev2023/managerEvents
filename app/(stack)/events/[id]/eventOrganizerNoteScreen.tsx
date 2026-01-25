@@ -10,11 +10,10 @@ import {
   Pressable,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { getAuth } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 import Colors from '@/constants/Colors';
-import { db } from '@/config/firebase';
+import { auth, db } from '@/config/firebase';
 import TextInput from '@/components/ui/TextInput';
 import Button from '@/components/ui/Button';
 
@@ -23,7 +22,7 @@ export default function EventOrganizerNoteScreen() {
   const colors = Colors[colorScheme];
 
   const { id: eventId } = useLocalSearchParams<{ id: string }>();
-  const user = getAuth().currentUser;
+  const user = auth.currentUser;
   const router = useRouter();
 
   const [label, setLabel] = useState('');
@@ -77,7 +76,7 @@ export default function EventOrganizerNoteScreen() {
       <Text style={[styles.title, { color: colors.text }]}>Nova Anotação</Text>
 
       <RNTextInput
-        placeholder="Nome do campo"
+        placeholder="Assunto"
         placeholderTextColor={colors.text2}
         value={label}
         onChangeText={setLabel}
@@ -139,7 +138,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 10,
     fontSize: 15,
-    marginBottom: 12,
+    marginBottom: 4,
   },
   saveButton: {
     paddingVertical: 12,
@@ -148,7 +147,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
   saveButtonText: {
     color: '#fff',

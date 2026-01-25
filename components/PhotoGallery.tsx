@@ -1,469 +1,571 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View,
-  Image,
-  StyleSheet,
-  TouchableOpacity,
-  Dimensions,
-  Text,
   Alert,
-  ScrollView,
+  Image,
+  Modal,
+  Pressable,
+  Text,
   TextInput,
-  TouchableWithoutFeedback,
+  TouchableOpacity,
+  View,
+  StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Trash2, Share2, MessageSquare } from 'lucide-react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import ImageViewing from 'react-native-image-viewing';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import { useColorScheme } from 'react-native';
-import Colors from '@/constants/Colors';
 import { getAuth } from 'firebase/auth';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { Photo } from '@/types';
-import { usePhotoComments } from '@/hooks/usePhotoComments';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import { Trash2, Send, X } from 'lucide-react-native';
 
-interface PhotoGalleryProps {
-  photos: Photo[];
-  editable?: boolean;
-  onDeletePhoto?: (photo: { id: string; publicId: string }) => Promise<void>;
-  deletingPhotoId?: string | null;
-  isCreator: boolean;
+import Colors from '@/constants/Colors';
+import { usePhotoComments } from '@/hooks/usePhotoComments'; // ajuste se necessário
+import type { Photo } from '@/types'; // ajuste se necessário
+
+import { useColorScheme } from 'react-native';
+
+type Props = {
   eventId: string;
   programId: string;
   activityId: string;
-  refetchEventById: (eventId: string) => Promise<void>;
+
+  photos: Photo[];
+  onDeletePhoto: (photoId: string, publicId?: string) => void;
+
+  eventCreatorId: string; // event.userId
+  currentUid: string;
+  isSuperAdmin: boolean;
+};
+
+function formatTimeAgo(createdAt: any) {
+  try {
+    const date =
+      typeof createdAt?.toDate === 'function' ? createdAt.toDate() : null;
+
+    if (!date) return 'agora';
+
+    const diffMs = Date.now() - date.getTime();
+    const diffMin = Math.floor(diffMs / (1000 * 60));
+    if (diffMin < 1) return 'agora';
+    if (diffMin < 60) return `${diffMin} min`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${diffH} h`;
+    const diffD = Math.floor(diffH / 24);
+    return `${diffD} d`;
+  } catch {
+    return 'agora';
+  }
 }
 
-const { width } = Dimensions.get('window');
-const ITEM_WIDTH = width * 0.9;
-const ITEM_HEIGHT = ITEM_WIDTH * 0.6;
-const currentUser = getAuth().currentUser;
+type PhotoItemProps = {
+  photo: Photo;
+  index: number;
+  colors: any;
 
-export default function PhotoGallery({
-  photos,
-  editable = false,
-  onDeletePhoto,
-  deletingPhotoId,
-  isCreator,
+  eventId: string;
+  programId: string;
+  activityId: string;
+
+  eventCreatorId: string;
+  currentUid: string;
+  isSuperAdmin: boolean;
+
+  onDeletePhoto: (photoId: string, publicId?: string) => void;
+  onOpen: () => void;
+};
+
+function PhotoItem({
+  photo,
+  index,
+  colors,
   eventId,
   programId,
   activityId,
-  refetchEventById,
-}: PhotoGalleryProps) {
-  const colorScheme = useColorScheme() ?? 'dark';
-  const colors = Colors[colorScheme];
+  eventCreatorId,
+  currentUid,
+  isSuperAdmin,
+  onDeletePhoto,
+  onOpen,
+}: PhotoItemProps) {
   const auth = getAuth();
-  const currentUser = auth.currentUser;
-  const displayName = currentUser?.displayName;
+  const firebaseUser = auth.currentUser;
+  const scheme = useColorScheme() ?? 'dark';
 
-  const [isViewerVisible, setIsViewerVisible] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const currentUserSafe = useMemo(() => {
+    const email = firebaseUser?.email?.toLowerCase() ?? '';
+    const uid = firebaseUser?.uid ?? currentUid;
 
-  const handleShareImage = async (imageUrl: string) => {
+    return {
+      uid,
+      email,
+      isSuperAdmin,
+      name: firebaseUser?.displayName ?? 'Usuário',
+    };
+  }, [firebaseUser, currentUid, isSuperAdmin]);
+
+  const canDeleteThisPhoto = useMemo(() => {
+    return (
+      isSuperAdmin ||
+      currentUid === eventCreatorId ||
+      currentUid === photo.createdBy
+    );
+  }, [isSuperAdmin, currentUid, eventCreatorId, photo.createdBy]);
+
+  const {
+    comments,
+    newComment,
+    setNewComment,
+    addComment,
+    confirmDeleteComment,
+    canDeleteComment,
+    isAddingComment,
+    isDeletingCommentIds,
+  } = usePhotoComments({
+    eventId,
+    programId,
+    activityId,
+    photoId: photo.id,
+    currentUser: currentUserSafe,
+    eventCreatorId, // dono do evento
+    photoCreatorId: photo.createdBy, // dono da foto
+  });
+
+  const handleDeletePhoto = () => {
+    if (!canDeleteThisPhoto) {
+      Alert.alert(
+        'Acesso negado',
+        'Você não tem permissão para excluir esta foto.'
+      );
+      return;
+    }
+
+    Alert.alert('Excluir foto', 'Tem certeza que deseja excluir esta foto?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: () => onDeletePhoto(photo.id, photo.publicId),
+      },
+    ]);
+  };
+
+  return (
+    <View style={[styles.photoCard, { backgroundColor: colors.backgroundd }]}>
+      <Pressable onPress={onOpen}>
+        <Image source={{ uri: photo.uri }} style={styles.photo} />
+      </Pressable>
+
+      <View style={styles.photoHeader}>
+        {/* <Text style={[styles.photoTitle, { color: colors.text }]}>
+          Foto {index + 1}
+        </Text> */}
+
+        {canDeleteThisPhoto && (
+          <TouchableOpacity
+            onPress={handleDeletePhoto}
+            style={styles.deleteBtn}
+          >
+            <Trash2 size={18} color={colors.primary2} />
+            <Text style={[styles.photoDescription, { color: colors.primary2 }]}>
+              Excluir foto
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {!!photo.description && (
+        <Text style={[styles.photoDescription, { color: colors.text }]}>
+          {photo.description}
+        </Text>
+      )}
+
+      {/* Comentários */}
+      {/* Comentários */}
+      <View
+        style={[
+          styles.commentsContainer,
+          scheme === 'dark' ? styles.commentsDark : styles.commentsLight,
+        ]}
+      >
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          Comentários
+        </Text>
+
+        {comments.length === 0 ? (
+          <Text style={[styles.emptyText, { color: colors.text }]}>
+            Nenhum comentário ainda.
+          </Text>
+        ) : (
+          comments.map((comment) => {
+            const isDeleting = isDeletingCommentIds.includes(comment.id);
+            const canDelete = canDeleteComment(comment);
+
+            return (
+              <View
+                key={comment.id}
+                style={[
+                  styles.commentCard,
+                  scheme === 'dark'
+                    ? styles.commentCardDark
+                    : styles.commentCardLight,
+                ]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.commentAuthor, { color: colors.text }]}>
+                    {comment.name ?? comment.email ?? 'Usuário'}{' '}
+                    <Text style={{ color: colors.text }}>
+                      · {formatTimeAgo(comment.createdAt)}
+                    </Text>
+                  </Text>
+
+                  <Text style={[styles.commentText, { color: colors.text }]}>
+                    {comment.text}
+                  </Text>
+                </View>
+
+                {canDelete && (
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteComment(comment)}
+                    disabled={isDeleting}
+                    style={styles.commentDeleteBtn}
+                  >
+                    {isDeleting ? (
+                      <ActivityIndicator size="small" />
+                    ) : (
+                      <Trash2 size={16} color={colors.text} />
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })
+        )}
+
+        {/* Input */}
+        <View
+          style={[
+            styles.addCommentRow,
+            scheme === 'dark' ? styles.inputRowDark : styles.inputRowLight,
+          ]}
+        >
+          <TextInput
+            value={newComment}
+            onChangeText={setNewComment}
+            placeholder="Adicionar um comentário…"
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            style={[
+              styles.commentInput,
+              scheme === 'dark'
+                ? styles.commentInputDark
+                : styles.commentInputLight,
+              { color: colors.text2 },
+            ]}
+          />
+
+          <TouchableOpacity
+            onPress={addComment}
+            disabled={!newComment.trim() || isAddingComment}
+            style={styles.sendBtn}
+          >
+            {isAddingComment ? (
+              <ActivityIndicator size="small" />
+            ) : (
+              <Send size={18} color={colors.primary} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+export default function PhotoGallery({
+  eventId,
+  programId,
+  activityId,
+  photos,
+  onDeletePhoto,
+  eventCreatorId,
+  currentUid,
+  isSuperAdmin,
+}: Props) {
+  // ✅ mantenha o seu padrão real de tema aqui.
+  // se você usa useColorScheme, troque para:
+  // const scheme = useColorScheme() ?? "light";
+  // const colors = Colors[scheme];
+  const colors = Colors.light;
+
+  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+
+  const handleDownload = async () => {
+    if (!selectedPhoto?.uri) return;
+
     try {
-      const downloadPath = FileSystem.documentDirectory + 'shared-image.jpg';
-      const { uri } = await FileSystem.downloadAsync(imageUrl, downloadPath);
-      await Sharing.shareAsync(uri);
-    } catch (error) {
-      console.error('Erro ao compartilhar imagem:', error);
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Permissão negada',
+          'Permita acesso à galeria para salvar a imagem.'
+        );
+        return;
+      }
+
+      const uri = selectedPhoto.uri;
+      const clean = uri.split('?')[0];
+      const ext = (
+        clean.match(/\.(jpg|jpeg|png|webp)$/i)?.[0] ?? '.jpg'
+      ).toLowerCase();
+
+      if (uri.startsWith('file://')) {
+        await MediaLibrary.saveToLibraryAsync(uri);
+      } else {
+        const filename = `photo-${selectedPhoto.id}${ext}`;
+        const fileUri = FileSystem.cacheDirectory + filename;
+        const result = await FileSystem.downloadAsync(uri, fileUri);
+        await MediaLibrary.saveToLibraryAsync(result.uri);
+      }
+
+      // ✅ FECHA O MODAL AQUI
+      Alert.alert('Salvo', 'A foto foi salva na galeria.', [
+        {
+          text: 'OK',
+          onPress: () => setSelectedPhoto(null),
+        },
+      ]);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Erro', 'Não foi possível salvar a foto.');
     }
   };
 
-  if (photos.length === 0) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <View style={[styles.emptyContainer, { borderColor: colors.border }]}>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            Nenhuma foto adicionada
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // const handleShare = async () => {
+  //   if (!selectedPhoto?.uri) return;
+
+  //   try {
+  //     const canShare = await Sharing.isAvailableAsync();
+  //     if (!canShare) {
+  //       Alert.alert(
+  //         'Indisponível',
+  //         'Compartilhamento não disponível neste dispositivo.'
+  //       );
+  //       return;
+  //     }
+
+  //     await Sharing.shareAsync(selectedPhoto.uri);
+  //   } catch (e) {
+  //     console.error(e);
+  //     Alert.alert('Erro', 'Não foi possível compartilhar.');
+  //   }
+  // };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView contentContainerStyle={[styles.container]}>
-        {photos.map((photo, index) => {
-          const {
-            comments,
-            newComment,
-            setNewComment,
-            addComment,
-            deleteComment,
-            canDeleteComment,
-            isAddingComment,
-            isDeletingCommentIds,
-          } = usePhotoComments({
-            eventId,
-            programId,
-            activityId,
-            photoId: photo.id,
-            currentUser: {
-              uid: currentUser?.uid ?? '',
-              email: currentUser?.email ?? '',
-              isSuperAdmin: isCreator,
-              name: currentUser?.displayName ?? '',
-            },
-            eventCreatorId: photo.createdBy ?? '',
-          });
-
-          return (
-            <View
-              key={photo.id}
-              style={{
-                width: '100%',
-                marginBottom: 20,
-                padding: 4,
-                borderBottomWidth: 1,
-                borderBottomColor: '#454545',
-              }}
-            >
-              <Animated.View
-                entering={FadeIn.duration(300)}
-                exiting={FadeOut.duration(300)}
-                style={styles.photoBlock}
-              >
-                <TouchableWithoutFeedback
-                  onPress={() => {
-                    setCurrentIndex(index);
-                    setIsViewerVisible(true);
-                  }}
-                >
-                  <View style={styles.photoWrapper}>
-                    <Image
-                      source={{ uri: photo.uri }}
-                      style={styles.photo}
-                      resizeMode="cover"
-                    />
-                    <View
-                      style={[
-                        styles.descriptionContainer,
-                        { backgroundColor: colors.backgroundC },
-                      ]}
-                    >
-                      <MessageSquare
-                        size={16}
-                        color={colors.primary}
-                        style={styles.icon}
-                      />
-                      <Text
-                        style={[styles.descriptionText, { color: colors.text }]}
-                      >
-                        {photo.description}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableWithoutFeedback>
-
-                <View style={styles.actionsContainer}>
-                  <TouchableOpacity
-                    onPress={() => handleShareImage(photo.uri)}
-                    style={[
-                      styles.actionButton,
-                      { backgroundColor: '#25D366' },
-                    ]}
-                  >
-                    <Share2 size={14} color="white" />
-                  </TouchableOpacity>
-
-                  {editable && onDeletePhoto && isCreator && (
-                    <TouchableOpacity
-                      disabled={deletingPhotoId === photo.id}
-                      onPress={() => {
-                        Alert.alert(
-                          'Confirmar exclusão',
-                          'Deseja excluir esta foto?',
-                          [
-                            { text: 'Cancelar', style: 'cancel' },
-                            {
-                              text: 'Excluir',
-                              style: 'destructive',
-                              onPress: async () => {
-                                try {
-                                  await onDeletePhoto({
-                                    id: photo.id,
-                                    publicId: photo.publicId!,
-                                  });
-                                  await refetchEventById(eventId);
-                                } catch (error) {
-                                  Alert.alert(
-                                    'Erro',
-                                    'Não foi possível excluir a foto.'
-                                  );
-                                }
-                              },
-                            },
-                          ]
-                        );
-                      }}
-                      style={[
-                        styles.actionButton,
-                        {
-                          backgroundColor: colors.error,
-                          opacity: deletingPhotoId === photo.id ? 0.6 : 1,
-                        },
-                      ]}
-                    >
-                      <Trash2 size={14} color="white" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </Animated.View>
-
-              <View style={styles.commentSection}>
-                <Text
-                  style={[
-                    styles.commentHeader,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  Comentários
-                </Text>
-
-                <View style={styles.inputRow}>
-                  <TextInput
-                    value={newComment}
-                    onChangeText={setNewComment}
-                    editable={!isAddingComment}
-                    placeholder="Escreva seu comentário..."
-                    placeholderTextColor="#999"
-                    maxLength={150}
-                    style={[
-                      styles.input,
-                      { backgroundColor: colors.backgroundComents },
-                    ]}
-                  />
-                  <TouchableOpacity
-                    onPress={addComment}
-                    disabled={isAddingComment}
-                    style={[
-                      styles.sendButton,
-                      { opacity: isAddingComment ? 0.5 : 1 },
-                    ]}
-                  >
-                    <Text style={styles.sendText}>
-                      {isAddingComment ? 'Enviando...' : 'Enviar'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {comments
-                  .filter((comment) => comment.createdAt?.toDate) // Só mostra após Firestore salvar
-                  .map((comment) => (
-                    <View
-                      key={comment.id}
-                      style={[
-                        styles.commentBox,
-                        { backgroundColor: colors.backgroundComents },
-                      ]}
-                    >
-                      <Text style={styles.commentAuthor}>
-                        {comment.name ?? 'Usuário'}
-                      </Text>
-
-                      <Text
-                        style={[
-                          styles.commentText,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        {comment.text}
-                      </Text>
-                      <View style={styles.commentFooterRow}>
-                        <Text style={styles.commentTime}>
-                          {formatDistanceToNow(comment.createdAt.toDate(), {
-                            addSuffix: true,
-                            locale: ptBR,
-                          })}
-                        </Text>
-                        {canDeleteComment(comment) && (
-                          <TouchableOpacity
-                            onPress={() => {
-                              Alert.alert(
-                                'Confirmar exclusão',
-                                'Deseja excluir este comentário?',
-                                [
-                                  { text: 'Cancelar', style: 'cancel' },
-                                  {
-                                    text: 'Excluir',
-                                    style: 'destructive',
-                                    onPress: () => deleteComment(comment),
-                                  },
-                                ]
-                              );
-                            }}
-                            disabled={isDeletingCommentIds.includes(comment.id)}
-                          >
-                            <Text style={styles.commentActionText}>
-                              {isDeletingCommentIds.includes(comment.id)
-                                ? 'Excluindo...'
-                                : 'Excluir'}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    </View>
-                  ))}
-              </View>
-            </View>
-          );
-        })}
-
-        <ImageViewing
-          images={photos.map((p) => ({ uri: p.uri }))}
-          imageIndex={currentIndex}
-          visible={isViewerVisible}
-          onRequestClose={() => setIsViewerVisible(false)}
+    <View style={{ gap: 12 }}>
+      {photos.map((photo, index) => (
+        <PhotoItem
+          key={photo.id}
+          photo={photo}
+          index={index}
+          colors={colors}
+          eventId={eventId}
+          programId={programId}
+          activityId={activityId}
+          eventCreatorId={eventCreatorId}
+          currentUid={currentUid}
+          isSuperAdmin={isSuperAdmin}
+          onDeletePhoto={onDeletePhoto}
+          onOpen={() => setSelectedPhoto(photo)}
         />
-      </ScrollView>
-    </SafeAreaView>
+      ))}
+
+      <Modal visible={!!selectedPhoto} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View
+            style={[styles.modalCard, { backgroundColor: colors.backgroundC }]}
+          >
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setSelectedPhoto(null)}>
+                <X size={22} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedPhoto?.uri ? (
+              <Image
+                source={{ uri: selectedPhoto.uri }}
+                style={styles.modalImage}
+              />
+            ) : null}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                onPress={handleDownload}
+                style={styles.actionBtn}
+              >
+                <Text style={{ color: colors.primary }}>Salvar</Text>
+              </TouchableOpacity>
+
+              {/* <TouchableOpacity onPress={handleShare} style={styles.actionBtn}>
+                <Text style={{ color: colors.primary }}>Compartilhar</Text>
+              </TouchableOpacity> */}
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 0,
-    paddingBottom: 8,
-  },
-  photoBlock: {
-    alignItems: 'center',
-    padding: 0,
-    marginTop: 0,
+  photoCard: {
+    borderRadius: 16,
+    padding: 12,
+    gap: 10,
   },
   photo: {
-    width: ITEM_WIDTH,
-    height: ITEM_HEIGHT,
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-  },
-  actionsContainer: {
     width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 10,
-    marginRight: 32,
-    gap: 6,
+    height: 220,
+    borderRadius: 14,
   },
-  actionButton: {
-    flexDirection: 'row',
-    paddingVertical: 4,
-    paddingHorizontal: 14,
-    borderRadius: 6,
-  },
-  photoWrapper: {
-    marginTop: 0,
-    padding: 0,
-    borderRadius: 10,
-  },
-  descriptionContainer: {
-    width: ITEM_WIDTH,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  descriptionText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    lineHeight: 20,
-    flex: 1,
-  },
-  icon: {
-    marginTop: 2,
-  },
-  commentSection: {
-    width: '100%',
-    paddingHorizontal: 10,
-  },
-  commentHeader: {
-    fontSize: 16,
-    fontFamily: 'Inter_600SemiBold',
-    marginBottom: 6,
-  },
-  inputRow: {
+  photoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
   },
-  input: {
+  photoTitle: { fontSize: 16, fontWeight: '700' },
+  deleteBtn: {
+    padding: 6,
+    flexDirection: 'row',
+    gap: 4,
+  },
+
+  photoDescription: { fontSize: 14, opacity: 0.9 },
+
+  commentsBox: {
+    marginTop: 10,
+    gap: 10,
+    padding: 10,
+    borderRadius: 14,
+  },
+  sectionTitle: { fontSize: 14, fontWeight: '700' },
+  emptyText: { fontSize: 13 },
+  commentRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+
+  modalBackdrop: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-    color: '#fff',
+    backgroundColor: 'rgba(0, 0, 0, 0.88)',
+    justifyContent: 'center',
+    padding: 16,
   },
-  sendButton: {
-    marginLeft: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: '#3e1d73',
-    borderRadius: 6,
+  modalCard: {
+    borderRadius: 18,
+    padding: 12,
+    gap: 12,
   },
-  sendText: {
-    color: 'white',
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-  },
-  commentBox: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    marginBottom: 2,
-    borderBottomWidth: 1,
-    borderBottomColor: '#262c34',
-    borderWidth: 1,
-    borderColor: '#3333',
-  },
-  commentAuthor: {
-    color: '#8b949e',
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-    marginBottom: 6,
-  },
-  commentText: {
-    fontSize: 15,
-    fontFamily: 'Inter_400Regular',
-    lineHeight: 22,
-    marginBottom: 6,
-  },
-  commentFooterRow: {
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  commentTime: {
-    fontSize: 12,
-    color: '#7a7a7a',
-    fontFamily: 'Inter_300Light',
+  modalTitle: { fontSize: 16, fontWeight: '700' },
+  modalImage: { width: '100%', height: 380, borderRadius: 14 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 14 },
+  actionBtn: { paddingVertical: 10, paddingHorizontal: 12 },
+
+  commentsContainer: {
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 18,
+    gap: 12,
   },
-  commentActionText: {
-    fontSize: 13,
-    color: '#f87171',
-    fontFamily: 'Inter_500Medium',
-  },
-  emptyContainer: {
-    margin: 16,
-    padding: 24,
+
+  commentsDark: {
+    backgroundColor: '#2a255048',
     borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: 10,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+
+  commentsLight: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+  },
+
+  commentCard: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+
+  commentCardDark: {
+    backgroundColor: 'rgba(59, 25, 109, 0.50)',
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+
+  commentCardLight: {
+    backgroundColor: '#f8f8f8',
+    borderColor: '#ddd',
+  },
+
+  commentAuthor: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  commentText: {
+    fontSize: 13,
+    marginTop: 4,
+    lineHeight: 18,
+  },
+
+  commentDeleteBtn: {
+    padding: 6,
+  },
+
+  addCommentRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-end',
+    marginTop: 6,
+  },
+
+  inputRowDark: {
+    backgroundColor: '#322C5E',
+    borderRadius: 14,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+
+  inputRowLight: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 14,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+
+  commentInput: {
+    flex: 1,
+    minHeight: 42,
+    maxHeight: 120,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+  },
+
+  commentInputDark: {
+    backgroundColor: 'transparent',
+  },
+
+  commentInputLight: {
+    backgroundColor: 'transparent',
+  },
+
+  sendBtn: {
+    padding: 10,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  emptyText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
   },
 });

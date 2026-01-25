@@ -11,7 +11,7 @@ import {
   StatusBar as RNStatusBar,
 } from 'react-native';
 import { useColorScheme } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { Trash2, MapPin } from 'lucide-react-native';
 import { useFollowedEvents } from '@/hooks/useFollowedEvents';
 import Colors from '@/constants/Colors';
@@ -42,7 +42,12 @@ export default function FollowedEventsScreen() {
 
   const renderItem = ({ item }: any) => (
     <Pressable
-      onPress={() => router.push(`/events/${item.id}`)}
+      onPress={() =>
+        router.push({
+          pathname: '/(stack)/events/[id]',
+          params: { id: item.id },
+        } as unknown as Href)
+      }
       style={[styles.card, { backgroundColor: colors.backgroundC }]}
     >
       <Image source={{ uri: item.coverImage }} style={styles.image} />

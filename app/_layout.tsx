@@ -1,32 +1,48 @@
-import 'react-native-reanimated';
+// app/_layout.tsx
 import React, { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useColorScheme } from 'react-native';
-import { useAuthListener } from '@/hooks/useAuthListener';
-import { EventsProvider } from '@/context/EventsContext';
-import Colors from '@/constants/Colors';
-import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { RegistrationFlowProvider } from '@/context/RegistrationFlowContext';
+import * as Linking from 'expo-linking';
+
+import Colors from '../constants/Colors';
+import { useAuthListener } from '../hooks/useAuthListener';
+import { EventsProvider } from '../context/EventsContext';
+import { RegistrationFlowProvider } from '../context/RegistrationFlowContext';
 
 export default function RootLayout() {
-  useFrameworkReady();
   const { user, authLoading } = useAuthListener();
-  const segments = useSegments(); // ex: ['(auth)', 'login']
+  const segments = useSegments();
   const router = useRouter();
+
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
-  // Protege rotas privadas e evita acesso de usuários logados a rotas públicas
   useEffect(() => {
     const inAuthGroup = segments[0] === '(auth)';
-
-    if (!authLoading) {
-      if (!user && !inAuthGroup) {
-        router.replace('/landing'); // redireciona para login se não autenticado
-      }
+    if (!authLoading && !user && !inAuthGroup) {
+      router.replace('/(auth)/landing');
     }
-  }, [authLoading, user, segments]);
+  }, [authLoading, user, segments, router]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const url = await Linking.getInitialURL();
+        if (url) {
+          console.log('[Linking] initialUrl', url, Linking.parse(url));
+        } else {
+          console.log('[Linking] initialUrl', url);
+        }
+      } catch (e) {
+        console.log('[Linking] initialUrl error', e);
+      }
+    })();
+    const sub = Linking.addEventListener('url', (ev) => {
+      console.log('[Linking] url event', ev.url, Linking.parse(ev.url));
+    });
+    return () => sub.remove();
+  }, []);
 
   if (authLoading) {
     return (
@@ -48,9 +64,5 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });

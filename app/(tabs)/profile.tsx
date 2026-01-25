@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+// app/(tabs)/profile.tsx
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,119 +8,290 @@ import {
   Alert,
   Platform,
   StatusBar as RNStatusBar,
-  ActivityIndicator,
   Modal,
   Pressable,
+  TextInput,
+  BackHandler,
 } from 'react-native';
 import { useColorScheme } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { signOut } from 'firebase/auth';
-import CustomDropdown from '@/components/ui/CustomDropdown';
-import { Bell, HeartHandshake } from 'lucide-react-native';
-import { BackHandler } from 'react-native';
-import Animated from 'react-native-reanimated';
-import { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useGuestEvents } from '@/hooks/useGuestEvents';
-
-import Colors from '@/constants/Colors';
-import { useEvents } from '@/context/EventsContext';
-import Button from '@/components/ui/Button';
+import {
+  signOut,
+  updateProfile,
+  deleteUser,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+} from 'firebase/auth';
 
 import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  query,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
+
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
+
+import {
+  Bell,
+  Edit,
+  HeartHandshake,
+  UserX,
+  Eye,
+  EyeOff,
   Settings,
   LogOut,
-  Trash2,
   CircleHelp as HelpCircle,
 } from 'lucide-react-native';
-import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
-import { auth } from '@/config/firebase';
-import { useAuthListener } from '@/hooks/useAuthListener';
-import LottieView from 'lottie-react-native';
-import {
-  getGuestParticipationsByEmail,
-  GuestParticipation,
-} from '@/config/guestParticipation.ts';
+
+// ✅ caminhos relativos (saindo de app/(tabs))
+import { auth, db } from '../../config/firebase';
+import CustomDropdown from '../../components/ui/CustomDropdown';
+import Button from '../../components/ui/Button';
+import Colors from '../../constants/Colors';
+import LoadingOverlay from '../../components/LoadingOverlay';
+
+import { useAuthListener } from '../../hooks/useAuthListener';
+import { useEvents } from '../../context/EventsContext';
+import { getGuestParticipationsByUserId } from '../../hooks/guestService';
+
+import type { Event } from '../../types/index';
+import type { GuestParticipation } from '../../types/guestParticipation';
 
 export default function ProfileScreen() {
   const { user, authLoading } = useAuthListener();
   const { state } = useEvents();
   const router = useRouter();
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const { guestEvents } = useGuestEvents();
-
-  const [supportVisible, setSupportVisible] = useState(false);
 
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
   const textColor = colorScheme === 'dark' ? '#fff' : '#1a1a1a';
   const textSecondary = colorScheme === 'dark' ? '#aaa' : '#555';
   const backgroundColor = colorScheme === 'dark' ? '#0b0b0f' : '#e9e6ff';
-  const [isLoadingEvents, setIsLoadingEvents] = useState(true);
-  const scheme = useColorScheme() ?? 'dark';
-  const theme = Colors[scheme];
 
   const gradientColors: [string, string, ...string[]] =
     colorScheme === 'dark'
       ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
       : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-    }
-  }, [authLoading, user]);
+  const uid = user?.uid ?? '';
 
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setIsLoadingEvents(false);
-    }, 10000); // 10 segundos
+  // =============================
+  // UI states
+  // =============================
+  const [supportVisible, setSupportVisible] = useState(false);
+  const [deleteVisible, setDeleteVisible] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
-    if (state.events.length > 0) {
-      setIsLoadingEvents(false); // já carregou
-      clearTimeout(timeout);
-    }
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
-    return () => clearTimeout(timeout);
-  }, [state.events]);
+  // ✅ reauth modal
+  const [deletePassword, setDeletePassword] = useState('');
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = () => {
-        if (supportVisible) {
-          setSupportVisible(false); // Fecha o modal se estiver aberto
-          return true; // Impede o comportamento padrão
-        }
-
-        router.back(); // Voltar para a tela anterior
-        return true;
-      };
-
-      BackHandler.addEventListener('hardwareBackPress', onBackPress);
-
-      return () => {
-        BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-      };
-    }, [supportVisible])
+  // ✅ Editar displayName
+  const [editNameVisible, setEditNameVisible] = useState(false);
+  const [nameDraft, setNameDraft] = useState(user?.displayName ?? '');
+  const [savingName, setSavingName] = useState(false);
+  const [localDisplayName, setLocalDisplayName] = useState(
+    user?.displayName ?? 'Usuário'
   );
 
+  // ✅ Participations (por UID)
   const [participations, setParticipations] = useState<GuestParticipation[]>(
     []
   );
   const [loadingParticipations, setLoadingParticipations] = useState(true);
-  const userEmail = user?.email?.toLowerCase();
+
+  // ✅ Loading geral
+  const isLoadingEvents = state.loading;
+
+  // =============================
+  // Effects
+  // =============================
+  useEffect(() => {
+    setNameDraft(user?.displayName ?? '');
+    setLocalDisplayName(user?.displayName ?? 'Usuário');
+  }, [user?.displayName]);
 
   useEffect(() => {
-    if (!userEmail) return;
+    if (!authLoading && !user) {
+      router.replace('/(auth)/login');
+    }
+  }, [authLoading, user, router]);
 
-    const fetch = async () => {
-      const data = await getGuestParticipationsByEmail(userEmail);
-      setParticipations(data);
-      setLoadingParticipations(false);
+  useEffect(() => {
+    let mounted = true;
+
+    const run = async () => {
+      if (!uid) {
+        if (mounted) {
+          setParticipations([]);
+          setLoadingParticipations(false);
+        }
+        return;
+      }
+
+      try {
+        setLoadingParticipations(true);
+        const data = await getGuestParticipationsByUserId(uid);
+        if (!mounted) return;
+        setParticipations(data);
+      } catch (e) {
+        console.error('Erro ao carregar participações:', e);
+        if (!mounted) return;
+        setParticipations([]);
+      } finally {
+        if (!mounted) return;
+        setLoadingParticipations(false);
+      }
     };
 
-    fetch();
-  }, [userEmail]);
+    run();
+    return () => {
+      mounted = false;
+    };
+  }, [uid]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (editNameVisible) {
+          setEditNameVisible(false);
+          return true;
+        }
+        if (supportVisible) {
+          setSupportVisible(false);
+          return true;
+        }
+        if (deleteVisible) {
+          setDeleteVisible(false);
+          return true;
+        }
+        router.back();
+        return true;
+      };
+
+      BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () =>
+        BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+    }, [supportVisible, editNameVisible, deleteVisible, router])
+  );
+
+  // =============================
+  // Eventos acessíveis
+  // =============================
+  const createdOrAdminEvents = useMemo(() => {
+    if (!uid) return [];
+
+    return state.events.filter((event) => {
+      const isCreator = event.userId === uid;
+      const myLevel = event.subAdminsByUid?.[uid];
+      const isSubAdmin = !!myLevel;
+      return isCreator || isSubAdmin;
+    });
+  }, [state.events, uid]);
+
+  const participantEvents = useMemo(() => {
+    if (!participations.length) return [];
+
+    const ids = new Set(
+      participations
+        .filter((p) => p.mode === 'confirmado' || p.mode === 'acompanhando')
+        .map((p) => p.eventId)
+    );
+
+    return state.events.filter((e) => ids.has(e.id));
+  }, [participations, state.events]);
+
+  const allAccessibleEvents = useMemo(() => {
+    const map = new Map<string, Event>();
+    createdOrAdminEvents.forEach((e) => map.set(e.id, e));
+    participantEvents.forEach((e) => map.set(e.id, e));
+    return Array.from(map.values());
+  }, [createdOrAdminEvents, participantEvents]);
+
+  // =============================
+  // Estatísticas
+  // =============================
+  const totalEvents = allAccessibleEvents.length;
+
+  const totalPrograms = useMemo(() => {
+    return allAccessibleEvents.reduce(
+      (sum, e) => sum + (e.programs?.length ?? 0),
+      0
+    );
+  }, [allAccessibleEvents]);
+
+  const totalActivities = useMemo(() => {
+    return allAccessibleEvents.reduce((sum, e) => {
+      const programs = e.programs ?? [];
+      return (
+        sum +
+        programs.reduce((pSum, p: any) => pSum + (p.activities?.length ?? 0), 0)
+      );
+    }, 0);
+  }, [allAccessibleEvents]);
+
+  const totalPhotos = useMemo(() => {
+    return allAccessibleEvents.reduce((sum, e) => {
+      const programs = e.programs ?? [];
+      return (
+        sum +
+        programs.reduce((pSum, p: any) => {
+          const activities = p.activities ?? [];
+          return (
+            pSum +
+            activities.reduce(
+              (aSum: number, a: any) => aSum + (a.photos?.length ?? 0),
+              0
+            )
+          );
+        }, 0)
+      );
+    }, 0);
+  }, [allAccessibleEvents]);
+
+  const pluralize = (count: number, singular: string, plural: string) =>
+    count <= 1 ? singular : plural;
+
+  // =============================
+  // Actions
+  // =============================
+
+  const handleSaveDisplayName = async () => {
+    const newName = nameDraft.trim();
+
+    if (newName.length < 2) {
+      Alert.alert(
+        'Nome inválido',
+        'Digite um nome com pelo menos 2 caracteres.'
+      );
+      return;
+    }
+
+    if (!auth.currentUser) {
+      Alert.alert('Erro', 'Usuário não autenticado.');
+      return;
+    }
+
+    try {
+      setSavingName(true);
+      await updateProfile(auth.currentUser, { displayName: newName });
+      setLocalDisplayName(newName);
+      Alert.alert('Sucesso', 'Seu nome foi atualizado.');
+      setEditNameVisible(false);
+    } catch (e: any) {
+      Alert.alert('Erro', e?.message ?? 'Não foi possível atualizar o nome.');
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Sair da conta', 'Deseja mesmo sair?', [
@@ -130,7 +302,7 @@ export default function ProfileScreen() {
         onPress: async () => {
           try {
             await signOut(auth);
-            router.replace('/login');
+            router.replace('/(auth)/login'); // ✅ rota correta
           } catch (error) {
             Alert.alert('Erro ao sair', (error as any).message);
           }
@@ -139,116 +311,103 @@ export default function ProfileScreen() {
     ]);
   };
 
-  // Eventos criados ou administrados
-  const createdOrAdminEvents = state.events.filter(
-    (event) =>
-      event.createdBy?.toLowerCase() === userEmail ||
-      event.subAdmins?.some((admin) => admin.email.toLowerCase() === userEmail)
-  );
+  const deleteMyDataFromFirestore = async (uidToDelete: string) => {
+    await deleteDoc(doc(db, 'users', uidToDelete));
 
-  // Eventos em que o usuário participa
-  const participantEvents = guestEvents.filter((event) =>
-    participations.some(
-      (p) =>
-        p.eventId === event.id &&
-        p.userEmail.toLowerCase() === userEmail &&
-        (p.mode === 'confirmado' || p.mode === 'acompanhando')
-    )
-  );
+    const colRef = collection(db, 'guestParticipations');
+    const q = query(colRef, where('userId', '==', uidToDelete));
+    const snap = await getDocs(q);
 
-  const allAccessibleEvents = [
-    ...createdOrAdminEvents,
-    ...participantEvents.filter(
-      (event) => !createdOrAdminEvents.some((e) => e.id === event.id)
-    ),
-  ];
+    const refs = snap.docs.map((d) => d.ref);
 
-  const followedEvents = guestEvents.filter(
-    (event) =>
-      event.createdBy?.toLowerCase() !== userEmail &&
-      !event.subAdmins?.some((admin) => admin.email.toLowerCase() === userEmail)
-  );
-
-  const totalEvents = allAccessibleEvents.length;
-  const totalPrograms = allAccessibleEvents.reduce(
-    (sum, e) => sum + e.programs.length,
-    0
-  );
-  const totalActivities = allAccessibleEvents.reduce(
-    (sum, e) =>
-      sum + e.programs.reduce((pSum, p) => pSum + p.activities.length, 0),
-    0
-  );
-  const totalPhotos = allAccessibleEvents.reduce(
-    (sum, e) =>
-      sum +
-      e.programs.reduce(
-        (pSum, p) =>
-          pSum +
-          p.activities.reduce((aSum, a) => aSum + (a.photos?.length ?? 0), 0),
-        0
-      ),
-    0
-  );
-
-  const handleGoToPermissions = (eventId: string) => {
-    router.push({
-      pathname: '/(stack)/permission-confirmation/[id]',
-      params: { id: eventId },
-    });
+    for (let i = 0; i < refs.length; i += 450) {
+      const batch = writeBatch(db);
+      refs.slice(i, i + 450).forEach((ref) => batch.delete(ref));
+      await batch.commit();
+    }
   };
 
-  const displayName = user?.displayName ?? 'Usuário';
+  const reauthForDeletion = async () => {
+    const current = auth.currentUser;
+    if (!current?.email) {
+      Alert.alert('Erro', 'Sua conta não possui e-mail para reautenticação.');
+      throw new Error('no_email');
+    }
 
-  const pluralize = (count: number, singular: string, plural: string) =>
-    count <= 1 ? singular : plural;
+    const pass = deletePassword.trim();
+    if (pass.length < 6) {
+      Alert.alert(
+        'Senha necessária',
+        'Digite sua senha para confirmar a exclusão.'
+      );
+      throw new Error('missing_password');
+    }
 
-  if (isLoadingEvents) {
-    return (
-      <LinearGradient
-        colors={gradientColors}
-        locations={[0, 0.7, 1]}
-        style={styles.container}
-      >
-        <StatusBar
-          translucent
-          backgroundColor="transparent"
-          style={scheme === 'dark' ? 'light' : 'dark'}
-        />
-        <View
-          style={[
-            styles.content,
-            {
-              paddingTop:
-                Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
-            },
-          ]}
-        >
-          <View style={[styles.gradient, styles.center]}>
-            <Text style={[styles.statLabel, { color: theme.text }]}>
-              Atualizando perfil...
-            </Text>
-            <LottieView
-              source={require('../../assets/images/loading.json')}
-              autoPlay
-              loop
-              style={styles.lottie}
-            />
-          </View>
-        </View>
-      </LinearGradient>
-    );
-  }
+    const cred = EmailAuthProvider.credential(current.email, pass);
+    await reauthenticateWithCredential(current, cred);
+  };
+
+  const handleDeleteAccount = async () => {
+    const current = auth.currentUser;
+    if (!current) {
+      Alert.alert('Erro', 'Usuário não autenticado.');
+      return;
+    }
+
+    const uidToDelete = current.uid;
+    setDeletingAccount(true);
+
+    try {
+      await reauthForDeletion();
+      await deleteMyDataFromFirestore(uidToDelete);
+      await deleteUser(auth.currentUser!);
+
+      setDeleteVisible(false);
+      setDeleteConfirmText('');
+      setDeletePassword('');
+      setShowDeletePassword(false);
+      router.replace('/(auth)/login');
+    } catch (e: any) {
+      const code = e?.code || '';
+      const msg = e?.message || 'Não foi possível excluir sua conta.';
+
+      if (
+        code.includes('wrong-password') ||
+        code.includes('invalid-credential')
+      ) {
+        Alert.alert(
+          'Senha incorreta',
+          'A senha informada está incorreta. Tente novamente.'
+        );
+        return;
+      }
+
+      if (code.includes('requires-recent-login')) {
+        Alert.alert(
+          'Confirmação necessária',
+          'Por segurança, confirme sua senha novamente para excluir.'
+        );
+        return;
+      }
+
+      Alert.alert('Erro ao excluir conta', msg);
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
+  // =============================
+  // Loading
+  // =============================
+  const isScreenLoading =
+    isLoadingEvents || authLoading || loadingParticipations;
 
   return (
-    <View style={{ flex: 1, backgroundColor: backgroundColor }}>
+    <View style={{ flex: 1, backgroundColor }}>
       <Animated.View
         entering={FadeIn.duration(50)}
         exiting={FadeOut.duration(50)}
-        style={{
-          flex: 1,
-          backgroundColor: gradientColors[0],
-        }}
+        style={{ flex: 1, backgroundColor: gradientColors[0] }}
       >
         <LinearGradient
           colors={gradientColors}
@@ -260,6 +419,11 @@ export default function ProfileScreen() {
             backgroundColor="transparent"
             style={colorScheme === 'dark' ? 'light' : 'dark'}
           />
+
+          {isScreenLoading && (
+            <LoadingOverlay message="Atualizando perfil..." />
+          )}
+
           <ScrollView
             contentContainerStyle={[
               styles.contentContainer,
@@ -271,15 +435,6 @@ export default function ProfileScreen() {
               },
             ]}
           >
-            <View style={styles.profileHeader}>
-              <Text style={[styles.profileName, { color: textColor }]}>
-                {displayName}
-              </Text>
-              <Text style={[styles.profileEmail, { color: textColor }]}>
-                {userEmail}
-              </Text>
-            </View>
-
             <View style={styles.statsGrid}>
               <View
                 style={[styles.statCard, { backgroundColor: colors.primary }]}
@@ -289,6 +444,7 @@ export default function ProfileScreen() {
                   {pluralize(totalEvents, 'Evento', 'Eventos')}
                 </Text>
               </View>
+
               <View
                 style={[styles.statCard, { backgroundColor: colors.primary2 }]}
               >
@@ -297,6 +453,7 @@ export default function ProfileScreen() {
                   {pluralize(totalPrograms, 'Programa', 'Programas')}
                 </Text>
               </View>
+
               <View
                 style={[styles.statCard, { backgroundColor: colors.primary2 }]}
               >
@@ -305,6 +462,7 @@ export default function ProfileScreen() {
                   {pluralize(totalActivities, 'Atividade', 'Atividades')}
                 </Text>
               </View>
+
               <View
                 style={[styles.statCard, { backgroundColor: colors.primary }]}
               >
@@ -318,40 +476,30 @@ export default function ProfileScreen() {
             <Text style={[styles.sectionTitle, { color: textColor }]}>
               Controle
             </Text>
+
             <View style={styles.card}>
               <Button
                 title="Lista de eventos"
                 icon={<Settings size={20} color={textColor} />}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(stack)/myevents',
-                  })
-                }
+                onPress={() => router.push({ pathname: '/(stack)/myevents' })}
                 variant="ghost"
                 fullWidth
                 style={styles.menuButton}
                 textStyle={{ color: textColor }}
               />
+
               <Text style={[styles.sectionTitle, { color: textColor }]}>
                 Administrar Permissões
               </Text>
+
               <View style={styles.dropdownContainer}>
                 <CustomDropdown
-                  items={state.events.filter((event) => {
-                    const isAuthorized =
-                      event.createdBy?.toLowerCase() === userEmail ||
-                      event.subAdmins?.some(
-                        (admin) =>
-                          admin.email.toLowerCase() === userEmail &&
-                          ['Super Admin', 'Admin parcial'].includes(admin.level)
-                      );
-                    return isAuthorized;
-                  })}
+                  items={createdOrAdminEvents}
                   placeholder="-- Escolha um evento --"
                   getItemLabel={(event) => event.title}
                   onSelect={(event) => {
                     router.push({
-                      pathname: '/(stack)/permission-confirmation/[id]',
+                      pathname: '/(stack)/events/[id]/permissions',
                       params: { id: event.id },
                     });
                   }}
@@ -377,6 +525,7 @@ export default function ProfileScreen() {
                 textStyle={{ color: textColor }}
               />
             </View>
+
             <Text style={[styles.sectionTitle, { color: textColor }]}>
               Editar acompanhantes
             </Text>
@@ -396,30 +545,6 @@ export default function ProfileScreen() {
                 borderColor={colors.border}
                 textColor={textColor}
               />
-              {/* {followedEvents.length > 0 && (
-                <>
-                  <Text style={[styles.sectionTitle, { color: textColor }]}>
-                    Eventos que você acompanha
-                  </Text>
-                  <View style={styles.dropdownContainer}>
-                    <CustomDropdown
-                      items={followedEvents}
-                      placeholder="-- Acompanhando --"
-                      getItemLabel={(event) => event.title}
-                      onSelect={(event) => {
-                        router.push({
-                          pathname: '/(stack)/events/[id]',
-                          params: { id: event.id },
-                        });
-                      }}
-                      icon={<Bell size={20} color={textColor} />}
-                      backgroundColor={colors.backGroundSecondary}
-                      borderColor={colors.border}
-                      textColor={textColor}
-                    />
-                  </View>
-                </>
-              )} */}
             </View>
 
             <Text style={[styles.sectionTitle, { color: textColor }]}>
@@ -427,31 +552,48 @@ export default function ProfileScreen() {
             </Text>
             <View style={styles.card}>
               <Button
-                title="Apoiar o App 💜"
+                title="Apoiar o App "
                 icon={<HeartHandshake size={20} color={textColor} />}
-                onPress={() => router.push('/donate')}
+                onPress={() => router.push('/(stack)/donate')}
                 variant="ghost"
                 fullWidth
                 style={styles.menuButton}
                 textStyle={{ color: textColor }}
               />
-              {/* <Button
-                title="Limpar Tudo"
-                icon={<Trash2 size={20} color="#f44336" />}
-                onPress={handleClearData}
+
+              <Button
+                title="Editar nome"
+                icon={<Edit size={20} color={textColor} />}
+                onPress={() => setEditNameVisible(true)}
                 variant="ghost"
                 fullWidth
                 style={styles.menuButton}
-                textStyle={{ color: '#f44336' }}
-              /> */}
+                textStyle={{ color: textColor }}
+              />
+
               <Button
                 title="Sair da Conta"
-                icon={<LogOut size={20} color="#f44336" />}
+                icon={<LogOut size={20} color={textColor} />}
                 onPress={handleLogout}
                 variant="ghost"
                 fullWidth
                 style={styles.menuButton}
-                textStyle={{ color: '#f44336' }}
+                textStyle={{ color: textColor }}
+              />
+
+              <Button
+                title="Excluir minha conta"
+                icon={<UserX size={10} color="#f44336" />}
+                onPress={() => {
+                  setDeleteConfirmText('');
+                  setDeletePassword('');
+                  setShowDeletePassword(false);
+                  setDeleteVisible(true);
+                }}
+                variant="ghost"
+                fullWidth
+                style={styles.menuButtonEx}
+                textStyle={{ color: '#f44336', fontSize: 11 }}
               />
             </View>
 
@@ -460,6 +602,57 @@ export default function ProfileScreen() {
             </Text>
           </ScrollView>
 
+          {/* MODAL: Editar nome */}
+          <Modal visible={editNameVisible} transparent animationType="fade">
+            <View style={styles.modalOverlay}>
+              <LinearGradient
+                colors={gradientColors}
+                style={styles.modalContent}
+                locations={[0, 0.7, 1]}
+              >
+                <Text style={[styles.titleHelp, { color: colors.primary }]}>
+                  Editar nome
+                </Text>
+
+                <TextInput
+                  value={nameDraft}
+                  onChangeText={setNameDraft}
+                  placeholder="Digite seu nome"
+                  placeholderTextColor={colors.textSecondary}
+                  autoCapitalize="words"
+                  style={[
+                    styles.nameInput,
+                    {
+                      color: textColor,
+                      borderColor: colors.border,
+                      backgroundColor: colors.backGroundSecondary,
+                    },
+                  ]}
+                />
+
+                <Button
+                  title={savingName ? 'Salvando...' : 'Salvar'}
+                  onPress={handleSaveDisplayName}
+                  style={{
+                    backgroundColor: colors.primary,
+                    width: '100%',
+                    marginTop: 12,
+                  }}
+                  textStyle={{ color: '#fff' }}
+                />
+
+                <Button
+                  title="Cancelar"
+                  onPress={() => setEditNameVisible(false)}
+                  variant="cancel"
+                  style={{ width: '100%', marginTop: 10 }}
+                  textStyle={{ color: '#fff' }}
+                />
+              </LinearGradient>
+            </View>
+          </Modal>
+
+          {/* MODAL: Suporte */}
           <Modal visible={supportVisible} transparent animationType="slide">
             <View style={styles.modalOverlay}>
               <LinearGradient
@@ -499,6 +692,125 @@ export default function ProfileScreen() {
               </LinearGradient>
             </View>
           </Modal>
+
+          {/* MODAL: Excluir conta */}
+          <Modal visible={deleteVisible} transparent animationType="fade">
+            <View style={styles.modalOverlay}>
+              <LinearGradient
+                colors={gradientColors}
+                style={styles.modalContent}
+                locations={[0, 0.7, 1]}
+              >
+                <Text style={[styles.titleHelp, { color: colors.primary }]}>
+                  Excluir conta
+                </Text>
+
+                <Text style={[styles.testHelp, { color: colors.text }]}>
+                  Essa ação é permanente. Seus dados de conta e participações
+                  serão apagados.
+                </Text>
+
+                <Text
+                  style={[
+                    styles.testHelp,
+                    { color: colors.text, marginTop: 12 },
+                  ]}
+                >
+                  Para confirmar, digite:{' '}
+                  <Text style={styles.bold}>EXCLUIR</Text>
+                </Text>
+
+                <TextInput
+                  value={deleteConfirmText}
+                  onChangeText={setDeleteConfirmText}
+                  placeholder="Digite EXCLUIR"
+                  placeholderTextColor={colors.textSecondary}
+                  autoCapitalize="characters"
+                  style={[
+                    styles.nameInput,
+                    {
+                      marginTop: 12,
+                      color: colors.text,
+                      borderColor: colors.border,
+                      backgroundColor: colors.backGroundSecondary,
+                    },
+                  ]}
+                />
+
+                <Text
+                  style={[
+                    styles.testHelp,
+                    { color: colors.text, marginTop: 12 },
+                  ]}
+                >
+                  Confirme sua senha para finalizar:
+                </Text>
+
+                <View style={styles.passwordRow}>
+                  <TextInput
+                    value={deletePassword}
+                    onChangeText={setDeletePassword}
+                    placeholder="Sua senha"
+                    placeholderTextColor={colors.textSecondary}
+                    secureTextEntry={!showDeletePassword}
+                    style={[
+                      styles.passwordInput,
+                      {
+                        color: colors.text,
+                        borderColor: colors.border,
+                        backgroundColor: colors.backGroundSecondary,
+                      },
+                    ]}
+                  />
+
+                  <Pressable
+                    onPress={() => setShowDeletePassword((p) => !p)}
+                    style={styles.eyeBtn}
+                  >
+                    {showDeletePassword ? (
+                      <EyeOff size={18} color={colors.textSecondary} />
+                    ) : (
+                      <Eye size={18} color={colors.textSecondary} />
+                    )}
+                  </Pressable>
+                </View>
+
+                <Button
+                  title={
+                    deletingAccount ? 'Excluindo...' : 'Confirmar exclusão'
+                  }
+                  onPress={handleDeleteAccount}
+                  style={{
+                    backgroundColor:
+                      deleteConfirmText.trim().toUpperCase() === 'EXCLUIR'
+                        ? '#f44336'
+                        : 'rgba(244,67,54,0.35)',
+                    width: '100%',
+                    marginTop: 12,
+                  }}
+                  textStyle={{ color: '#fff' }}
+                  disabled={
+                    deletingAccount ||
+                    deleteConfirmText.trim().toUpperCase() !== 'EXCLUIR'
+                  }
+                />
+
+                <Button
+                  title="Cancelar"
+                  onPress={() => {
+                    setDeleteVisible(false);
+                    setDeleteConfirmText('');
+                    setDeletePassword('');
+                    setShowDeletePassword(false);
+                  }}
+                  variant="cancel"
+                  style={{ width: '100%', marginTop: 10 }}
+                  textStyle={{ color: '#fff' }}
+                  disabled={deletingAccount}
+                />
+              </LinearGradient>
+            </View>
+          </Modal>
         </LinearGradient>
       </Animated.View>
     </View>
@@ -506,21 +818,53 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  gradient: { flex: 1 },
-  center: { justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1 },
   contentContainer: { paddingHorizontal: 16, paddingBottom: 20 },
+  gradient: { flex: 1 },
+
   profileHeader: { alignItems: 'flex-start', marginBottom: 20 },
   profileName: { fontSize: 24, fontFamily: 'Inter-Bold', marginBottom: 4 },
   profileEmail: { fontSize: 16, fontFamily: 'Inter-Regular' },
+
+  nameRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+
+  nameInput: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    fontFamily: 'Inter_400Regular',
+  },
+
+  passwordRow: {
+    width: '100%',
+    position: 'relative',
+    marginTop: 10,
+  },
+  passwordInput: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingRight: 44,
+    fontSize: 16,
+    fontFamily: 'Inter_400Regular',
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+  },
+
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -544,6 +888,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statLabel: { color: 'white', fontSize: 16, fontFamily: 'Inter-Medium' },
+
   sectionTitle: {
     fontSize: 18,
     fontFamily: 'Inter-Bold',
@@ -553,6 +898,11 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   menuButton: { justifyContent: 'flex-start', paddingVertical: 12 },
+  menuButtonEx: {
+    justifyContent: 'flex-start',
+    paddingVertical: 12,
+    marginTop: 16,
+  },
   versionText: {
     textAlign: 'center',
     fontSize: 12,
@@ -573,6 +923,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     borderWidth: 1,
     borderColor: '#444',
+    padding: 16,
   },
   modalContent: {
     width: '85%',
@@ -582,7 +933,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#444',
   },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
   dropdownContainer: {
     marginBottom: 24,
     marginLeft: 40,
@@ -600,23 +950,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontFamily: 'Inter_700Bold',
   },
-  suporte: {
-    marginTop: 24,
-    marginBottom: 10,
-  },
-  lottie: {
-    width: 150,
-    height: 150,
-  },
-  modalBody: {
-    width: '100%',
-    marginTop: 16,
-  },
-
-  bold: {
-    fontWeight: 'bold',
-    color: '#7c3aed',
-  },
+  modalBody: { width: '100%', marginTop: 16 },
+  bold: { fontWeight: 'bold', color: '#7c3aed' },
   supportEmail: {
     marginTop: 20,
     fontSize: 16,

@@ -17,7 +17,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Edit, Pencil, Plus, Trash2, X } from 'lucide-react-native';
 
 import Colors from '@/constants/Colors';
-import { db } from '@/config/firebase';
+import { auth, db } from '@/config/firebase';
 import Button from '@/components/ui/Button';
 
 type Field = { label: string; value: string };
@@ -27,7 +27,7 @@ export default function EventOrganizerNoteViewScreen() {
   const colors = Colors[colorScheme];
 
   const { id: eventId } = useLocalSearchParams<{ id: string }>();
-  const user = getAuth().currentUser;
+  const user = auth.currentUser;
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
 

@@ -1,98 +1,243 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
-import { getAuth } from 'firebase/auth';
+// hooks/useEventAccess.ts
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { useEvents } from '@/context/EventsContext';
-import { Event } from '@/types'; // substitua pelo seu tipo real, se houver
 
-type GuestStatus = 'none' | 'confirmed' | 'interested';
+// Ajuste o import do tipo do seu Event conforme seu projeto
+import type { Event, PermissionLevel } from '@/types';
 
-export function useEventAccess(title?: string, accessCode?: string) {
-  const { state, getGuestParticipation } = useEvents();
-  const router = useRouter();
+// Ajuste conforme seu tipo real (no seu projeto já existe GuestParticipation)
+import type { GuestParticipation } from '@/types/guestParticipation';
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [verifyingAccess, setVerifyingAccess] = useState(true);
-  const [eventFound, setEventFound] = useState<Event | null>(null);
-  const [isCreator, setIsCreator] = useState(false);
-  const [guestStatus, setGuestStatus] = useState<GuestStatus>('none');
+// Se no seu projeto você usa um service externo, pode trocar aqui,
+// mas como você já tem funções no EventsContext, vamos usar elas.
+type UseEventAccessParams = {
+  eventId?: string;
+  /**
+   * Se você usa telas tipo "FoundEventScreen" que podem achar o evento por accessCode,
+   * você pode passar accessCode e o hook tenta resolver.
+   */
+  accessCode?: string;
 
-  const user = getAuth().currentUser;
-  const userEmail = user?.email ?? 'convidado@anonimo.com';
+  /**
+   * Se quiser forçar reload do evento no mount.
+   */
+  autoRefetch?: boolean;
+};
 
-  // 🔎 Busca o evento com base no título e código
+type UseEventAccessReturn = {
+  uid: string;
+  isAuthReady: boolean;
+
+  event: Event | null;
+  eventLoading: boolean;
+  eventError: string | null;
+
+  // Permissões
+  isCreator: boolean;
+  myPermissionLevel: PermissionLevel | null;
+  isSuperAdmin: boolean;
+  isPartialAdmin: boolean;
+
+  // Participação (guestParticipations)
+  myParticipation: GuestParticipation | null;
+  participationLoading: boolean;
+  isParticipant: boolean;
+  isConfirmed: boolean;
+  isFollowing: boolean; // "acompanhando"
+  hasAccess: boolean;
+
+  // helpers
+  refetch: () => Promise<void>;
+};
+
+/**
+ * Hook central para decidir:
+ * - evento carregado?
+ * - usuário é criador / subadmin?
+ * - usuário é participante (confirmado/acompanhando) via guestParticipations?
+ * - usuário tem acesso?
+ */
+export function useEventAccess({
+  eventId,
+  accessCode,
+  autoRefetch = true,
+}: UseEventAccessParams): UseEventAccessReturn {
+  const {
+    state,
+    fetchEvents,
+    refetchEventById,
+    // você já usa essas no MyEventsScreen:
+    getGuestParticipationsByUserId,
+  } = useEvents();
+
+  const [uid, setUid] = useState('');
+  const [isAuthReady, setIsAuthReady] = useState(false);
+
+  const [eventLoading, setEventLoading] = useState(false);
+  const [eventError, setEventError] = useState<string | null>(null);
+
+  const [participationLoading, setParticipationLoading] = useState(false);
+  const [myParticipation, setMyParticipation] =
+    useState<GuestParticipation | null>(null);
+
+  const cancelledRef = useRef(false);
+
+  // ✅ uid reativo (evita bug de currentUser desatualizado)
   useEffect(() => {
-    if (!title || !accessCode) {
-      setIsLoading(false);
-      return;
-    }
+    const auth = getAuth();
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUid(u?.uid ?? '');
+      setIsAuthReady(true);
+    });
+    return unsub;
+  }, []);
 
-    const timeout = setTimeout(() => {
-      if (!eventFound) {
-        console.warn('❌ Evento não encontrado após 8 segundos.');
-        setIsLoading(false);
-      }
-    }, 8000);
+  // ✅ resolve o evento do state (por id ou por accessCode)
+  const eventFromState = useMemo(() => {
+    if (eventId) return state.events.find((e) => e.id === eventId) ?? null;
+    if (accessCode)
+      return state.events.find((e) => e.accessCode === accessCode) ?? null;
+    return null;
+  }, [state.events, eventId, accessCode]);
 
-    const normalizedAccessCode = accessCode.toLowerCase().trim();
-    const normalizedTitle = title.toLowerCase().trim();
+  const [event, setEvent] = useState<Event | null>(null);
 
-    const found = state.events.find(
-      (e) =>
-        e.accessCode?.toLowerCase().trim() === normalizedAccessCode &&
-        e.title?.toLowerCase().trim() === normalizedTitle
-    );
+  // mantém o state local sincronizado com o state global
+  useEffect(() => {
+    setEvent(eventFromState);
+  }, [eventFromState]);
 
-    if (found) {
-      setEventFound(found);
-      clearTimeout(timeout);
-      setIsLoading(false);
-    }
+  const refetch = useCallback(async () => {
+    if (!isAuthReady) return;
 
-    return () => clearTimeout(timeout);
-  }, [state.events, title, accessCode]);
-
-  const refetchAccess = async () => {
-    if (!eventFound || !userEmail) return;
-
-    const isCreatorUser =
-      eventFound.createdBy?.toLowerCase() === userEmail.toLowerCase();
-
-    setIsCreator(isCreatorUser);
-
-    if (isCreatorUser) {
-      router.replace(`/events/${eventFound.id}`);
-      return;
-    }
+    setEventError(null);
 
     try {
-      const participation = await getGuestParticipation(
-        eventFound.id,
-        userEmail
-      );
+      setEventLoading(true);
 
-      if (participation?.mode) {
-        const status =
-          participation.mode === 'confirmado' ? 'confirmed' : 'interested';
-        setGuestStatus(status);
-        router.replace(`/events/${eventFound.id}`);
-      } else {
-        setGuestStatus('none');
+      // se a lista estiver vazia, puxa eventos
+      if (!state.events.length) {
+        await fetchEvents();
       }
-    } catch (error) {
-      console.error('Erro ao buscar participação:', error);
-      setGuestStatus('none');
-    }
-  };
 
+      // se temos eventId e existe função para refetch individual, melhor ainda
+      if (eventId && typeof refetchEventById === 'function') {
+        await refetchEventById(eventId);
+      }
+
+      // depois do fetch/refetch, o useMemo eventFromState atualiza sozinho
+    } catch (e: any) {
+      setEventError(e?.message ?? 'Falha ao carregar evento.');
+    } finally {
+      setEventLoading(false);
+    }
+  }, [
+    isAuthReady,
+    state.events.length,
+    fetchEvents,
+    refetchEventById,
+    eventId,
+  ]);
+
+  // ✅ auto-carregar evento
   useEffect(() => {
-    refetchAccess().finally(() => setVerifyingAccess(false));
-  }, [eventFound, userEmail]);
+    cancelledRef.current = false;
+
+    const run = async () => {
+      if (!autoRefetch) return;
+      // se já tem no state, não precisa carregar (mas se quiser sempre, remove esse if)
+      if (eventFromState) return;
+      await refetch();
+    };
+
+    run();
+
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, [autoRefetch, eventFromState, refetch]);
+
+  // ✅ carregar participação do usuário (guestParticipations)
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!uid) {
+        setMyParticipation(null);
+        return;
+      }
+
+      // sem evento ainda → não busca
+      const ev = eventFromState;
+      if (!ev) {
+        setMyParticipation(null);
+        return;
+      }
+
+      try {
+        setParticipationLoading(true);
+
+        // pega todas participações do usuário e filtra por eventId
+        const list = await getGuestParticipationsByUserId(uid);
+        const found = list.find((p) => p.eventId === ev.id) ?? null;
+
+        if (!cancelled) setMyParticipation(found);
+      } catch (e) {
+        if (!cancelled) setMyParticipation(null);
+      } finally {
+        if (!cancelled) setParticipationLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [uid, eventFromState, getGuestParticipationsByUserId]);
+
+  // ========= Permissões =========
+  const isCreator = !!event && !!uid && event.userId === uid;
+
+  const myPermissionLevel: PermissionLevel | null = useMemo(() => {
+    if (!event || !uid) return null;
+    const level = event.subAdminsByUid?.[uid];
+    return (level ?? null) as PermissionLevel | null;
+  }, [event, uid]);
+
+  const isSuperAdmin = isCreator || myPermissionLevel === 'Super Admin';
+  const isPartialAdmin = !isCreator && myPermissionLevel === 'Admin parcial';
+
+  // ========= Participação =========
+  const isConfirmed = myParticipation?.mode === 'confirmado';
+  const isFollowing = myParticipation?.mode === 'acompanhando';
+  const isParticipant = isConfirmed || isFollowing;
+
+  // ✅ regra final de acesso
+  const hasAccess = isCreator || !!myPermissionLevel || isParticipant;
 
   return {
-    isLoading: isLoading || verifyingAccess,
-    eventFound,
+    uid,
+    isAuthReady,
+
+    event,
+    eventLoading,
+    eventError,
+
     isCreator,
-    guestStatus,
-    refetchAccess, // <== aqui
+    myPermissionLevel,
+    isSuperAdmin,
+    isPartialAdmin,
+
+    myParticipation,
+    participationLoading,
+    isParticipant,
+    isConfirmed,
+    isFollowing,
+    hasAccess,
+
+    refetch,
   };
 }
+
+export default useEventAccess;

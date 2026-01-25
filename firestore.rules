@@ -1,0 +1,328 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================
+    // Helpers globais
+    // =========================================================
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // docId padrão: `${uid}_${eventId}`
+    function guestDocId(uid, eventId) {
+      return uid + "_" + eventId;
+    }
+
+    function eventExists(eventId) {
+      return exists(/databases/$(database)/documents/events/$(eventId));
+    }
+
+    function eventDocById(eventId) {
+      return get(/databases/$(database)/documents/events/$(eventId));
+    }
+
+    function isOwnerOfEventId(eventId) {
+      return signedIn()
+        && eventExists(eventId)
+        && eventDocById(eventId).data.userId == request.auth.uid;
+    }
+
+    function isSubAdminOfEventId(eventId) {
+      return signedIn()
+        && eventExists(eventId)
+        && (eventDocById(eventId).data.subAdminsByUid is map)
+        && (eventDocById(eventId).data.subAdminsByUid[request.auth.uid] != null);
+    }
+
+    function isParticipantOfEventId(eventId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/guestParticipations/$(guestDocId(request.auth.uid, eventId)));
+    }
+
+    function canReadEventTree(eventId) {
+      return isOwnerOfEventId(eventId) || isSubAdminOfEventId(eventId) || isParticipantOfEventId(eventId);
+    }
+
+    function canManageEventTree(eventId) {
+      // admin (owner ou subadmin)
+      return isOwnerOfEventId(eventId) || isSubAdminOfEventId(eventId);
+    }
+
+    // =========================================================
+    // EVENT SHARE KEYS (shareKey -> eventId)
+    // =========================================================
+    match /eventShareKeys/{shareKey} {
+
+      // ✅ permitir GET de uma chave específica (resolver shareKey -> eventId)
+      allow get: if signedIn();
+
+      // ❌ bloquear enumeração
+      allow list: if false;
+
+      function createdAtOk() {
+        return !(request.resource.data.keys().hasAny(['createdAt']))
+          || request.resource.data.createdAt is timestamp;
+      }
+
+      // ✅ criar: apenas dono do evento
+      allow create: if signedIn()
+        && request.resource.data.eventId is string
+        && eventExists(request.resource.data.eventId)
+        && eventDocById(request.resource.data.eventId).data.userId == request.auth.uid
+        && createdAtOk();
+
+      // ✅ update: apenas dono, eventId imutável
+      allow update: if signedIn()
+        && request.resource.data.eventId is string
+        && eventExists(request.resource.data.eventId)
+        && eventDocById(request.resource.data.eventId).data.userId == request.auth.uid
+        && (
+          !(resource.data.keys().hasAny(['eventId'])) ||
+          request.resource.data.eventId == resource.data.eventId
+        )
+        && createdAtOk();
+
+      // ✅ delete: apenas dono do evento
+      allow delete: if signedIn()
+        && resource.data.eventId is string
+        && eventExists(resource.data.eventId)
+        && eventDocById(resource.data.eventId).data.userId == request.auth.uid;
+    }
+
+    // =========================================================
+    // EVENT INVITE SUMMARIES (preview reduzido por shareKey)
+    // =========================================================
+    match /eventInviteSummaries/{shareKey} {
+
+      // ✅ leitura do preview: usuário autenticado
+      allow get: if signedIn();
+
+      // ❌ bloqueia enumeração (não permitir varredura de convites)
+      allow list: if false;
+
+      function keyExists() {
+        return exists(/databases/$(database)/documents/eventShareKeys/$(shareKey));
+      }
+
+      function keyDoc() {
+        return get(/databases/$(database)/documents/eventShareKeys/$(shareKey));
+      }
+
+      function eventIdFromKey() {
+        return keyDoc().data.eventId;
+      }
+
+      // ✅ create/update: somente owner do evento vinculado à shareKey
+      allow create, update: if signedIn()
+        && keyExists()
+        && request.resource.data.v == 1
+        && request.resource.data.shareKey == shareKey
+        && request.resource.data.eventId == eventIdFromKey()
+        && isOwnerOfEventId(eventIdFromKey());
+
+      // ✅ delete: somente owner do evento vinculado à shareKey
+      allow delete: if signedIn()
+        && keyExists()
+        && isOwnerOfEventId(eventIdFromKey());
+    }
+
+    // =========================================================
+    // EVENTS
+    // =========================================================
+    match /events/{eventId} {
+
+      // Documento do evento
+      allow get: if canReadEventTree(eventId);
+      allow list: if signedIn();
+
+      // criar: somente usuário criando seu próprio evento
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+
+      // update/delete: somente dono do evento (mantendo sua regra atual)
+      allow update, delete: if signedIn() && resource.data.userId == request.auth.uid;
+
+      // -------------------------
+      // Subcoleções
+      // -------------------------
+      match /programs/{programId} {
+        allow read, write: if canReadEventTree(eventId);
+
+        match /activities/{activityId} {
+          allow read, write: if canReadEventTree(eventId);
+
+          match /photos/{photoId} {
+            allow read, write: if canReadEventTree(eventId);
+
+            match /comments/{commentId} {
+              allow read, create: if canReadEventTree(eventId);
+              allow delete: if signedIn() && (
+                resource.data.userId == request.auth.uid ||
+                isOwnerOfEventId(eventId)
+              );
+            }
+          }
+        }
+      }
+
+      match /notes/{noteId} {
+        // suas notas são administrativas
+        allow read, write: if canManageEventTree(eventId);
+      }
+    }
+
+    // =========================================================
+    // =========================================================
+    // GUEST PARTICIPATIONS
+    // =========================================================
+    match /guestParticipations/{docId} {
+
+      // -------------------------
+      // Helpers locais
+      // -------------------------
+      function isOwnerOfParticipation() {
+        return resource.data.userId == request.auth.uid;
+      }
+
+      function validModeValue(mode) {
+        return mode in ['confirmado', 'acompanhando'];
+      }
+
+      function validMode() {
+        // usa request.resource (quando está criando/atualizando)
+        return validModeValue(request.resource.data.mode);
+      }
+
+      function userNameOk() {
+        // permite não enviar userName, ou enviar null, ou string
+        return !(request.resource.data.keys().hasAny(['userName']))
+          || request.resource.data.userName == null
+          || request.resource.data.userName is string;
+      }
+
+      function familyOk() {
+        // permite não enviar family, ou enviar uma lista
+        return !(request.resource.data.keys().hasAny(['family']))
+          || (request.resource.data.family is list);
+      }
+
+      function eventIdFromResourceOk() {
+        return (resource.data.eventId is string) && eventExists(resource.data.eventId);
+      }
+
+      function eventIdFromRequestOk() {
+        return (request.resource.data.eventId is string) && eventExists(request.resource.data.eventId);
+      }
+
+      function isEventOwner(eventId) {
+        return eventDocById(eventId).data.userId == request.auth.uid;
+      }
+
+      function isEventSuperAdmin(eventId) {
+        return (eventDocById(eventId).data.subAdminsByUid is map)
+          && (eventDocById(eventId).data.subAdminsByUid[request.auth.uid] == "Super Admin");
+      }
+
+      function canReadParticipationByEventPermission() {
+        return resource.data.eventId is string
+          && eventExists(resource.data.eventId)
+          && (isEventOwner(resource.data.eventId)
+            || (
+              (eventDocById(resource.data.eventId).data.subAdminsByUid is map)
+              && (eventDocById(resource.data.eventId).data.subAdminsByUid[request.auth.uid] != null)
+            )
+          );
+      }
+
+      function ownerUpdateOk() {
+        // dono pode editar seus próprios campos (com validações)
+        return isOwnerOfParticipation()
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.eventId == resource.data.eventId
+          && userNameOk()
+          && familyOk()
+          && (
+            // se mudou mode, valida
+            !(request.resource.data.diff(resource.data).changedKeys().hasAny(['mode']))
+            || validMode()
+          );
+      }
+
+      function adminModeOnlyUpdateOk() {
+        // criador do evento ou super admin pode alterar somente mode/updatedAt
+        return eventIdFromResourceOk()
+          && (isEventOwner(resource.data.eventId) || isEventSuperAdmin(resource.data.eventId))
+
+          // não pode trocar dono/evento/nome/family
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.eventId == resource.data.eventId
+          && request.resource.data.userName == resource.data.userName
+          && request.resource.data.family == resource.data.family
+
+          // só permite mudar mode/updatedAt
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['mode', 'updatedAt'])
+          && validMode();
+      }
+
+      // -------------------------
+      // READ (get/list)
+      // -------------------------
+      // - dono da participação
+      // - ou dono/subadmin do evento
+      // - ou documento inexistente (permite retornar not-found sem erro de permissão)
+      allow read: if signedIn() && (
+        !exists(/databases/$(database)/documents/guestParticipations/$(docId))
+        || isOwnerOfParticipation()
+        || canReadParticipationByEventPermission()
+      );
+
+      // -------------------------
+      // CREATE
+      // -------------------------
+      allow create: if signedIn()
+        && eventIdFromRequestOk()
+        && docId == (request.auth.uid + "_" + request.resource.data.eventId)
+        && request.resource.data.userId == request.auth.uid
+        && validMode()
+        && userNameOk()
+        && familyOk();
+
+      // -------------------------
+      // UPDATE
+      // -------------------------
+      allow update: if signedIn() && (
+        ownerUpdateOk()
+        || adminModeOnlyUpdateOk()
+      );
+
+      // -------------------------
+      // DELETE
+      // -------------------------
+      allow delete: if signedIn() && (
+        // dono da participação pode sair
+        isOwnerOfParticipation()
+        // criador do evento pode remover qualquer participação do seu evento
+        || (
+          resource.data.eventId is string
+          && eventExists(resource.data.eventId)
+          && isEventOwner(resource.data.eventId)
+        )
+      );
+    }
+
+
+    // =========================================================
+    // USERS
+    // =========================================================
+    match /users/{uid} {
+      allow read, write: if signedIn() && uid == request.auth.uid;
+    }
+
+    // =========================================================
+    // Default deny
+    // =========================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

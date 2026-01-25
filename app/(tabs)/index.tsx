@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '@/constants/Colors';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import LottieView from 'lottie-react-native';
+
 import { useFocusEffect } from '@react-navigation/native';
 
 import Animated, {
@@ -32,6 +32,20 @@ export default function HomeScreen() {
   const colors = Colors[colorScheme];
   const router = useRouter();
   const [exitModalVisible, setExitModalVisible] = useState(false);
+
+  const [Lottie, setLottie] = useState<any>(null);
+  useEffect(() => {
+    let active = true;
+    try {
+      const mod = require('lottie-react-native');
+      if (active) setLottie(() => mod?.default ?? mod);
+    } catch {
+      if (active) setLottie(null);
+    }
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.96);
@@ -162,12 +176,14 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.lottieWrapper}>
-            <LottieView
-              source={require('../../assets/images/date.json')}
-              autoPlay
-              loop
-              style={{ width: 100, height: 100 }}
-            />
+            {Lottie ? (
+              <Lottie
+                source={require('../../assets/images/date.json')}
+                autoPlay
+                loop
+                style={{ width: 100, height: 100 }}
+              />
+            ) : null}
           </View>
         </Animated.View>
         {/* <Modal

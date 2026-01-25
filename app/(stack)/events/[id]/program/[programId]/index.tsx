@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import ActivityItem from '@/components/ActivityItem';
 import { Event, Program } from '@/types';
 import Animated from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { scheduleNotification } from '@/app/utils/notifications';
+import { auth } from '@/config/firebase';
 
 export default function ProgramDetailScreen() {
   const { id, programId } = useLocalSearchParams<{
@@ -28,11 +28,18 @@ export default function ProgramDetailScreen() {
   }>();
 
   const { state, deleteProgram, refetchEventById } = useEvents();
+  const lastIdRef = useRef<string | null>(null);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
   useEffect(() => {
-    if (id) refetchEventById(id);
+    if (!id) return;
+
+    // ✅ evita refetch repetido se o id é o mesmo
+    if (lastIdRef.current === id) return;
+    lastIdRef.current = id;
+
+    refetchEventById(id);
   }, [id]);
 
   const event = state.events.find((e) => e.id === id) as Event | undefined;
@@ -40,15 +47,17 @@ export default function ProgramDetailScreen() {
     | Program
     | undefined;
 
-  const authUser = getAuth().currentUser;
-  const userEmail = authUser?.email?.toLowerCase() ?? '';
-  const isCreator = event?.createdBy?.toLowerCase() === userEmail;
-  const isSubAdmin = event?.subAdmins?.some(
-    (admin) =>
-      admin.email.toLowerCase() === userEmail &&
-      (admin.level.toLowerCase() === 'super admin' ||
-        admin.level.toLowerCase() === 'admin parcial')
-  );
+  const authUser = auth.currentUser;
+  const myUid = authUser?.uid ?? '';
+
+  const isCreator = (event?.userId ?? '') !== '' && event?.userId === myUid;
+
+  const level = event?.subAdminsByUid?.[myUid]; // fonte de verdade
+  const isSubAdmin =
+    typeof level === 'string' &&
+    (level.toLowerCase() === 'super admin' ||
+      level.toLowerCase() === 'admin parcial');
+
   const hasPermission = isCreator || isSubAdmin;
 
   if (!event || !program) {
@@ -60,7 +69,7 @@ export default function ProgramDetailScreen() {
             headerTitle: 'Program not found',
             headerLeft: () => (
               <TouchableOpacity onPress={() => router.back()}>
-                <ArrowLeft size={24} color={colors.text} />
+                <ArrowLeft size={24} color={colors.primary} />
               </TouchableOpacity>
             ),
           }}
@@ -122,18 +131,14 @@ export default function ProgramDetailScreen() {
         options={{
           headerShown: true,
           headerTitle: 'Detalhes da Programação',
-          headerTitleStyle: {
-            fontFamily: 'Inter-Bold',
-            fontSize: 18,
-            color: colors.text,
-          },
+
           headerTransparent: true,
           headerLeft: () => (
             <TouchableOpacity
               style={styles.headerButton}
               onPress={() => router.back()}
             >
-              <ArrowLeft size={24} color={colors.text} />
+              <ArrowLeft size={24} color={colors.primary} />
             </TouchableOpacity>
           ),
           headerRight: () =>
@@ -193,11 +198,13 @@ export default function ProgramDetailScreen() {
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                 Nenhuma atividade registrada
               </Text>
-              <Text
-                style={[styles.emptySubtext, { color: colors.textSecondary }]}
-              >
-                Adicione as atividades e suas fotos
-              </Text>
+              {hasPermission && (
+                <Text
+                  style={[styles.emptySubtext, { color: colors.textSecondary }]}
+                >
+                  Adicione as atividades e suas fotos
+                </Text>
+              )}
             </View>
           ) : (
             program.activities
@@ -208,8 +215,8 @@ export default function ProgramDetailScreen() {
                     activity={activity}
                     eventId={event.id}
                     programId={program.id}
-                    createdBy={event.createdBy}
-                    subAdmins={event.subAdmins}
+                    creatorUid={event.userId}
+                    subAdminsByUid={event.subAdminsByUid}
                     programDate={program.date}
                   />
                 </Animated.View>
