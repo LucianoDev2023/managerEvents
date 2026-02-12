@@ -64,8 +64,8 @@ export function buildEventUpdateDoc(event: Event) {
 
     titleLower,
 
-    // userId não muda
-    userId: event.userId,
+    // userId não muda (proteção extra para garantir que nunca seja perdido)
+    userId: event.userId || '',
 
     subAdminsByUid,
     subAdminUids,

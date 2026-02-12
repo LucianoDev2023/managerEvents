@@ -114,7 +114,6 @@ export function useEventAccessByShareKey(shareKey?: string) {
       }
 
       try {
-        // STEP 1) shareKey -> eventId
         const keySnap = await getDoc(doc(db, 'eventShareKeys', k));
         if (!keySnap.exists()) {
           safe(() => {
@@ -171,23 +170,33 @@ export function useEventAccessByShareKey(shareKey?: string) {
           return;
         }
 
-        // não participante: tenta summary
+        // tenta ler evento para detectar owner
+        try {
+          const eventRef = doc(db, 'events', eventId);
+          const eventSnap = await getDoc(eventRef);
+          if (eventSnap.exists()) {
+            const data: any = eventSnap.data();
+            if (data?.userId && data.userId === immediateUid) {
+              safe(() => setEventFound(mapEvent(eventId, data)));
+            }
+          }
+        } catch (e: any) {}
+
         const summarySnap = await getDoc(doc(db, 'eventInviteSummaries', k));
         if (!summarySnap.exists()) {
+          // Fallback: sem summary, ainda assim continuar com Event mínimo (id)
           safe(() => {
-            setEventFound(null);
+            setEventFound({ id: eventId } as Event);
             setGuestStatus('none');
           });
-          return;
+        } else {
+          const summary = summarySnap.data() as InviteSummary;
+          // ✅ não participante: usa SOMENTE o summary (nunca tenta ler events)
+          safe(() => setEventFound(mapSummaryToEvent(eventId, summary)));
         }
-
-        const summary = summarySnap.data() as InviteSummary;
-        // ✅ não participante: usa SOMENTE o summary (nunca tenta ler events)
-        safe(() => setEventFound(mapSummaryToEvent(eventId, summary)));
 
         // opcional: best-effort tentar ler evento completo pra detectar owner sem flas
       } catch (err) {
-        console.error('🔥 [useEventAccessByShareKey] ERROR', err);
         safe(() => {
           setEventFound(null);
           setGuestStatus('none');

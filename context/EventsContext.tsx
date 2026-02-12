@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useCallback,
 } from 'react';
+import { Alert } from 'react-native';
 import type {
   Event,
   Program,
@@ -41,6 +42,7 @@ import {
   getGuestParticipationsByEventId as getGuestParticipationsByEventIdService,
   updateGuestParticipation as updateGuestParticipationService,
   upsertGuestParticipation as upsertGuestParticipationService,
+  removeGuestParticipation as removeGuestParticipationService,
 } from '@/hooks/guestService';
 
 import { normalizeSubAdminsByUid } from '@/src/helpers/eventPermissions';
@@ -101,13 +103,21 @@ const eventsReducer = (
       return { ...state, loading: false, error: action.payload };
     case 'ADD_EVENT':
       return { ...state, events: [...state.events, action.payload] };
-    case 'UPDATE_EVENT':
+    case 'UPDATE_EVENT': {
+      const exists = state.events.some((e) => e.id === action.payload.id);
+      if (exists) {
+        return {
+          ...state,
+          events: state.events.map((e) =>
+            e.id === action.payload.id ? action.payload : e,
+          ),
+        };
+      }
       return {
         ...state,
-        events: state.events.map((e) =>
-          e.id === action.payload.id ? action.payload : e,
-        ),
+        events: [...state.events, action.payload],
       };
+    }
     case 'DELETE_EVENT':
       return {
         ...state,
@@ -152,7 +162,7 @@ type EventsContextType = {
   deleteEvent: (eventId: string) => Promise<void>;
   addProgram: (eventId: string, date: Date) => Promise<void>;
   deleteProgram: (eventId: string, programId: string) => Promise<void>;
-  refetchEventById: (eventId: string) => Promise<Event | null>;
+  refetchEventById: (eventId: string) => Promise<EventVM | null>;
 
   addActivity: (
     eventId: string,
@@ -287,20 +297,27 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      // 1) Eventos do criador + 2) Eventos onde é subadmin
       const eventsRef = collection(db, 'events');
 
-      const [ownerSnap, subadminSnap] = await Promise.all([
-        getDocs(query(eventsRef, where('userId', '==', uid))),
-        getDocs(query(eventsRef, where('subAdminUids', 'array-contains', uid))),
-      ]);
+      let ownerSnap: any = { docs: [], size: 0 };
+      let subadminSnap: any = { docs: [], size: 0 };
+
+      try {
+        ownerSnap = await getDocs(query(eventsRef, where('userId', '==', uid)));
+      } catch (e: any) {}
+
+      try {
+        subadminSnap = await getDocs(
+          query(eventsRef, where('subAdminUids', 'array-contains', uid)),
+        );
+      } catch (e: any) {}
 
       const eventsMap = new Map<string, Event>();
 
-      ownerSnap.docs.forEach((d) =>
+      ownerSnap.docs.forEach((d: QueryDocumentSnapshot<DocumentData>) =>
         eventsMap.set(d.id, mapEvent(d as FireDoc)),
       );
-      subadminSnap.docs.forEach((d) =>
+      subadminSnap.docs.forEach((d: QueryDocumentSnapshot<DocumentData>) =>
         eventsMap.set(d.id, mapEvent(d as FireDoc)),
       );
 
@@ -328,13 +345,20 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         const batches = chunk(missingIds, 10);
 
         const snaps = await Promise.all(
-          batches.map((ids) =>
-            getDocs(query(eventsRef, where(documentId(), 'in', ids))),
-          ),
+          batches.map(async (ids) => {
+            try {
+              const qs = await getDocs(
+                query(eventsRef, where(documentId(), 'in', ids)),
+              );
+              return qs;
+            } catch (e: any) {
+              return { docs: [], size: 0 } as any;
+            }
+          }),
         );
 
         snaps.forEach((qs) => {
-          qs.docs.forEach((d) => {
+          qs.docs.forEach((d: QueryDocumentSnapshot<DocumentData>) => {
             const ev = mapEvent(d as FireDoc);
             eventsMap.set(ev.id, ev);
           });
@@ -350,7 +374,6 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
 
       dispatch({ type: 'FETCH_EVENTS_SUCCESS', payload: merged });
     } catch (err: any) {
-      console.error('fetchEvents error:', err);
       dispatch({
         type: 'FETCH_EVENTS_ERROR',
         payload: err?.message ?? 'Erro ao buscar eventos',
@@ -481,6 +504,12 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
 
     await updateDoc(doc(db, 'events', event.id), updateDocPayload);
 
+    if (event.shareKey?.trim()) {
+      try {
+        await createInviteSummary(event.shareKey.trim(), event.id);
+      } catch (e: any) {}
+    }
+
     dispatch({
       type: 'UPDATE_EVENT',
       payload: { ...event, subAdminsByUid },
@@ -488,8 +517,90 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const deleteEvent = async (eventId: string) => {
-    await deleteDoc(doc(db, 'events', eventId));
-    dispatch({ type: 'DELETE_EVENT', payload: eventId });
+    console.log(`[Diagnostic] 🛠️ Iniciando exclusão granular do evento: ${eventId}`);
+
+    const runStep = async (name: string, path: string, fn: () => Promise<void>) => {
+      try {
+        console.log(`[Diagnostic] ⏳ Tentando: ${name} (Path: ${path})`);
+        await fn();
+        console.log(`[Diagnostic] ✅ Sucesso: ${name}`);
+      } catch (e: any) {
+        console.error(`[Diagnostic] ❌ FALHA: ${name} (Path: ${path})`, {
+          code: e?.code,
+          message: e?.message,
+        });
+      }
+    };
+
+    try {
+      // --- 1) GUEST PARTICIPATIONS ---
+      await runStep('delete guestParticipations', `guestParticipations (eventId == ${eventId})`, async () => {
+        const parts = await getGuestParticipationsByEventIdService(eventId);
+        await Promise.all(parts.map((p) => deleteDoc(doc(db, 'guestParticipations', p.id))));
+      });
+
+      // --- 2) SHARE KEYS & SUMMARIES ---
+      const evSnap = await getDoc(doc(db, 'events', eventId));
+      const evData = evSnap.data();
+      if (evData?.shareKey) {
+        const sk = evData.shareKey;
+        await runStep('delete eventShareKeys', `eventShareKeys/${sk}`, () => deleteDoc(doc(db, 'eventShareKeys', sk)));
+        await runStep('delete inviteSummaries', `eventInviteSummaries/${sk}`, () => deleteDoc(doc(db, 'eventInviteSummaries', sk)));
+      }
+
+      // --- 3) TREE CLEANUP (Sub-coleções) ---
+      // Pegamos todos os programas
+      const progSnap = await getDocs(collection(db, 'events', eventId, 'programs'));
+      for (const pDoc of progSnap.docs) {
+        const pId = pDoc.id;
+
+        // Pegamos todas as atividades do programa
+        const actSnap = await getDocs(collection(db, 'events', eventId, 'programs', pId, 'activities'));
+        for (const aDoc of actSnap.docs) {
+          const aId = aDoc.id;
+
+          // Pegamos todas as fotos da atividade
+          const photoSnap = await getDocs(collection(db, 'events', eventId, 'programs', pId, 'activities', aId, 'photos'));
+          for (const phDoc of photoSnap.docs) {
+            const phId = phDoc.id;
+
+            // Deletar Comentários da Foto
+            await runStep('delete comments', `events/${eventId}/.../photos/${phId}/comments`, async () => {
+              const commSnap = await getDocs(collection(db, 'events', eventId, 'programs', pId, 'activities', aId, 'photos', phId, 'comments'));
+              await Promise.all(commSnap.docs.map(c => deleteDoc(c.ref)));
+            });
+
+            // Deletar Foto
+            await runStep('delete photo', `events/${eventId}/.../photos/${phId}`, () => deleteDoc(phDoc.ref));
+          }
+
+          // Deletar Atividade
+          await runStep('delete activity', `events/${eventId}/programs/${pId}/activities/${aId}`, () => deleteDoc(aDoc.ref));
+        }
+
+        // Deletar Programa
+        await runStep('delete program', `events/${eventId}/programs/${pId}`, () => deleteDoc(pDoc.ref));
+      }
+
+      // --- 4) NOTES ---
+      await runStep('delete notes', `events/${eventId}/notes`, async () => {
+        const noteSnap = await getDocs(collection(db, 'events', eventId, 'notes'));
+        await Promise.all(noteSnap.docs.map(n => deleteDoc(n.ref)));
+      });
+
+      // --- 5) EVENT DOC (O grand finale) ---
+      await runStep('delete event doc', `events/${eventId}`, () => deleteDoc(doc(db, 'events', eventId)));
+
+      dispatch({ type: 'DELETE_EVENT', payload: eventId });
+      console.log(`[Diagnostic] 🏁 Processo de exclusão finalizado para o evento ${eventId}`);
+    } catch (e: any) {
+      console.error('[Diagnostic] 🆘 Erro catastrófico no flow de exclusão:', e);
+      Alert.alert(
+        'Erro ao Excluir',
+        'Ocorreu um erro ao tentar processar a exclusão. Verifique os logs de diagnóstico.',
+      );
+      throw e;
+    }
   };
 
   // ---------------------------
@@ -512,9 +623,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       });
 
       dispatch({ type: 'SET_PROGRAMS', payload: { eventId, programs } });
-    } catch (error) {
-      console.error('Erro ao carregar os programas:', error);
-    }
+    } catch (error) {}
   };
 
   const loadActivitiesByProgramId = async (
@@ -557,6 +666,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const photos: Photo[] = snap.docs.map((d) => {
       const data = d.data();
+
       return {
         id: d.id,
         activityId,
@@ -565,43 +675,25 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         publicId: data.publicId,
         timestamp: data.timestamp?.toDate?.() ?? new Date(),
         description: data.description ?? '',
-        createdBy: data.createdBy ?? '',
+
+        // ✅ UID-only
+        createdByUid: data.createdByUid ?? '',
       };
     });
 
     dispatch({ type: 'SET_PHOTOS', payload: { activityId, photos } });
   };
 
-  // Dentro do seu EventsContext (ou onde estiver)
-  // ✅ versão completa com logs + identificação do "ponto" que falhou
-  // helper opcional: log bonito
-  function logStep(tag: string, data?: any) {
-    try {
-    } catch {
-      // ignore
-    }
-  }
-
   const refetchLocksRef = { current: new Map<string, Promise<Event | null>>() };
   // Se preferir, declare isso no topo do EventsContext:
   // const refetchLocksRef = useRef<Map<string, Promise<Event | null>>>(new Map());
 
-  const refetchEventById = async (eventId: string): Promise<Event | null> => {
-    // ✅ se já tem uma chamada em andamento para o MESMO eventId, reaproveita
+  const refetchEventById = async (eventId: string): Promise<EventVM | null> => {
     const existing = refetchLocksRef.current.get(eventId);
-    if (existing) {
-      logStep('JOIN in-flight refetch', { eventId });
-      return existing;
-    }
+    if (existing) return existing;
 
     const task = (async () => {
-      console.log('🧭 [refetchEventById] CALLED FROM:\n', new Error().stack);
-
       const auth = getAuth();
-      const uid = auth.currentUser?.uid ?? null;
-      const startedAt = Date.now();
-
-      logStep('START', { eventId, uid });
 
       // ✅ retry/backoff apenas para permission-denied (race condition)
       const delays = [0, 250, 600, 1200]; // 4 tentativas (0 + 3 retries)
@@ -612,54 +704,38 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         const delay = delays[attempt];
 
         if (delay > 0) {
-          logStep('retry wait', { eventId, delay, attempt: attempt + 1 });
           await new Promise((r) => setTimeout(r, delay));
         }
 
         try {
           // 1) EVENT DOC
-          const eventPath = `events/${eventId}`;
-          logStep('READ event doc ->', eventPath);
-
           const eventRef = doc(db, 'events', eventId);
           const eventSnap = await getDoc(eventRef);
-
-          logStep('event doc read OK', {
-            exists: eventSnap.exists(),
-            id: eventSnap.id,
-          });
 
           if (!eventSnap.exists()) throw new Error('Evento não encontrado');
 
           const eventData: any = eventSnap.data();
 
-          logStep('event.userId check', {
-            eventUserId: eventData.userId ?? null,
-            uid,
-            isOwner: uid ? eventData.userId === uid : false,
-            hasSubAdmin: uid ? !!eventData.subAdminsByUid?.[uid] : false,
-          });
-
-          // 2) PROGRAMS
-          const programsPath = `events/${eventId}/programs`;
-          logStep('READ programs ->', programsPath);
+          // 2) PARTICIPATION (myGuestMode)
+          let myGuestMode: any = undefined;
+          const uid = getAuth().currentUser?.uid;
+          if (uid) {
+            try {
+              const pSnap = await getDoc(doc(db, 'guestParticipations', `${uid}_${eventId}`));
+              if (pSnap.exists()) {
+                myGuestMode = pSnap.data()?.mode;
+              }
+            } catch (e) {}
+          }
 
           const programsRef = collection(db, 'events', eventId, 'programs');
           const programsSnap = await getDocs(programsRef);
-
-          logStep('programs read OK', { count: programsSnap.size });
 
           const programs: Program[] = [];
 
           for (const programDoc of programsSnap.docs) {
             const programId = programDoc.id;
             const programData: any = programDoc.data();
-
-            logStep('PROGRAM', { programId });
-
-            // 3) ACTIVITIES
-            const activitiesPath = `events/${eventId}/programs/${programId}/activities`;
-            logStep('READ activities ->', activitiesPath);
 
             const activitiesRef = collection(
               db,
@@ -671,22 +747,11 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
             );
             const activitiesSnap = await getDocs(activitiesRef);
 
-            logStep('activities read OK', {
-              programId,
-              count: activitiesSnap.size,
-            });
-
             const activities: Activity[] = [];
 
             for (const activityDoc of activitiesSnap.docs) {
               const activityId = activityDoc.id;
               const activityData: any = activityDoc.data();
-
-              logStep('ACTIVITY', { programId, activityId });
-
-              // 4) PHOTOS
-              const photosPath = `events/${eventId}/programs/${programId}/activities/${activityId}/photos`;
-              logStep('READ photos ->', photosPath);
 
               const photosRef = collection(
                 db,
@@ -701,15 +766,10 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
 
               const activityPhotosSnap = await getDocs(photosRef);
 
-              logStep('photos read OK', {
-                programId,
-                activityId,
-                count: activityPhotosSnap.size,
-              });
-
               const activityPhotos: Photo[] = activityPhotosSnap.docs.map(
                 (photoDoc) => {
                   const p: any = photoDoc.data();
+
                   return {
                     id: photoDoc.id,
                     activityId,
@@ -718,7 +778,9 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
                     publicId: p.publicId,
                     description: p.description ?? '',
                     timestamp: p.timestamp?.toDate?.() ?? new Date(),
-                    createdBy: p.createdBy ?? '',
+
+                    // ✅ UID-only
+                    createdByUid: p.createdByUid ?? '',
                   };
                 },
               );
@@ -742,7 +804,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
             });
           }
 
-          const updatedEvent: Event = {
+          const updatedEvent: EventVM = {
             id: eventSnap.id,
             title: eventData.title,
             location: eventData.location,
@@ -757,56 +819,26 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
             >,
             programs,
             shareKey: eventData.shareKey ?? '',
+            myGuestMode,
           };
 
           dispatch({ type: 'UPDATE_EVENT', payload: updatedEvent });
-
-          logStep('DONE', {
-            ms: Date.now() - startedAt,
-            programs: programs.length,
-            attempt: attempt + 1,
-          });
 
           return updatedEvent;
         } catch (error: any) {
           lastErr = error;
 
-          const errInfo = {
-            name: error?.name,
-            code: error?.code,
-            message: error?.message,
-            eventId,
-            uid,
-            ms: Date.now() - startedAt,
-            attempt: attempt + 1,
-          };
-
-          // ✅ se for permission-denied, vamos tentar de novo (até acabar)
           if (
             error?.code === 'permission-denied' &&
             attempt < delays.length - 1
           ) {
-            logStep('permission-denied (will retry)', errInfo);
             continue;
           }
 
-          // ❌ aqui acabou (ou não é permission-denied)
-          console.error('❌ [refetchEventById] FAILED', {
-            ...errInfo,
-            stack: error?.stack,
-          });
           return null;
         }
       }
 
-      // fallback (não deveria chegar aqui)
-      console.error('❌ [refetchEventById] FAILED (exhausted retries)', {
-        code: lastErr?.code,
-        message: lastErr?.message,
-        eventId,
-        uid,
-        ms: Date.now() - startedAt,
-      });
       return null;
     })();
 
@@ -928,6 +960,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     );
 
     const user = getAuth().currentUser;
+    const createdByUid = user?.uid ?? '';
 
     await addDoc(photoRef, {
       activityId,
@@ -936,7 +969,9 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       publicId,
       description,
       timestamp: Timestamp.now(),
-      createdBy: user?.email ?? '',
+
+      // ✅ UID-only (fonte de verdade)
+      createdByUid,
     });
 
     await refetchEventById(eventId);

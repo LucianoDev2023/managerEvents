@@ -7,7 +7,7 @@ export const eventFormSchema = z
     startDate: z.date(),
     endDate: z.date(),
     description: z.string().min(1, 'Descrição obrigatória'),
-    coverImage: z.string().url('Imagem do evento é obrigatória.'),
+    coverImage: z.string().default(''),
   })
   .refine((data) => data.endDate >= data.startDate, {
     message: 'A data de fim não pode ser anterior à de início.',

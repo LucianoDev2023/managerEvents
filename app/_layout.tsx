@@ -1,6 +1,6 @@
 // app/_layout.tsx
 import React, { useEffect } from 'react';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Slot, useRouter, useSegments, usePathname } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useColorScheme } from 'react-native';
 import * as Linking from 'expo-linking';
@@ -14,33 +14,32 @@ export default function RootLayout() {
   const { user, authLoading } = useAuthListener();
   const segments = useSegments();
   const router = useRouter();
+  const pathname = usePathname();
 
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
   useEffect(() => {
     const inAuthGroup = segments[0] === '(auth)';
-    if (!authLoading && !user && !inAuthGroup) {
+    const publicPaths = new Set([
+      '/(auth)/landing',
+      '/invite',
+      '/invite-gate',
+      '/invite-preview',
+      '/+not-found',
+    ]);
+    if (!authLoading && !user && !inAuthGroup && !publicPaths.has(pathname)) {
       router.replace('/(auth)/landing');
     }
-  }, [authLoading, user, segments, router]);
+  }, [authLoading, user, segments, router, pathname]);
 
   useEffect(() => {
     (async () => {
       try {
-        const url = await Linking.getInitialURL();
-        if (url) {
-          console.log('[Linking] initialUrl', url, Linking.parse(url));
-        } else {
-          console.log('[Linking] initialUrl', url);
-        }
-      } catch (e) {
-        console.log('[Linking] initialUrl error', e);
-      }
+        await Linking.getInitialURL();
+      } catch {}
     })();
-    const sub = Linking.addEventListener('url', (ev) => {
-      console.log('[Linking] url event', ev.url, Linking.parse(ev.url));
-    });
+    const sub = Linking.addEventListener('url', () => {});
     return () => sub.remove();
   }, []);
 

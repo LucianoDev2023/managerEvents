@@ -8,19 +8,31 @@ import {
   StyleSheet,
   ActivityIndicator,
   Pressable,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  EmailAuthProvider,
+  linkWithCredential,
+  User,
+} from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { useRegistrationFlow } from '@/context/RegistrationFlowContext';
+import { useEvents } from '@/context/EventsContext';
 import { doc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { serverTimestamp } from 'firebase/firestore';
+import * as WebBrowser from 'expo-web-browser';
+import { LEGAL_URLS } from '@/constants/Legal';
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const { k } = useLocalSearchParams<{ k?: string }>();
   const { setCameFromRegister } = useRegistrationFlow();
+  const { fetchEvents } = useEvents();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -32,23 +44,45 @@ export default function RegisterScreen() {
   const PRIVACY_VERSION = 'v1.0';
   const TERMS_VERSION = 'v1.0';
 
+  function friendlyAuthError(code?: string, fallback?: string) {
+    switch (code) {
+      case 'auth/email-already-in-use':
+        return 'Este e-mail já está em uso. Faça login ou use outro e-mail.';
+      case 'auth/invalid-email':
+        return 'E-mail inválido.';
+      case 'auth/weak-password':
+        return 'Senha fraca. Use pelo menos 6 caracteres.';
+      case 'auth/operation-not-allowed':
+        return 'Método de autenticação não habilitado no Firebase.';
+      case 'auth/credential-already-in-use':
+        return 'Este e-mail já está vinculado a outra conta. Faça login.';
+      case 'auth/provider-already-linked':
+        return 'Esta conta já está vinculada.';
+      default:
+        return fallback ?? 'Não foi possível criar sua conta. Tente novamente.';
+    }
+  }
+
   const handleRegister = async () => {
     Keyboard.dismiss();
 
-    if (!name || !email || !password || !confirm) {
-      alert('Preencha todos os campos.');
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!name || !cleanEmail || !password || !confirm) {
+      Alert.alert('Atenção', 'Preencha todos os campos.');
       return;
     }
 
     if (password !== confirm) {
-      alert('As senhas não coincidem.');
+      Alert.alert('Atenção', 'As senhas não coincidem.');
       return;
     }
 
     // ✅ LGPD: bloqueio obrigatório
     if (!acceptedTerms) {
-      alert(
-        'Você precisa aceitar a Política de Privacidade e os Termos de Uso.'
+      Alert.alert(
+        'Atenção',
+        'Você precisa aceitar a Política de Privacidade e os Termos de Uso.',
       );
       return;
     }
@@ -56,19 +90,33 @@ export default function RegisterScreen() {
     setLoading(true);
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email.trim(),
-        password
-      );
+      let finalUser: User;
 
-      await updateProfile(userCredential.user, {
+      const current = auth.currentUser;
+
+      // ✅ Se estiver como visitante (anônimo): converte a conta mantendo o mesmo UID
+      if (current && current.isAnonymous) {
+        const credential = EmailAuthProvider.credential(cleanEmail, password);
+
+        const linked = await linkWithCredential(current, credential);
+        finalUser = linked.user;
+      } else {
+        // ✅ Fluxo normal (sem visitante)
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          cleanEmail,
+          password,
+        );
+        finalUser = userCredential.user;
+      }
+
+      await updateProfile(finalUser, {
         displayName: name,
       });
 
       // ✅ LGPD: salvar aceite no Firestore
       await setDoc(
-        doc(db, 'users', userCredential.user.uid),
+        doc(db, 'users', finalUser.uid),
         {
           name,
           privacyAcceptedAt: Timestamp.now(),
@@ -77,23 +125,34 @@ export default function RegisterScreen() {
           termsVersion: TERMS_VERSION,
           createdAt: Timestamp.now(),
         },
-        { merge: true }
+        { merge: true },
       );
 
+      // ✅ Índice público para busca por e-mail (se você usa isso para convites)
       await setDoc(
-        doc(db, 'publicUsers', userCredential.user.uid),
+        doc(db, 'publicUsers', finalUser.uid),
         {
-          uid: userCredential.user.uid,
-          emailLower: email.trim().toLowerCase(),
+          uid: finalUser.uid,
           updatedAt: serverTimestamp(),
         },
-        { merge: true }
+        { merge: true },
       );
 
       setCameFromRegister(true);
-      router.replace('/accountCreatedScreen');
+
+      // ✅ Foça reload dos eventos para garantir que o contexto atualize com o usuário "convertido"
+      try {
+        await fetchEvents();
+      } catch (e) {
+      }
+
+      router.replace({
+        pathname: '/accountCreatedScreen',
+        params: k ? { k } : {},
+      } as any);
     } catch (error: any) {
-      alert('Erro ao registrar: ' + error.message);
+      const msg = friendlyAuthError(error?.code, error?.message);
+      Alert.alert('Erro ao registrar', msg);
     } finally {
       setLoading(false);
     }
@@ -155,14 +214,14 @@ export default function RegisterScreen() {
           Li e aceito a{' '}
           <Text
             style={styles.link}
-            onPress={() => router.push('/(auth)/privacidade')}
+            onPress={() => WebBrowser.openBrowserAsync(LEGAL_URLS.PRIVACY_POLICY)}
           >
             Política de Privacidade
           </Text>{' '}
           e os{' '}
           <Text
             style={styles.link}
-            onPress={() => router.push('/(auth)/termos')}
+            onPress={() => WebBrowser.openBrowserAsync(LEGAL_URLS.TERMS_OF_USE)}
           >
             Termos de Uso
           </Text>
@@ -220,7 +279,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
-  // ✅ LGPD checkbox
   checkboxContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',

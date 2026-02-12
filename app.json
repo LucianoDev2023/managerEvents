@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "planejeja",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
@@ -15,19 +15,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.luciano_dev_2025.gerenciadordeeventos",
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização para exibir o mapa corretamente."
-      },
+      "bundleIdentifier": "com.planejeja.plannix",
+      "infoPlist": {},
       "associatedDomains": ["applinks:planejeja.com.br"]
     },
     "android": {
-      "permissions": [
-        "CAMERA",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "NOTIFICATIONS"
-      ],
       "package": "com.luciano_dev_2025.gerenciadordeeventos",
       "intentFilters": [
         {
@@ -64,12 +56,10 @@
         "expo-camera",
         {
           "cameraPermission": "Permissão para acessar a câmera é necessária",
-          "microphonePermission": "Permissão para acessar o microfone é necessária",
           "recordAudioAndroid": false
         }
       ],
-      "expo-font",
-      "expo-location"
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

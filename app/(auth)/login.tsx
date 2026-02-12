@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Eye, EyeOff } from 'lucide-react-native';
@@ -26,30 +27,72 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(true);
 
-  const handleLogin = async () => {
+  function resolvedInviteKey() {
+    return typeof k === 'string' && k.trim() ? k.trim() : '';
+  }
+
+  function goAfterLogin() {
+    const key = resolvedInviteKey();
+    if (key) {
+      router.replace({
+        pathname: '/(auth)/invite-preview',
+        params: { k: key },
+      } as any);
+      return;
+    }
+    router.replace('/(tabs)');
+  }
+
+  const doLogin = async () => {
     Keyboard.dismiss();
-    if (!email || !password) {
-      alert('Preencha todos os campos.');
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail || !password) {
+      Alert.alert('Atenção', 'Preencha todos os campos.');
       return;
     }
 
+    if (loading) return;
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
-      const resolvedKey =
-        typeof k === 'string' && k.trim() ? (k as string).trim() : '';
-      if (resolvedKey) {
-        router.replace({
-          pathname: '/(newevents)/search',
-          params: { k: resolvedKey },
-        } as any);
-      }
+      await signInWithEmailAndPassword(auth, cleanEmail, password);
+      goAfterLogin();
     } catch (error: any) {
-      alert('Erro no login: Confirme email e/ou senha');
+      Alert.alert('Erro no login', 'Confirme e-mail e/ou senha.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLogin = async () => {
+    const current = auth.currentUser;
+
+    // ⚠️ Se está como visitante, fazer login com conta existente pode “abandonar” dados do UID anônimo
+    if (current?.isAnonymous) {
+      Alert.alert(
+        'Você está como visitante',
+        'Se você entrar com uma conta existente agora, os dados criados como visitante podem não aparecer nessa conta.\n\nRecomendado: crie sua conta (converter) para manter tudo.',
+        [
+          {
+            text: 'Converter (recomendado)',
+            onPress: () => router.push('/(auth)/register'),
+          },
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Continuar login',
+            style: 'destructive',
+            onPress: () => {
+              void doLogin();
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    void doLogin();
   };
 
   return (
@@ -221,8 +264,6 @@ const styles = StyleSheet.create({
   signUpText: {
     color: '#b18aff',
   },
-
-  // ✅ bloco LGPD
   legalBox: {
     marginTop: 18,
     width: '100%',

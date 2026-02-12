@@ -53,7 +53,7 @@ export default function CalendarScreen() {
 
   const [uid, setUid] = useState('');
   const [participations, setParticipations] = useState<GuestParticipation[]>(
-    []
+    [],
   );
   const [isLoadingParticipations, setIsLoadingParticipations] = useState(false);
 
@@ -77,7 +77,6 @@ export default function CalendarScreen() {
         const data = await getGuestParticipationsByUserId(uid);
         if (!cancelled) setParticipations(data);
       } catch (e) {
-        console.error('Erro ao carregar participações:', e);
         if (!cancelled) setParticipations([]);
       } finally {
         if (!cancelled) setIsLoadingParticipations(false);
@@ -108,7 +107,7 @@ export default function CalendarScreen() {
     return new Set(
       participations
         .filter((p) => p.mode === 'confirmado' || p.mode === 'acompanhando')
-        .map((p) => p.eventId)
+        .map((p) => p.eventId),
     );
   }, [participations]);
 
@@ -179,7 +178,10 @@ export default function CalendarScreen() {
     });
 
   const handleEventPress = (eventId: string) => {
-    router.push(`/(stack)/events/${eventId}` as any);
+    router.push({
+      pathname: `/(stack)/events/${eventId}`,
+      params: { from: 'calendar' },
+    } as any);
   };
 
   const isLoading = !!uid && isLoadingParticipations;
@@ -202,7 +204,7 @@ export default function CalendarScreen() {
           styles.container,
           {
             paddingTop:
-              Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 40 : 0,
+              Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 40) : 0,
           },
         ]}
       >
@@ -318,15 +320,15 @@ export default function CalendarScreen() {
                     <View
                       style={[
                         styles.cardShadow,
-                        { backgroundColor: colors.backGroundSecondary },
+                        { backgroundColor: colors.backgroundSecondary },
                       ]}
                     >
                       <View
                         style={[
                           styles.eventCard,
                           {
-                            backgroundColor: colors.backGroundSecondary,
-                            borderColor: colors.primary2,
+                            backgroundColor: colors.backgroundSecondary,
+                            borderColor: colors.primaryDark,
                           },
                         ]}
                       >

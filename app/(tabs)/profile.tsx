@@ -31,6 +31,8 @@ import {
   query,
   where,
   writeBatch,
+  setDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -47,7 +49,12 @@ import {
   Settings,
   LogOut,
   CircleHelp as HelpCircle,
+  ShieldCheck,
+  FileText,
+  Globe,
 } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { LEGAL_URLS } from '../../constants/Legal';
 
 // ✅ caminhos relativos (saindo de app/(tabs))
 import { auth, db } from '../../config/firebase';
@@ -58,7 +65,7 @@ import LoadingOverlay from '../../components/LoadingOverlay';
 
 import { useAuthListener } from '../../hooks/useAuthListener';
 import { useEvents } from '../../context/EventsContext';
-import { getGuestParticipationsByUserId } from '../../hooks/guestService';
+import { getGuestParticipationsByUserId, updateAllParticipationsUserName } from '../../hooks/guestService';
 
 import type { Event } from '../../types/index';
 import type { GuestParticipation } from '../../types/guestParticipation';
@@ -70,14 +77,11 @@ export default function ProfileScreen() {
 
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
-  const textColor = colorScheme === 'dark' ? '#fff' : '#1a1a1a';
-  const textSecondary = colorScheme === 'dark' ? '#aaa' : '#555';
-  const backgroundColor = colorScheme === 'dark' ? '#0b0b0f' : '#e9e6ff';
+  const textColor = colors.text;
+  const textSecondary = colors.textSecondary;
+  const backgroundColor = colors.background;
 
-  const gradientColors: [string, string, ...string[]] =
-    colorScheme === 'dark'
-      ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
-      : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
+  const gradientColors = colors.gradients;
 
   const uid = user?.uid ?? '';
 
@@ -99,12 +103,12 @@ export default function ProfileScreen() {
   const [nameDraft, setNameDraft] = useState(user?.displayName ?? '');
   const [savingName, setSavingName] = useState(false);
   const [localDisplayName, setLocalDisplayName] = useState(
-    user?.displayName ?? 'Usuário'
+    user?.displayName ?? 'Usuário',
   );
 
   // ✅ Participations (por UID)
   const [participations, setParticipations] = useState<GuestParticipation[]>(
-    []
+    [],
   );
   const [loadingParticipations, setLoadingParticipations] = useState(true);
 
@@ -180,7 +184,7 @@ export default function ProfileScreen() {
       BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () =>
         BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-    }, [supportVisible, editNameVisible, deleteVisible, router])
+    }, [supportVisible, editNameVisible, deleteVisible, router]),
   );
 
   // =============================
@@ -203,7 +207,7 @@ export default function ProfileScreen() {
     const ids = new Set(
       participations
         .filter((p) => p.mode === 'confirmado' || p.mode === 'acompanhando')
-        .map((p) => p.eventId)
+        .map((p) => p.eventId),
     );
 
     return state.events.filter((e) => ids.has(e.id));
@@ -224,7 +228,7 @@ export default function ProfileScreen() {
   const totalPrograms = useMemo(() => {
     return allAccessibleEvents.reduce(
       (sum, e) => sum + (e.programs?.length ?? 0),
-      0
+      0,
     );
   }, [allAccessibleEvents]);
 
@@ -249,7 +253,7 @@ export default function ProfileScreen() {
             pSum +
             activities.reduce(
               (aSum: number, a: any) => aSum + (a.photos?.length ?? 0),
-              0
+              0,
             )
           );
         }, 0)
@@ -270,7 +274,7 @@ export default function ProfileScreen() {
     if (newName.length < 2) {
       Alert.alert(
         'Nome inválido',
-        'Digite um nome com pelo menos 2 caracteres.'
+        'Digite um nome com pelo menos 2 caracteres.',
       );
       return;
     }
@@ -282,9 +286,22 @@ export default function ProfileScreen() {
 
     try {
       setSavingName(true);
+      
+      // 1. Firebase Auth
       await updateProfile(auth.currentUser, { displayName: newName });
+      
+      // 2. Firestore Users
+      await setDoc(
+        doc(db, 'users', auth.currentUser.uid),
+        { name: newName, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+
+      // 3. Guest Participations (Sincroniza com a lista de convidados)
+      await updateAllParticipationsUserName(auth.currentUser.uid, newName);
+
       setLocalDisplayName(newName);
-      Alert.alert('Sucesso', 'Seu nome foi atualizado.');
+      Alert.alert('Sucesso', 'Seu nome foi atualizado em todo o app.');
       setEditNameVisible(false);
     } catch (e: any) {
       Alert.alert('Erro', e?.message ?? 'Não foi possível atualizar o nome.');
@@ -338,7 +355,7 @@ export default function ProfileScreen() {
     if (pass.length < 6) {
       Alert.alert(
         'Senha necessária',
-        'Digite sua senha para confirmar a exclusão.'
+        'Digite sua senha para confirmar a exclusão.',
       );
       throw new Error('missing_password');
     }
@@ -377,7 +394,7 @@ export default function ProfileScreen() {
       ) {
         Alert.alert(
           'Senha incorreta',
-          'A senha informada está incorreta. Tente novamente.'
+          'A senha informada está incorreta. Tente novamente.',
         );
         return;
       }
@@ -385,7 +402,7 @@ export default function ProfileScreen() {
       if (code.includes('requires-recent-login')) {
         Alert.alert(
           'Confirmação necessária',
-          'Por segurança, confirme sua senha novamente para excluir.'
+          'Por segurança, confirme sua senha novamente para excluir.',
         );
         return;
       }
@@ -430,7 +447,7 @@ export default function ProfileScreen() {
               {
                 paddingTop:
                   Platform.OS === 'android'
-                    ? RNStatusBar.currentHeight ?? 40
+                    ? (RNStatusBar.currentHeight ?? 40)
                     : 0,
               },
             ]}
@@ -446,7 +463,7 @@ export default function ProfileScreen() {
               </View>
 
               <View
-                style={[styles.statCard, { backgroundColor: colors.primary2 }]}
+                style={[styles.statCard, { backgroundColor: colors.primary }]}
               >
                 <Text style={styles.statNumber}>{totalPrograms}</Text>
                 <Text style={styles.statLabel}>
@@ -455,7 +472,7 @@ export default function ProfileScreen() {
               </View>
 
               <View
-                style={[styles.statCard, { backgroundColor: colors.primary2 }]}
+                style={[styles.statCard, { backgroundColor: colors.primary }]}
               >
                 <Text style={styles.statNumber}>{totalActivities}</Text>
                 <Text style={styles.statLabel}>
@@ -478,6 +495,17 @@ export default function ProfileScreen() {
             </Text>
 
             <View style={styles.card}>
+              {auth.currentUser?.isAnonymous && (
+                <Button
+                  title="Criar conta"
+                  icon={<Settings size={20} color={textColor} />}
+                  onPress={() => router.push('/(auth)/register')}
+                  variant="ghost"
+                  fullWidth
+                  style={styles.menuButton}
+                  textStyle={{ color: textColor }}
+                />
+              )}
               <Button
                 title="Lista de eventos"
                 icon={<Settings size={20} color={textColor} />}
@@ -504,7 +532,7 @@ export default function ProfileScreen() {
                     });
                   }}
                   icon={<Bell size={20} color={textColor} />}
-                  backgroundColor={colors.backGroundSecondary}
+                  backgroundColor={colors.backgroundSecondary}
                   borderColor={colors.border}
                   textColor={textColor}
                 />
@@ -527,11 +555,44 @@ export default function ProfileScreen() {
             </View>
 
             <Text style={[styles.sectionTitle, { color: textColor }]}>
+              Informações Legais
+            </Text>
+            <View style={styles.card}>
+              <Button
+                title="Política de Privacidade"
+                icon={<ShieldCheck size={20} color={textColor} />}
+                onPress={() => WebBrowser.openBrowserAsync(LEGAL_URLS.PRIVACY_POLICY)}
+                variant="ghost"
+                fullWidth
+                style={styles.menuButton}
+                textStyle={{ color: textColor }}
+              />
+              <Button
+                title="Termos de Uso"
+                icon={<FileText size={20} color={textColor} />}
+                onPress={() => WebBrowser.openBrowserAsync(LEGAL_URLS.TERMS_OF_USE)}
+                variant="ghost"
+                fullWidth
+                style={styles.menuButton}
+                textStyle={{ color: textColor }}
+              />
+              {/* <Button
+                title="Visite nosso site"
+                icon={<Globe size={20} color={textColor} />}
+                onPress={() => WebBrowser.openBrowserAsync(LEGAL_URLS.WEBSITE)}
+                variant="ghost"
+                fullWidth
+                style={styles.menuButton}
+                textStyle={{ color: textColor }}
+              /> */}
+            </View>
+
+            <Text style={[styles.sectionTitle, { color: textColor }]}>
               Editar acompanhantes
             </Text>
             <View style={styles.dropdownContainer}>
               <CustomDropdown
-                items={participantEvents}
+                items={allAccessibleEvents}
                 placeholder="-- Escolha um evento --"
                 getItemLabel={(event) => event.title}
                 onSelect={(event) => {
@@ -541,7 +602,7 @@ export default function ProfileScreen() {
                   });
                 }}
                 icon={<Bell size={20} color={textColor} />}
-                backgroundColor={colors.backGroundSecondary}
+                backgroundColor={colors.backgroundSecondary}
                 borderColor={colors.border}
                 textColor={textColor}
               />
@@ -625,7 +686,7 @@ export default function ProfileScreen() {
                     {
                       color: textColor,
                       borderColor: colors.border,
-                      backgroundColor: colors.backGroundSecondary,
+                      backgroundColor: colors.backgroundSecondary,
                     },
                   ]}
                 />
@@ -732,7 +793,7 @@ export default function ProfileScreen() {
                       marginTop: 12,
                       color: colors.text,
                       borderColor: colors.border,
-                      backgroundColor: colors.backGroundSecondary,
+                      backgroundColor: colors.backgroundSecondary,
                     },
                   ]}
                 />
@@ -758,7 +819,7 @@ export default function ProfileScreen() {
                       {
                         color: colors.text,
                         borderColor: colors.border,
-                        backgroundColor: colors.backGroundSecondary,
+                        backgroundColor: colors.backgroundSecondary,
                       },
                     ]}
                   />

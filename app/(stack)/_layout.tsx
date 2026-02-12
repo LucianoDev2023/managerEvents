@@ -1,27 +1,17 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useColorScheme, TouchableOpacity } from 'react-native';
+import { useColorScheme, TouchableOpacity, BackHandler } from 'react-native';
 import Colors from '../../constants/Colors';
 import { ArrowLeft } from 'lucide-react-native';
+import { useSmartNavigation } from '@/hooks/useSmartNavigation';
 
 export default function StackLayout() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const { from } = useLocalSearchParams<{ from?: string }>();
 
-  const handleGoBack = useCallback(() => {
-    if (from === 'profile') {
-      router.push('/(tabs)/profile');
-      return;
-    }
+  const { handleGoBack } = useSmartNavigation(from);
 
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-
-    router.replace('/(tabs)');
-  }, [from]);
 
   const HeaderBack = () => (
     <TouchableOpacity onPress={handleGoBack} style={{ paddingHorizontal: 16 }}>

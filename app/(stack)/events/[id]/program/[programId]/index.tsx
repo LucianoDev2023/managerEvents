@@ -107,7 +107,7 @@ export default function ProgramDetailScreen() {
             router.back();
           },
         },
-      ]
+      ],
     );
   };
 

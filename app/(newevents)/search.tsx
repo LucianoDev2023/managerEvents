@@ -185,11 +185,6 @@ export default function SearchScreen() {
       if (!eventFound || !uid) return;
 
       setBusy(mode);
-      console.log('🟩 [SearchScreen] choose start', {
-        mode,
-        userId: uid,
-        eventId: eventFound.id,
-      });
 
       if (mode === 'confirmado') {
         setThanks(true);
@@ -205,11 +200,6 @@ export default function SearchScreen() {
           mode,
         });
 
-        console.log('🟩 [SearchScreen] choose success', {
-          mode,
-          eventId: eventFound.id,
-        });
-
         if (redirectRef.current?.startsWith('event:')) return;
         const id = eventFound.id;
         redirectRef.current = `event:${id}`;
@@ -219,7 +209,6 @@ export default function SearchScreen() {
           params: { id },
         } as any);
       } catch (err) {
-        console.error('🟥 [SearchScreen] choose error', err);
         if (mode === 'confirmado') setThanks(false);
       } finally {
         setBusy(null);
@@ -243,13 +232,8 @@ export default function SearchScreen() {
     </View>
   );
 
-  // 1) Carregando / resolvendo convite (suprimir preview para owner)
-  const ownerUid = (eventFound as any)?.userId as string | undefined;
-  if (
-    isLoading ||
-    (!eventFound && !requiresAuth) ||
-    (ownerUid && uid && ownerUid === uid)
-  ) {
+  // 1) Carregando / resolvendo convite (gate apenas isLoading)
+  if (isLoading) {
     return (
       <ScreenShell>
         <View style={{ alignItems: 'center' }}>
@@ -486,7 +470,7 @@ export default function SearchScreen() {
                 borderWidth: 1,
                 borderColor: colors.border,
                 backgroundColor:
-                  busy === 'acompanhando' ? colors.backgroundC : 'transparent',
+                  busy === 'acompanhando' ? colors.backgroundCard : 'transparent',
                 opacity: busy !== null && busy !== 'acompanhando' ? 0.6 : 1,
               }}
             >

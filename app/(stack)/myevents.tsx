@@ -96,7 +96,7 @@ export default function MyEventsScreen() {
 
       router.push(href);
     },
-    [router]
+    [router],
   );
 
   const goToGuests = useCallback(
@@ -114,7 +114,7 @@ export default function MyEventsScreen() {
         Alert.alert('Erro', 'Não foi possível carregar os convidados.');
       }
     },
-    [getGuestParticipationsByEventId, router]
+    [getGuestParticipationsByEventId, router],
   );
 
   // ---------- QR Share ----------
@@ -152,7 +152,7 @@ export default function MyEventsScreen() {
       BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () =>
         BackHandler.removeEventListener('hardwareBackPress', onBackPress);
-    }, [router])
+    }, [router]),
   );
 
   // ---------- Fetch & Filter ----------
@@ -203,12 +203,12 @@ export default function MyEventsScreen() {
         });
 
         const finalList = (result.length ? result : state.events).filter(
-          Boolean
+          Boolean,
         );
 
         // remove duplicados
         const unique = Array.from(
-          new Map(finalList.map((e) => [e.id, e])).values()
+          new Map(finalList.map((e) => [e.id, e])).values(),
         );
 
         if (!active) return;
@@ -247,13 +247,13 @@ export default function MyEventsScreen() {
 
       return newKey;
     },
-    [updateEvent]
+    [updateEvent],
   );
 
   const renderEventItem = useCallback(
     ({ item }: { item: Event }) => {
       const isCreator = item.userId === userUid;
-      const myLevel = userUid ? item.subAdminsByUid?.[userUid] ?? null : null;
+      const myLevel = userUid ? (item.subAdminsByUid?.[userUid] ?? null) : null;
       const isSuperAdmin = isCreator || myLevel === 'Super Admin';
       const myGuestMode = myGuestModeByEventId[item.id] ?? null;
       const isGuest = !!myGuestMode;
@@ -309,7 +309,7 @@ export default function MyEventsScreen() {
                 <View style={styles.eventCard}>
                   <Text style={styles.overlayDesc} numberOfLines={2}>
                     {`${new Date(item.startDate).toLocaleDateString(
-                      'pt-BR'
+                      'pt-BR',
                     )} - ${new Date(item.endDate).toLocaleDateString('pt-BR')}`}
                   </Text>
                 </View>
@@ -321,7 +321,7 @@ export default function MyEventsScreen() {
                 onPress={() => goToGuests(item.id)}
                 style={[styles.mapBtn, { borderColor: colors.primary }]}
               >
-                <Text style={[styles.mapBtnText, { color: colors.text2 }]}>
+                <Text style={[styles.mapBtnText, { color: colors.text }]}>
                   Convidados
                 </Text>
               </Pressable>
@@ -363,7 +363,7 @@ export default function MyEventsScreen() {
                       wasFollowing ? 'Removido' : 'Sucesso',
                       wasFollowing
                         ? 'Você deixou de seguir o evento.'
-                        : 'Você está seguindo este evento.'
+                        : 'Você está seguindo este evento.',
                     );
                   }}
                   style={styles.permissionBtn}
@@ -397,14 +397,14 @@ export default function MyEventsScreen() {
     [
       colors.border,
       colors.primary,
-      colors.text2,
+      colors.text,
       colors.textSecondary,
       goToEvent,
       goToGuests,
       isFollowing,
       toggleFollowEvent,
       userUid,
-    ]
+    ],
   );
 
   return (
@@ -493,7 +493,7 @@ const PermissionModal = ({
         <LinearGradient
           colors={gradientColors}
           locations={[0, 0.7, 1]}
-          style={[styles.modalContent, { borderColor: colors.primary2 }]}
+          style={[styles.modalContent, { borderColor: colors.primary }]}
         >
           <Text style={[styles.modalTitle, { color: colors.primary }]}>
             🔐 Permissões
@@ -528,7 +528,7 @@ const PermissionModal = ({
             style={[
               styles.input,
               {
-                backgroundColor: colors.backGroundSecondary,
+                backgroundColor: colors.backgroundSecondary,
                 borderColor: colors.border,
                 color: colors.text,
               },

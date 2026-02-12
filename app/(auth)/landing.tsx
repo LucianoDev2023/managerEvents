@@ -1,7 +1,15 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, {
+  useRef,
+  useEffect,
+  useCallback,
+  useState,
+  useMemo,
+} from 'react';
 import {
   View,
   Text,
+  ActivityIndicator,
+  Alert,
   StyleSheet,
   ScrollView,
   Platform,
@@ -13,11 +21,15 @@ import { useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
+import { signInAnonymously } from 'firebase/auth';
+import { auth } from '@/config/firebase';
 
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, Easing } from 'react-native-reanimated';
 import Colors from '@/constants/Colors';
 import { Check } from 'lucide-react-native';
 import LottieView from 'lottie-react-native';
+
+import { useAuthListener } from '@/hooks/useAuthListener';
 
 const mockups = [
   require('@/assets/kup/mockup1.png'),
@@ -27,12 +39,17 @@ const mockups = [
   require('@/assets/kup/mockup5.png'),
 ];
 
-const MOCKUP_WIDTH = Dimensions.get('window').width * 0.7;
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const SIDE_SPACING = (SCREEN_WIDTH - MOCKUP_WIDTH) / 4;
+const MOCKUP_WIDTH = SCREEN_WIDTH * 0.6;
+const SIDE_SPACING = (SCREEN_WIDTH - MOCKUP_WIDTH) / 3;
+
+// ✅ Largura única para os dois botões (igual ao guestButton)
+const BUTTON_WIDTH = 220;
+
+// ✅ Altura real de botão (mais coerente)
+const PRIMARY_BUTTON_HEIGHT = 48;
 
 const features = [
-  'Recebeu um convite? O cadastro é rápido, gratuito e sem complicação',
   'Organize seus eventos em um só lugar',
   'Gerencie convidados, presenças e acompanhantes com facilidade',
   'Convites rápidos via QR Code ou link compartilhável',
@@ -44,12 +61,19 @@ const features = [
 export default function LandingScreen() {
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
+
   const router = useRouter();
 
-  const gradientColors: [string, string, ...string[]] =
-    colorScheme === 'dark'
-      ? ['#0b0b0f', '#1b0033', '#3e1d73']
-      : ['#ffffff', '#f0f0ff', '#e9e6ff'];
+  const { user } = useAuthListener();
+  const [guestLoading, setGuestLoading] = useState(false);
+
+  const gradientColors: [string, string, ...string[]] = useMemo(
+    () =>
+      colorScheme === 'dark'
+        ? ['#0a0a10', '#151326', '#2a2150']
+        : ['#ffffff', '#f7f7ff', '#efecff'],
+    [colorScheme],
+  );
 
   const scrollRef = useRef<ScrollView>(null);
   const mockupIndex = useRef(0);
@@ -58,7 +82,7 @@ export default function LandingScreen() {
     const interval = setInterval(() => {
       mockupIndex.current = (mockupIndex.current + 1) % mockups.length;
       scrollRef.current?.scrollTo({
-        x: mockupIndex.current * MOCKUP_WIDTH,
+        x: mockupIndex.current * (MOCKUP_WIDTH + 10),
         animated: true,
       });
     }, 3000);
@@ -69,6 +93,29 @@ export default function LandingScreen() {
   const handleNavigate = useCallback(() => {
     router.push('/(auth)/login');
   }, [router]);
+
+  const handleGuest = useCallback(async () => {
+    try {
+      if (guestLoading) return;
+
+      // se já estiver logado (anon ou não), só entra
+      if (user) {
+        router.replace('/(tabs)');
+        return;
+      }
+
+      setGuestLoading(true);
+      await signInAnonymously(auth);
+      router.replace('/(tabs)');
+    } catch (e: any) {
+      Alert.alert(
+        'Não foi possível entrar como visitante',
+        e?.message ?? 'Tente novamente.',
+      );
+    } finally {
+      setGuestLoading(false);
+    }
+  }, [guestLoading, router, user]);
 
   return (
     <LinearGradient colors={gradientColors} style={styles.gradient}>
@@ -84,7 +131,9 @@ export default function LandingScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View
-          entering={FadeInDown.delay(100)}
+          entering={FadeInDown.duration(550)
+            .easing(Easing.out(Easing.cubic))
+            .delay(100)}
           style={styles.centeredBlock}
         >
           <Text style={[styles.title, { color: colors.primary }]}>PLANNIX</Text>
@@ -116,13 +165,11 @@ export default function LandingScreen() {
             contentContainerStyle={{
               paddingHorizontal: SIDE_SPACING,
             }}
-            // ⚠️ seu snapToInterval=10 não faz sentido pra largura do card
-            // o correto é snapToInterval={MOCKUP_WIDTH + 10}
             snapToInterval={MOCKUP_WIDTH + 10}
             decelerationRate="fast"
             scrollEventThrottle={16}
           >
-            {mockups.map((img, index) => (
+            {/* {mockups.map((img, index) => (
               <Animated.Image
                 key={index}
                 source={img}
@@ -132,7 +179,7 @@ export default function LandingScreen() {
                 ]}
                 entering={FadeInDown.delay(300 + index * 100)}
               />
-            ))}
+            ))} */}
           </ScrollView>
         </Animated.View>
 
@@ -155,29 +202,68 @@ export default function LandingScreen() {
         </Animated.View>
 
         <Animated.View
-          entering={FadeInDown.delay(400)}
+          entering={FadeInDown.duration(550)
+            .easing(Easing.out(Easing.cubic))
+            .delay(400)}
           style={styles.buttonContainer}
         >
+          {/* ✅ Botão principal (Lottie vira só “efeito” e não quebra clicks) */}
           <Pressable
             onPress={handleNavigate}
-            style={styles.button}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              { backgroundColor: colors.primary },
+              {
+                opacity: pressed ? 0.95 : 1,
+                transform: [{ scale: pressed ? 0.985 : 1 }],
+              },
+            ]}
             accessible
             accessibilityRole="button"
           >
-            <LottieView
-              source={require('@/assets/images/action.json')}
-              autoPlay
-              loop
-              style={styles.lottieButton}
-            />
-
-            <View style={styles.textOverlay}>
-              <Text style={styles.overlayText}>Comece agora</Text>
+            {/* ✅ wrapper com pointerEvents="none" (TypeScript OK) */}
+            <View style={styles.primaryLottieWrap} pointerEvents="none">
+              <LottieView
+                source={require('@/assets/images/action.json')}
+                autoPlay
+                loop
+                resizeMode="cover"
+                style={styles.primaryLottieBg}
+              />
             </View>
+
+            <Text style={styles.primaryText}>Comece agora</Text>
+          </Pressable>
+
+          {/* Botão secundário: Visitante */}
+          <Pressable
+            onPress={handleGuest}
+            disabled={guestLoading}
+            style={({ pressed }) => [
+              styles.guestButton,
+              {
+                opacity: guestLoading ? 0.7 : pressed ? 0.85 : 1,
+                borderColor: colors.primary,
+                transform: [{ scale: pressed ? 0.99 : 1 }],
+              },
+            ]}
+            accessible
+            accessibilityRole="button"
+          >
+            {guestLoading ? (
+              <View style={styles.guestRow}>
+                <ActivityIndicator color={colors.text} size="small" />
+                <Text style={[styles.guestText, { color: colors.text }]}>
+                  Entrando...
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.guestText, { color: colors.text }]}>
+                Explorar sem conta
+              </Text>
+            )}
           </Pressable>
         </Animated.View>
-
-        <Text style={styles.testimonial}>Experimente a versão Beta. V 1.0</Text>
       </ScrollView>
     </LinearGradient>
   );
@@ -189,36 +275,42 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 50,
+    paddingHorizontal: 24,
+    paddingVertical: 24,
     paddingBottom: 40,
   },
+
   centeredBlock: { alignItems: 'center', marginTop: 24 },
   title: {
     fontSize: 40,
     fontFamily: 'Inter-Bold',
     textAlign: 'center',
-    marginBottom: 8,
-    textShadowColor: '#000',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    marginBottom: 4,
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
   slogan: {
     fontSize: 16,
     fontFamily: 'Inter-Medium',
     textAlign: 'center',
     marginBottom: 8,
+    lineHeight: 22,
   },
+
   lottieBox: { marginVertical: 20, alignItems: 'center' },
   lottie: { width: 300, height: 150 },
+
   mockupGallery: { width: '100%' },
   mockupImage: {
     width: MOCKUP_WIDTH,
-    height: 380,
+    height: 340,
     resizeMode: 'contain',
     borderRadius: 16,
     marginRight: 10,
   },
+
   featureList: { width: '100%', paddingHorizontal: 6, marginBottom: 32 },
   featureItem: {
     flexDirection: 'row',
@@ -231,27 +323,62 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     flexShrink: 1,
   },
-  buttonContainer: { alignItems: 'center', justifyContent: 'center' },
-  button: { alignItems: 'center', justifyContent: 'center' },
-  lottieButton: { width: 280, height: 80 },
-  textOverlay: {
-    position: 'absolute',
-    justifyContent: 'center',
+
+  buttonContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
   },
-  overlayText: {
-    fontSize: 22,
-    fontWeight: 'bold',
+
+  // ✅ Botão principal (cara de botão)
+  primaryButton: {
+    width: BUTTON_WIDTH,
+    height: PRIMARY_BUTTON_HEIGHT,
+    borderRadius: PRIMARY_BUTTON_HEIGHT / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+
+  // ✅ wrapper absoluto do Lottie (onde aplicamos pointerEvents)
+  primaryLottieWrap: {
+    ...StyleSheet.absoluteFillObject,
+  },
+
+  // ✅ Lottie como textura/efeito (não “desenha” o botão)
+  primaryLottieBg: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.22,
+    transform: [{ scale: 1.35 }],
+  },
+
+  primaryText: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
     color: 'white',
     textAlign: 'center',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 8,
+    paddingHorizontal: 10,
   },
-  testimonial: {
+
+  guestButton: {
+    width: BUTTON_WIDTH,
+    paddingVertical: 12,
+    borderRadius: PRIMARY_BUTTON_HEIGHT / 2,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  guestRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  guestText: {
     fontSize: 14,
-    fontFamily: 'Inter-Light',
-    color: '#aaa',
+    fontFamily: 'Inter-Medium',
     textAlign: 'center',
-    marginTop: 24,
   },
 });

@@ -86,7 +86,7 @@ export default function HomeScreen() {
               onPress: () => BackHandler.exitApp(),
               style: 'destructive',
             },
-          ]
+          ],
         );
         return true;
       };
@@ -95,7 +95,7 @@ export default function HomeScreen() {
       return () => {
         BackHandler.removeEventListener('hardwareBackPress', onBackPress);
       };
-    }, [])
+    }, []),
   );
 
   const confirmExit = () => BackHandler.exitApp();
@@ -132,7 +132,7 @@ export default function HomeScreen() {
               {
                 paddingTop:
                   Platform.OS === 'android'
-                    ? RNStatusBar.currentHeight ?? 40
+                    ? (RNStatusBar.currentHeight ?? 40)
                     : 0,
               },
             ]}
@@ -269,7 +269,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 24 : 0,
+    paddingTop:
+      Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 24) : 0,
   },
   modalCard: {
     width: '100%',

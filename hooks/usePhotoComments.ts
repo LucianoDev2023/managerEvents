@@ -16,9 +16,14 @@ export interface PhotoComment {
   id: string;
   text: string;
   createdAt: any;
-  email: string;
-  userId: string;
+
+  // ✅ novo padrão
+  uid: string; // autor do comentário (UID)
   name?: string;
+
+  // ♻️ legado (não usar mais / só leitura)
+  userId?: string; // antigo
+  email?: string; // antigo
 }
 
 interface UsePhotoCommentsParams {
@@ -29,14 +34,13 @@ interface UsePhotoCommentsParams {
 
   currentUser: {
     uid: string;
-    email: string;
     isSuperAdmin: boolean;
-    name: string;
+    name?: string;
   };
 
-  // ✅ Moderadores
-  eventCreatorId: string; // event.userId
-  photoCreatorId: string; // photo.createdBy
+  // ✅ Moderadores (UID)
+  eventCreatorId: string; // event.userId (UID)
+  photoCreatorId: string; // photo.createdByUid (UID)
 }
 
 export function usePhotoComments({
@@ -52,7 +56,7 @@ export function usePhotoComments({
   const [newComment, setNewComment] = useState('');
   const [isAddingComment, setIsAddingComment] = useState(false);
   const [isDeletingCommentIds, setIsDeletingCommentIds] = useState<string[]>(
-    []
+    [],
   );
 
   useEffect(() => {
@@ -68,7 +72,7 @@ export function usePhotoComments({
       activityId,
       'photos',
       photoId,
-      'comments'
+      'comments',
     );
 
     const q = query(commentsRef, orderBy('createdAt', 'desc'));
@@ -76,13 +80,25 @@ export function usePhotoComments({
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data: PhotoComment[] = snapshot.docs.map((d) => {
         const raw = d.data() as any;
+
+        // ✅ tentar extrair UID do novo padrão; fallback pro legado
+        const uid =
+          raw.uid ??
+          raw.userId ?? // legado
+          raw.createdByUid ?? // se algum lugar usou isso
+          '';
+
         return {
           id: d.id,
           text: raw.text ?? '',
-          email: raw.email ?? '',
-          userId: raw.userId ?? '',
-          createdAt: raw.createdAt,
-          name: raw.name,
+          createdAt: raw.createdAt ?? null,
+
+          uid,
+          name: raw.name ?? raw.displayName ?? undefined,
+
+          // ♻️ legado (só leitura)
+          userId: raw.userId ?? undefined,
+          email: raw.email ?? undefined,
         };
       });
 
@@ -94,9 +110,14 @@ export function usePhotoComments({
 
   const canDeleteComment = useMemo(() => {
     return (comment: PhotoComment) => {
-      const isAuthor = comment.userId === currentUser.uid;
-      const isEventCreator = currentUser.uid === eventCreatorId;
-      const isPhotoCreator = currentUser.uid === photoCreatorId;
+      const myUid = currentUser.uid;
+
+      // ✅ authorUid robusto (novo + legado)
+      const authorUid = comment.uid || comment.userId || '';
+
+      const isAuthor = !!authorUid && authorUid === myUid;
+      const isEventCreator = myUid === eventCreatorId;
+      const isPhotoCreator = myUid === photoCreatorId;
       const isSuperAdmin = currentUser.isSuperAdmin;
 
       return isAuthor || isEventCreator || isPhotoCreator || isSuperAdmin;
@@ -111,6 +132,11 @@ export function usePhotoComments({
   const addComment = async () => {
     if (!newComment.trim() || isAddingComment) return;
 
+    if (!currentUser.uid) {
+      Alert.alert('Erro', 'Usuário não autenticado.');
+      return;
+    }
+
     setIsAddingComment(true);
     try {
       const commentRef = collection(
@@ -123,20 +149,20 @@ export function usePhotoComments({
         activityId,
         'photos',
         photoId,
-        'comments'
+        'comments',
       );
 
+      // ✅ NÃO grava email (compatibilidade PlayStore/LGPD)
       await addDoc(commentRef, {
         text: newComment.trim(),
-        email: currentUser.email,
-        userId: currentUser.uid,
+        uid: currentUser.uid,
+        name: currentUser.name ?? 'Usuário',
         createdAt: serverTimestamp(),
-        name: currentUser.name,
       });
 
       setNewComment('');
     } catch (error) {
-      console.error('Erro ao adicionar comentário:', error);
+      Alert.alert('Erro', 'Não foi possível adicionar o comentário.');
     } finally {
       setIsAddingComment(false);
     }
@@ -144,7 +170,6 @@ export function usePhotoComments({
 
   const deleteComment = async (comment: PhotoComment) => {
     if (!canDeleteComment(comment)) {
-      console.warn('❌ Você não tem permissão para deletar este comentário.');
       return;
     }
 
@@ -164,12 +189,12 @@ export function usePhotoComments({
         'photos',
         photoId,
         'comments',
-        comment.id
+        comment.id,
       );
 
       await deleteDoc(ref);
     } catch (error) {
-      console.error('Erro ao deletar comentário:', error);
+      Alert.alert('Erro', 'Não foi possível excluir o comentário.');
     } finally {
       setIsDeletingCommentIds((prev) => prev.filter((id) => id !== comment.id));
     }
@@ -179,7 +204,7 @@ export function usePhotoComments({
     if (!canDeleteComment(comment)) {
       Alert.alert(
         'Acesso negado',
-        'Você não tem permissão para excluir este comentário.'
+        'Você não tem permissão para excluir este comentário.',
       );
       return;
     }
@@ -194,7 +219,7 @@ export function usePhotoComments({
           onPress: () => deleteComment(comment),
           style: 'destructive',
         },
-      ]
+      ],
     );
   };
 

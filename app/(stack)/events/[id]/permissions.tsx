@@ -138,14 +138,23 @@ export default function PermissionConfirmationScreen() {
 
   const guestNameByUid = useMemo(() => {
     const map = new Map<string, string>();
+
+    // 1. Nome do usuário atual (via Auth)
+    if (userUid && auth.currentUser?.displayName) {
+      map.set(userUid, auth.currentUser.displayName);
+    }
+
+    // 2. Nomes vindos das participações (que já são atualizados pelo Perfil)
     guestParts.forEach((p) => {
       if (!p.userId) return;
-      const label =
-        (p.userName ?? '').trim() || `Usuário ${shortUid(p.userId)}`;
-      map.set(p.userId, label);
+      const label = (p.userName ?? '').trim();
+      if (label && !map.has(p.userId)) {
+        map.set(p.userId, label);
+      }
     });
+
     return map;
-  }, [guestParts]);
+  }, [guestParts, userUid, auth.currentUser?.displayName]);
 
   const loadGuests = useCallback(async () => {
     if (!event?.id) return;
@@ -173,8 +182,7 @@ export default function PermissionConfirmationScreen() {
         // ✅ sempre tem label
         .map((p) => ({
           ...p,
-          userName:
-            (p.userName ?? '').trim() || `Usuário ${shortUid(p.userId)}`,
+          userName: (p.userName ?? '').trim(),
         }))
 
         // ✅ ordena: confirmado antes
@@ -197,6 +205,13 @@ export default function PermissionConfirmationScreen() {
   }, [event?.id, event?.userId]);
 
   const [guestQuery, setGuestQuery] = useState('');
+
+  // ✅ Carrega as participações (nomes) ao montar a tela
+  React.useEffect(() => {
+    if (event?.id) {
+      loadGuests();
+    }
+  }, [event?.id, loadGuests]);
 
   const filteredGuestParts = useMemo(() => {
     const q = guestQuery.trim().toLowerCase();
@@ -349,7 +364,7 @@ export default function PermissionConfirmationScreen() {
     const label =
       selectedGuestLabel ||
       guestNameByUid.get(uidToApply) ||
-      shortUid(uidToApply);
+      (uidToApply === userUid ? '(Você)' : 'Usuário');
 
     const doSave = async () => {
       if (saving) return; // evita duplo clique
@@ -450,7 +465,7 @@ export default function PermissionConfirmationScreen() {
               title="Add Permissão"
               onPress={openAdd}
               style={{
-                backgroundColor: colors.primary2,
+                backgroundColor: colors.primary,
                 alignSelf: 'flex-end',
                 paddingHorizontal: 16,
                 paddingVertical: 8,
@@ -469,7 +484,7 @@ export default function PermissionConfirmationScreen() {
           style={[
             styles.permissionsCard,
             {
-              backgroundColor: colors.backGroundSecondary,
+              backgroundColor: colors.backgroundSecondary,
               paddingVertical: 12,
               paddingHorizontal: 16,
             },
@@ -516,8 +531,8 @@ export default function PermissionConfirmationScreen() {
                       }}
                       numberOfLines={1}
                     >
-                      {guestNameByUid.get(uid) ?? `Usuário ${shortUid(uid)}`}
-                      {isMe ? ' (Você)' : ''}
+                      {guestNameByUid.get(uid) || (isMe ? '(Você)' : 'Usuário')}
+                      {isMe && guestNameByUid.get(uid) ? ' (Você)' : ''}
                     </Text>
 
                     <Text
@@ -575,7 +590,7 @@ export default function PermissionConfirmationScreen() {
             <LinearGradient
               colors={gradientColors}
               locations={[0, 0.7, 1]}
-              style={[styles.modalContent, { borderColor: colors.primary2 }]}
+              style={[styles.modalContent, { borderColor: colors.primary }]}
             >
               <Text style={[styles.modalTitle, { color: colors.primary }]}>
                 🔐 Permissões
@@ -708,7 +723,7 @@ export default function PermissionConfirmationScreen() {
                 borderRadius: 12,
                 paddingHorizontal: 12,
                 paddingVertical: 10,
-                backgroundColor: colors.backGroundSecondary,
+                backgroundColor: colors.backgroundSecondary,
               }}
             >
               <Text
@@ -751,7 +766,8 @@ export default function PermissionConfirmationScreen() {
               <ScrollView style={{ maxHeight: 340, marginTop: 12 }}>
                 {selectableGuests.map((p) => {
                   const label =
-                    p.userName?.trim() || `Usuário ${shortUid(p.userId)}`;
+                    p.userName?.trim() ||
+                    (p.userId === userUid ? '(Você)' : 'Usuário');
 
                   const subtitle =
                     p.mode === 'confirmado'
@@ -816,7 +832,7 @@ export default function PermissionConfirmationScreen() {
               </ScrollView>
             )}
 
-            {!!selectedGuestUid && (
+            {/* {!!selectedGuestUid && (
               <View
                 style={[
                   styles.selectedGuestBox,
@@ -831,7 +847,7 @@ export default function PermissionConfirmationScreen() {
                     `Usuário ${shortUid(selectedGuestUid)}`}
                 </Text>
               </View>
-            )}
+            )} */}
 
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
               <Button

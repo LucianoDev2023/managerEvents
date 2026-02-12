@@ -14,6 +14,7 @@ import { useColorScheme } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Trash2, MapPin } from 'lucide-react-native';
 import { useFollowedEvents } from '@/hooks/useFollowedEvents';
+import { getOptimizedUrl } from '@/lib/cloudinary';
 import Colors from '@/constants/Colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
@@ -24,10 +25,7 @@ export default function FollowedEventsScreen() {
   const router = useRouter();
   const { followedEvents, removeFollowedEvent } = useFollowedEvents();
 
-  const gradientColors: [string, string, ...string[]] =
-    colorScheme === 'dark'
-      ? ['#0b0b0f', '#1b0033', '#3e1d73']
-      : ['#ffffff', '#f0f0ff', '#e9e6ff'];
+  const gradientColors = colors.gradients;
 
   const handleDelete = (eventId: string) => {
     Alert.alert('Excluir', 'Deseja deixar de seguir este evento?', [
@@ -42,15 +40,18 @@ export default function FollowedEventsScreen() {
 
   const renderItem = ({ item }: any) => (
     <Pressable
-      onPress={() =>
+      onPress={() => {
         router.push({
           pathname: '/(stack)/events/[id]',
-          params: { id: item.id },
-        } as unknown as Href)
-      }
-      style={[styles.card, { backgroundColor: colors.backgroundC }]}
+          params: { id: item.id, from: 'seguidos' },
+        } as unknown as Href);
+      }}
+      style={[styles.card, { backgroundColor: colors.backgroundCard }]}
     >
-      <Image source={{ uri: item.coverImage }} style={styles.image} />
+      <Image 
+        source={{ uri: getOptimizedUrl(item.coverImage, { width: 400 }) }} 
+        style={styles.image} 
+      />
       <View style={styles.info}>
         <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
         <Text style={[styles.location, { color: colors.textSecondary }]}>

@@ -53,7 +53,7 @@ export default function EventOrganizerNoteScreen() {
           fields: updatedFields,
           createdBy: snap.data()?.createdBy ?? user.uid,
         },
-        { merge: true }
+        { merge: true },
       );
 
       Alert.alert('Sucesso', 'Anotação adicionada!');
@@ -77,7 +77,7 @@ export default function EventOrganizerNoteScreen() {
 
       <RNTextInput
         placeholder="Assunto"
-        placeholderTextColor={colors.text2}
+        placeholderTextColor={colors.textSecondary}
         value={label}
         onChangeText={setLabel}
         style={[

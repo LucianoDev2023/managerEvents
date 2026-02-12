@@ -17,6 +17,7 @@ type ShareEventButtonProps = {
   shareKey: string; // ✅ único identificador de convite
   onEnsureInvite?: () => Promise<string>;
   onShowQRCode: (payload: string) => void;
+  onPressInterceptor?: (proceed: () => void) => void;
   // opcional: facilita trocar o domínio sem mexer no componente
   baseUrl?: string; // default: https://planejeja.com.br/app.html
 };
@@ -25,6 +26,7 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({
   shareKey,
   onEnsureInvite,
   onShowQRCode,
+  onPressInterceptor,
   baseUrl = 'https://planejeja.com.br/app.html',
 }) => {
   const [showOptions, setShowOptions] = useState(false);
@@ -32,6 +34,25 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({
   const colors = Colors[colorScheme];
 
   const normalizedKey = shareKey?.trim() ?? '';
+
+  const showInviteError = (e: any) => {
+    const code = e?.message || e?.code || '';
+    if (code === 'anonymous-user' || code === 'anonymous-blocked') {
+      Alert.alert(
+        'Cadastro necessário',
+        'Para compartilhar convites, crie uma conta.',
+      );
+      return;
+    }
+    if (code === 'invite-permission-denied') {
+      Alert.alert(
+        'Sem permissão',
+        'Você precisa ser o criador do evento para gerar convites.',
+      );
+      return;
+    }
+    Alert.alert('Erro', 'Erro ao gerar ou compartilhar o convite.');
+  };
 
   const getKey = async () => {
     if (normalizedKey) return normalizedKey;
@@ -49,8 +70,8 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({
         message: `🎉 Você está convidado! Abra no app Plannix: ${url}`,
         url,
       });
-    } catch {
-      Alert.alert('Erro', 'Erro ao gerar ou compartilhar o link.');
+    } catch (e: any) {
+      showInviteError(e);
     }
   };
 
@@ -58,8 +79,8 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({
     try {
       const key = await getKey();
       onShowQRCode(JSON.stringify({ shareKey: key, v: 1 }));
-    } catch {
-      Alert.alert('Erro', 'Erro ao gerar QR Code.');
+    } catch (e: any) {
+      showInviteError(e);
     }
   };
 
@@ -70,11 +91,19 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({
 
   const disabled = normalizedKey.length === 0;
 
+  const handlePress = () => {
+    if (onPressInterceptor) {
+      onPressInterceptor(() => setShowOptions(true));
+    } else {
+      setShowOptions(true);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Pressable
         disabled={disabled}
-        onPress={() => setShowOptions(true)}
+        onPress={handlePress}
         style={({ pressed }) => [
           styles.shareBtn,
           { backgroundColor: disabled ? '#5f6b5f' : '#09960C' },
@@ -96,15 +125,12 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               Compartilhar seu evento
             </Text>
-            <Text style={[styles.modalSubtitle, { color: colors.text2 }]}>
+            <Text style={[styles.modalSubtitle, { color: colors.text }]}>
               Escolha a forma:
             </Text>
 
             <Pressable
-              style={[
-                styles.optionBtn,
-                { backgroundColor: colors.backgroundC },
-              ]}
+              style={[styles.optionBtn, { backgroundColor: colors.background }]}
               onPress={() => {
                 setShowOptions(false);
                 handleShare();
@@ -121,10 +147,7 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({
             </Pressable>
 
             <Pressable
-              style={[
-                styles.optionBtn,
-                { backgroundColor: colors.backgroundC },
-              ]}
+              style={[styles.optionBtn, { backgroundColor: colors.background }]}
               onPress={() => {
                 setShowOptions(false);
                 handleQRCode();
@@ -143,7 +166,7 @@ const ShareEventButton: React.FC<ShareEventButtonProps> = ({
             <Pressable
               style={[
                 styles.optionBtn,
-                { backgroundColor: colors.backgroundComents },
+                { backgroundColor: colors.backgroundComments },
               ]}
               onPress={() => setShowOptions(false)}
             >

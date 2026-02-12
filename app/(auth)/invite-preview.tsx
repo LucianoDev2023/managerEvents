@@ -25,6 +25,9 @@ import {
   getGuestParticipation,
 } from '@/hooks/guestService';
 import { useAuthListener } from '@/hooks/useAuthListener';
+import { createInviteSummary } from '@/hooks/inviteService';
+import { useEvents } from '@/context/EventsContext';
+import { getOptimizedUrl } from '@/lib/cloudinary';
 
 type GuestMode = 'confirmado' | 'acompanhando';
 
@@ -32,10 +35,9 @@ type InviteSummary = {
   v: number;
   shareKey: string;
   eventId: string;
-
   title?: string;
   coverImage?: string;
-  locationName?: string;
+  location?: string;
   startDate?: any;
   endDate?: any;
   ownerName?: string;
@@ -97,15 +99,30 @@ export default function InvitePreviewScreen() {
     }
   }, [shareKey, uid, authLoading]);
 
-  // helper: navegar pro evento 1x
+  // helper: navegar pro evento
   const goEvent = useCallback(
     (eventId: string) => {
-      const key = `${shareKey}:${eventId}:${uid}`;
+      const key = `${shareKey}:detail:${eventId}:${uid}`;
       if (navigatedToEvent.current === key) return;
       navigatedToEvent.current = key;
 
       router.replace({
         pathname: '/(stack)/events/[id]',
+        params: { id: eventId },
+      } as any);
+    },
+    [shareKey, uid],
+  );
+
+  // helper: navegar para "Minha participação"
+  const goMyParticipation = useCallback(
+    (eventId: string) => {
+      const key = `${shareKey}:part:${eventId}:${uid}`;
+      if (navigatedToEvent.current === key) return;
+      navigatedToEvent.current = key;
+
+      router.replace({
+        pathname: '/(stack)/events/[id]/edit-my-participation',
         params: { id: eventId },
       } as any);
     },
@@ -129,41 +146,128 @@ export default function InvitePreviewScreen() {
       if (fetchedForKey.current === shareKey) return;
       fetchedForKey.current = shareKey;
 
+      console.log(`[InviteDiag] 🛠️ Iniciando resolução: shareKey=${shareKey}, uid=${uid}`);
       setLoading(true);
       setSummary(null);
 
       try {
-        const snap = await getDoc(doc(db, 'eventInviteSummaries', shareKey));
-        if (cancelled) return;
+        // 🔥 Pequeno delay para garantir que o Firestore Auth propagou as regras
+        // (especialmente após um redirect rápido de login/register)
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
-        if (!snap.exists()) {
+        let snap;
+        try {
+          snap = await getDoc(doc(db, 'eventInviteSummaries', shareKey));
+        } catch (e: any) {
+          console.log('[InviteDiag] ⚠️ Erro na leitura primária (summary):', e.code);
+          // se for permissão negada, tenta mais uma vez em 1s
+          if (e.code === 'permission-denied') {
+             await new Promise((resolve) => setTimeout(resolve, 1000));
+             snap = await getDoc(doc(db, 'eventInviteSummaries', shareKey));
+          } else {
+             throw e;
+          }
+        }
+
+        if (cancelled) return;
+        let data: InviteSummary | null = null;
+        let usedFallback = false;
+
+        if (snap?.exists()) {
+          console.log('[InviteDiag] ✅ eventInviteSummaries encontrado');
+          const raw = snap.data() as InviteSummary;
+          if (raw?.shareKey === shareKey && raw?.v === 1 && raw?.eventId) {
+            data = raw;
+          }
+        } else {
+          console.log('[InviteDiag] ⚠️ eventInviteSummaries não existe');
+        }
+
+        // Fallback: se não há summary válido, resolve eventId via eventShareKeys
+        if (!data) {
+          console.log('[InviteDiag] ⏳ Tentando fallback via eventShareKeys...');
+          try {
+            const keySnap = await getDoc(doc(db, 'eventShareKeys', shareKey));
+            if (cancelled) return;
+            if (keySnap.exists()) {
+              console.log('[InviteDiag] ✅ eventShareKeys (fallback) encontrado');
+              const eventId = (keySnap.data() as any)?.eventId;
+              if (typeof eventId === 'string' && eventId) {
+                data = { v: 1, shareKey, eventId, title: 'Convite' };
+                usedFallback = true;
+              }
+            } else {
+              console.log('[InviteDiag] ❌ eventShareKeys (fallback) NÃO existe');
+            }
+          } catch (keyErr: any) {
+            console.log('[InviteDiag] ❌ Erro ao ler eventShareKeys (fallback):', keyErr.code);
+          }
+        }
+
+        if (!data) {
+          console.log('[InviteDiag] 🚫 Falha total: doc não encontrado ou sem permissão');
           setSummary(null);
           return;
         }
 
-        const data = snap.data() as InviteSummary;
-
-        // sanity checks
-        if (data?.shareKey !== shareKey || data?.v !== 1 || !data?.eventId) {
-          setSummary(null);
-          return;
+        try {
+          console.log(`[InviteDiag] ⏳ Verificando detalhes do evento: ${data?.eventId}`);
+          const evSnap = await getDoc(doc(db, 'events', data!.eventId));
+          if (evSnap.exists()) {
+            console.log('[InviteDiag] ✅ Evento principal acessível');
+            const evData: any = evSnap.data();
+            const isOwner = evData?.userId === uid;
+            if (isOwner) {
+              console.log('[InviteDiag] 👑 Usuário é o dono, redirecionando direto');
+              if (usedFallback) {
+                try {
+                  await createInviteSummary(shareKey, data!.eventId);
+                } catch (healErr: any) {
+                  console.log('[InviteDiag] ⚠️ Erro ao curar summary:', healErr.message);
+                }
+              }
+              goEvent(data!.eventId);
+              return;
+            }
+          } else {
+            console.log('[InviteDiag] ❌ Evento principal não encontrado ou ACESSO NEGADO');
+          }
+        } catch (checkErr: any) {
+          console.log('[InviteDiag] ❌ Erro ao ler evento (ignorável pro preview):', checkErr.code);
         }
 
         setSummary(data);
 
-        // ✅ AQUI está o “pulo do gato”:
-        // se já existe participação (confirmado/acompanhando), entra direto no evento.
-        const existing = await getGuestParticipation(uid, data.eventId);
-        if (cancelled) return;
+        // Se já for logado, checa se já participa
+        if (uid) {
+          try {
+            console.log(`[InviteDiag] 🔍 Checando participação para uid=${uid}, eventId=${data.eventId}`);
+            const existing = await getGuestParticipation(uid, data.eventId);
+            if (cancelled) return;
 
-        if (
-          existing?.mode === 'confirmado' ||
-          existing?.mode === 'acompanhando'
-        ) {
-          goEvent(data.eventId);
-          return;
+            if (
+              existing?.mode === 'confirmado' ||
+              existing?.mode === 'acompanhando'
+            ) {
+              console.log('[InviteDiag] ✅ Já participa, indo para Minha Participação');
+              await refetchEventById(data.eventId);
+              goMyParticipation(data.eventId);
+              return;
+            }
+          } catch (partErr: any) {
+             const code = partErr.code || '';
+             const msg = partErr.message || '';
+             // 💡 Conforme solicitado: se der acesso negado, consideramos que o registro não existe
+             if (code.includes('permission-denied') || msg.includes('permission-denied')) {
+               console.log('[InviteDiag] ℹ️ Acesso negado na participação (tratado como inexistente).');
+             } else {
+               console.log('[InviteDiag] ⚠️ Erro ao checar participação:', code || msg);
+             }
+             // Não interrompe o fluxo de preview
+          }
         }
-      } catch (e) {
+      } catch (e: any) {
+        console.log('[InviteDiag] 🚨 ERRO FATAL no fluxo:', e.code, e.message);
         setSummary(null);
       } finally {
         if (!cancelled) setLoading(false);
@@ -175,6 +279,9 @@ export default function InvitePreviewScreen() {
       cancelled = true;
     };
   }, [shareKey, uid, authLoading, goEvent]);
+
+  // ✅ Context
+  const { refetchEventById } = useEvents();
 
   const handleChoose = async (mode: GuestMode) => {
     if (!uid || !summary?.eventId) return;
@@ -189,7 +296,10 @@ export default function InvitePreviewScreen() {
         // userName: user?.displayName ?? 'Convidado',
       });
 
-      goEvent(summary.eventId);
+      // ✅ Garante que o evento esteja carregado no contexto antes de navegar
+      await refetchEventById(summary.eventId);
+
+      goMyParticipation(summary.eventId);
     } catch (e) {
       Alert.alert('Não foi possível confirmar', 'Tente novamente.');
     } finally {
@@ -265,7 +375,7 @@ export default function InvitePreviewScreen() {
     >
       {!!summary.coverImage && (
         <Image
-          source={{ uri: summary.coverImage }}
+          source={{ uri: getOptimizedUrl(summary.coverImage, { width: 800 }) }}
           style={{
             width: '100%',
             height: 200,
@@ -287,9 +397,9 @@ export default function InvitePreviewScreen() {
         {summary.title ?? 'Evento'}
       </Text>
 
-      {!!summary.locationName && (
+      {!!summary.location && (
         <Text style={{ color: colors.textSecondary, marginBottom: 6 }}>
-          Local: {summary.locationName}
+          Local: {summary.location}
         </Text>
       )}
 
@@ -323,8 +433,14 @@ export default function InvitePreviewScreen() {
             backgroundColor:
               busy === 'confirmado' ? colors.primary : 'transparent',
             alignItems: 'center',
+            flexDirection: 'row',
+            justifyContent: 'center',
+            gap: 8,
           }}
         >
+          {busy === 'confirmado' && (
+            <ActivityIndicator size="small" color="#fff" />
+          )}
           <Text style={{ color: busy === 'confirmado' ? '#fff' : colors.text }}>
             Confirmar presença
           </Text>
@@ -340,10 +456,16 @@ export default function InvitePreviewScreen() {
             borderWidth: 1,
             borderColor: colors.border,
             backgroundColor:
-              busy === 'acompanhando' ? colors.backgroundC : 'transparent',
+              busy === 'acompanhando' ? colors.backgroundCard : 'transparent',
             alignItems: 'center',
+            flexDirection: 'row',
+            justifyContent: 'center',
+            gap: 8,
           }}
         >
+          {busy === 'acompanhando' && (
+            <ActivityIndicator size="small" color={colors.primary} />
+          )}
           <Text
             style={{
               color:

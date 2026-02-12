@@ -54,9 +54,6 @@ export default function NotFoundScreen() {
   const pathname = usePathname();
   const segments = useSegments();
 
-  console.log('🧨 NOT FOUND pathname:', pathname);
-  console.log('🧨 NOT FOUND segments:', segments);
-
   return (
     <>
       <Stack.Screen options={{ title: 'Redirecionando...' }} />

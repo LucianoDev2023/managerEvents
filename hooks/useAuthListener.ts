@@ -1,9 +1,16 @@
-import { useEffect, useState } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import {
+  onAuthStateChanged,
+  User,
+  signInAnonymously as fbSignInAnonymously,
+  signOut,
+} from 'firebase/auth';
 import { auth } from '@/config/firebase';
 
+type AuthUserState = User | null;
+
 export function useAuthListener() {
-  const [user, setUser] = useState<User | null | undefined>(undefined); // <-- undefined: ainda carregando
+  const [user, setUser] = useState<AuthUserState | undefined>(undefined); // undefined = carregando
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
@@ -12,10 +19,33 @@ export function useAuthListener() {
       setAuthLoading(false);
     });
 
-    return () => {
-      unsubscribe(); // segurança: remove listener ao desmontar
-    };
+    return unsubscribe;
   }, []);
 
-  return { user, authLoading };
+  const isAuthReady = !authLoading && user !== undefined;
+  const isLogged = !!user; // inclui anônimo
+  const isAnonymous = !!user?.isAnonymous;
+
+  const signInAnonymously = useCallback(async () => {
+    // se já está logado (anon ou não), não precisa refazer
+    if (auth.currentUser) return auth.currentUser;
+
+    const cred = await fbSignInAnonymously(auth);
+    return cred.user;
+  }, []);
+
+  const logout = useCallback(async () => {
+    await signOut(auth);
+  }, []);
+
+  return {
+    user: (user === undefined ? null : user) as AuthUserState, // opcional: normalize pra não vazar undefined
+    rawUser: user, // se você quiser diferenciar undefined
+    authLoading,
+    isAuthReady,
+    isLogged,
+    isAnonymous,
+    signInAnonymously,
+    logout,
+  };
 }

@@ -23,7 +23,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   getGuestParticipation,
   updateGuestParticipation,
+  updateAllParticipationsUserName,
 } from '@/hooks/guestService';
+import { GuestMode } from '@/types';
+import { updateProfile } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/config/firebase';
+import { auth } from '@/config/firebase';
 
 export default function EditMyParticipationScreen() {
   const router = useRouter();
@@ -42,11 +48,11 @@ export default function EditMyParticipationScreen() {
   }, [scheme]);
 
   const [family, setFamily] = useState<string[]>([]);
+  const [userName, setUserName] = useState('');
   const [newName, setNewName] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [initializing, setInitializing] = useState(true);
-  const [adding, setAdding] = useState(false);
 
   const canUseScreen = !!eventId && !!userId && !authLoading;
 
@@ -70,12 +76,17 @@ export default function EditMyParticipationScreen() {
   const headerOptions = useMemo(() => {
     return {
       headerShown: true,
-      headerTitle: 'Meus acompanhantes',
+      headerTitle: 'Minha participação',
       headerTransparent: true,
       headerTintColor: colors.text,
       headerBackTitleVisible: false,
-    };
-  }, [colors.text]);
+      headerStyle: {
+        backgroundColor: scheme === 'dark' ? '#1e1630' : '#f8f8ff',
+      },
+      headerBlurEffect: (scheme === 'dark' ? 'dark' : 'light') as any,
+      headerShadowVisible: false,
+    } as any;
+  }, [colors.text, scheme]);
 
   // Carrega participação
   useEffect(() => {
@@ -91,6 +102,12 @@ export default function EditMyParticipationScreen() {
       try {
         const guest = await getGuestParticipation(userId, eventId);
         setFamily(guest?.family ?? []);
+        setUserName(guest?.userName ?? user?.displayName ?? '');
+        
+        // Se existir, usa o mode do banco. Se não, mantemos 'confirmado'.
+        if (guest?.mode) {
+          setMode(guest.mode);
+        }
       } catch (error) {
         Alert.alert('Erro', 'Não foi possível carregar sua participação.');
       } finally {
@@ -99,11 +116,11 @@ export default function EditMyParticipationScreen() {
     };
 
     fetchParticipation();
-  }, [authLoading, eventId, userId]);
+  }, [authLoading, eventId, userId, user?.displayName]);
 
   const normalizedNewName = useMemo(() => newName.trim(), [newName]);
 
-  const handleAdd = useCallback(async () => {
+  const handleAdd = useCallback(() => {
     const trimmed = normalizedNewName;
     if (!trimmed) return;
 
@@ -116,15 +133,8 @@ export default function EditMyParticipationScreen() {
       return;
     }
 
-    setAdding(true);
-    try {
-      // pequena latência visual para UX (pode remover se quiser)
-      await new Promise((res) => setTimeout(res, 200));
-      setFamily((prev) => [...prev, trimmed]);
-      setNewName('');
-    } finally {
-      setAdding(false);
-    }
+    setFamily((prev) => [...prev, trimmed]);
+    setNewName('');
   }, [family, normalizedNewName]);
 
   const handleRemove = useCallback((name: string) => {
@@ -142,33 +152,66 @@ export default function EditMyParticipationScreen() {
     );
   }, []);
 
+  // ✅ Se o usuário ainda não existe, mode padrão = confirmado
+  // Se já existe, usa o que veio do banco.
+  const [mode, setMode] = useState<GuestMode>('confirmado');
+
   const handleSave = useCallback(async () => {
     if (!eventId || !userId) return;
 
+    if (userName.trim().length < 2) {
+      Alert.alert('Erro', 'Digite seu nome corretamente.');
+      return;
+    }
+
     setSaving(true);
     try {
+      // 1. Atualiza a participação específica do evento
       await updateGuestParticipation({
         userId,
         eventId,
-        updates: { family },
+        updates: { 
+          family, 
+          userName: userName.trim(),
+          mode // ✅ Garante que o mode seja enviado
+        },
       });
 
-      Alert.alert('✅ Sucesso', 'Participação atualizada!');
+      // 2. Sincroniza o novo nome com o Perfil (Auth + Users) e outras participações
+      if (auth.currentUser) {
+        // Atualiza Firebase Auth
+        await updateProfile(auth.currentUser, { displayName: userName.trim() });
+        
+        // Atualiza Firestore Users
+        await setDoc(
+          doc(db, 'users', userId),
+          { name: userName.trim(), updatedAt: serverTimestamp() },
+          { merge: true }
+        );
+
+        // Sincroniza todas as outras participações deste usuário
+        await updateAllParticipationsUserName(userId, userName.trim());
+      }
+
+      Alert.alert('✅ Sucesso', 'Participação e perfil atualizados!');
       router.replace({
         pathname: '/events/[id]/confirmed-guests',
         params: { id: eventId },
       } as any);
     } catch (error: any) {
+      console.log('❌ updateGuestParticipation error:', error);
+      console.log('code:', error?.code);
+      console.log('message:', error?.message);
+      console.log('details:', error?.details);
+
       Alert.alert(
         'Erro',
-        `${error?.code ?? ''} ${
-          error?.message ?? 'Não foi possível atualizar.'
-        }`.trim(),
+        `${error?.code ?? ''}\n${error?.message ?? 'Falha ao salvar.'}`,
       );
     } finally {
       setSaving(false);
     }
-  }, [eventId, userId, family, router]);
+  }, [eventId, userId, family, userName, mode, router]);
 
   const handleClearAll = useCallback(() => {
     if (family.length === 0) return;
@@ -191,9 +234,9 @@ export default function EditMyParticipationScreen() {
     return (
       <View style={[styles.full, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+        {/* <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
           Carregando...
-        </Text>
+        </Text> */}
       </View>
     );
   }
@@ -247,15 +290,46 @@ export default function EditMyParticipationScreen() {
             <View style={styles.headerRow}>
               <Users size={18} color={colors.primary} />
               <Text style={[styles.headerTitle, { color: colors.text }]}>
-                Acompanhantes
+                Minha Participação
               </Text>
             </View>
 
             <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
-              Adicione ou remova nomes. Isso vale para a sua participação neste
-              evento.
+              Atualize seus dados e acompanhantes para este evento.
             </Text>
           </View>
+
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Seu nome (ou como deseja ser identificado)
+          </Text>
+
+          <TextInput
+            value={userName}
+            onChangeText={setUserName}
+            placeholder="Seu nome"
+            placeholderTextColor={colors.textSecondary}
+            style={[
+              styles.input,
+              {
+                borderColor: colors.border,
+                color: colors.text,
+                backgroundColor:
+                  scheme === 'dark'
+                    ? 'rgba(0,0,0,0.25)'
+                    : 'rgba(255,255,255,0.7)',
+                marginBottom: 20,
+              },
+            ]}
+          />
+
+          <View
+            style={{
+              height: 1,
+              backgroundColor: colors.border,
+              marginVertical: 10,
+              opacity: 0.3,
+            }}
+          />
 
           <Text style={[styles.label, { color: colors.textSecondary }]}>
             Nome do acompanhante
@@ -286,18 +360,13 @@ export default function EditMyParticipationScreen() {
               style={({ pressed }) => [
                 styles.addButton,
                 {
-                  opacity:
-                    adding || !normalizedNewName ? 0.55 : pressed ? 0.85 : 1,
+                  opacity: !normalizedNewName ? 0.55 : pressed ? 0.85 : 1,
                 },
               ]}
               onPress={handleAdd}
-              disabled={adding || !normalizedNewName}
+              disabled={!normalizedNewName}
             >
-              {adding ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.addButtonText}>Adicionar</Text>
-              )}
+              <Text style={styles.addButtonText}>Adicionar</Text>
             </Pressable>
           </View>
 
@@ -401,13 +470,6 @@ export default function EditMyParticipationScreen() {
               style={{ borderColor: colors.border }}
             />
           </View>
-
-          {saving && (
-            <ActivityIndicator
-              style={{ marginTop: 16 }}
-              color={colors.primary}
-            />
-          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
@@ -419,7 +481,7 @@ const styles = StyleSheet.create({
 
   content: {
     padding: 20,
-    paddingTop: 90, // por causa do header transparente
+    paddingTop: 120, // por causa do header transparente (aumentado de 90)
     paddingBottom: 30,
   },
 

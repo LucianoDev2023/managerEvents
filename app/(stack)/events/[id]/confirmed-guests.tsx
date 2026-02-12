@@ -68,14 +68,24 @@ export default function ConfirmedGuestsScreen() {
 
     setLoading(true);
     try {
-      const participations = await getGuestParticipationsByEventId(eventId);
-      setGuests(participations as GuestParticipation[]);
+      if (hasPermission) {
+        // ✅ Admin: Buscar todos
+        const participations = await getGuestParticipationsByEventId(eventId);
+        setGuests(participations as GuestParticipation[]);
+      } else {
+        // ✅ Guest: Buscar apenas o meu
+        // (Isso evita erro de permissão se a rule de listagem for restrita)
+        // Precisamos importar getGuestParticipation se não estiver
+        const { getGuestParticipation } = require('@/hooks/guestService');
+        const myPart = await getGuestParticipation(myUid, eventId);
+        setGuests(myPart ? [myPart as GuestParticipation] : []);
+      }
     } catch (error: any) {
       Alert.alert('Erro', error?.message ?? 'Falha ao buscar convidados.');
     } finally {
       setLoading(false);
     }
-  }, [eventId]);
+  }, [eventId, hasPermission, myUid]);
 
   useFocusEffect(
     useCallback(() => {
@@ -238,7 +248,7 @@ export default function ConfirmedGuestsScreen() {
           style={[
             styles.guestItem,
             {
-              backgroundColor: colors.backGroundSecondary,
+              backgroundColor: colors.backgroundCard,
               borderColor: colors.border,
             },
           ]}
@@ -277,7 +287,7 @@ export default function ConfirmedGuestsScreen() {
                 onPress={() => goToEdit(item)}
                 style={[styles.actionBtn, { borderColor: colors.primary }]}
               >
-                <Text style={[styles.actionText, { color: colors.text2 }]}>
+                <Text style={[styles.actionText, { color: colors.text }]}>
                   ✏️ Editar
                 </Text>
               </Pressable>
@@ -319,7 +329,7 @@ export default function ConfirmedGuestsScreen() {
                   {busyId === item.id ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : (
-                    <Text style={[styles.actionText, { color: colors.text2 }]}>
+                    <Text style={[styles.actionText, { color: colors.text }]}>
                       {item.mode === 'confirmado' ? '👀 Mudar' : '✅ Confirmar'}
                     </Text>
                   )}
@@ -353,7 +363,7 @@ export default function ConfirmedGuestsScreen() {
                   },
                 ]}
               >
-                <Text style={[styles.actionText, { color: colors.text2 }]}>
+                <Text style={[styles.actionText, { color: colors.text }]}>
                   🗑️
                 </Text>
               </Pressable>
@@ -365,11 +375,10 @@ export default function ConfirmedGuestsScreen() {
     [
       myUid,
       hasPermission,
-      colors.backGroundSecondary,
+      colors.backgroundSecondary,
       colors.border,
       colors.primary,
       colors.text,
-      colors.text2,
       colors.textSecondary,
       busyId,
       goToEdit,
@@ -416,37 +425,40 @@ export default function ConfirmedGuestsScreen() {
           </Text>
         </Pressable>
 
-        {hasPermission && (
-          <Pressable
-            onPress={() => setActiveTab('acompanhando')}
+        <Pressable
+          onPress={() => setActiveTab('acompanhando')}
+          style={[
+            styles.tabBtn,
+            {
+              borderColor:
+                activeTab === 'acompanhando' ? colors.primary : 'transparent',
+            },
+          ]}
+        >
+          <Text
             style={[
-              styles.tabBtn,
+              styles.tabText,
               {
-                borderColor:
-                  activeTab === 'acompanhando' ? colors.primary : 'transparent',
+                color:
+                  activeTab === 'acompanhando'
+                    ? colors.primary
+                    : colors.textSecondary,
+                fontWeight: activeTab === 'acompanhando' ? '700' : '400',
               },
             ]}
           >
-            <Text
-              style={[
-                styles.tabText,
-                {
-                  color:
-                    activeTab === 'acompanhando'
-                      ? colors.primary
-                      : colors.textSecondary,
-                  fontWeight: activeTab === 'acompanhando' ? '700' : '400',
-                },
-              ]}
-            >
-              👀 Acompanhando ({totals.acompanhando})
-            </Text>
-          </Pressable>
-        )}
+            👀 Acompanhando {hasPermission ? `(${totals.acompanhando})` : ''}
+          </Text>
+        </Pressable>
 
         {hasPermission && (
           <Pressable
-            onPress={() => router.push(`/(stack)/events/${eventId}/add-guest`)}
+            onPress={() =>
+              router.push({
+                pathname: '/(stack)/events/[id]/add-guest-manual',
+                params: { id: eventId },
+              } as any)
+            }
             style={[styles.addBtn, { backgroundColor: colors.primary }]}
           >
             <Text style={{ color: '#fff', fontWeight: '800' }}>＋</Text>

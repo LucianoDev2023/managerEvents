@@ -34,12 +34,14 @@ import {
   Trash2,
   Plus,
   CalendarDays,
+  CheckCircle,
 } from 'lucide-react-native';
 import ProgramItem from '@/components/ProgramItem';
 import { getAuth } from 'firebase/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import LottieView from 'lottie-react-native';
+import { useSmartNavigation } from '@/hooks/useSmartNavigation';
 
 import type { Guest, Event } from '@/types';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -48,7 +50,7 @@ export default function EventDetailScreen() {
   const { refetchEventById, deleteEvent, addProgram, getGuestsByEventId } =
     useEvents();
 
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const userUid = getAuth().currentUser?.uid ?? '';
@@ -61,6 +63,8 @@ export default function EventDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [isAddingProgram, setIsAddingProgram] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeletionFinished, setIsDeletionFinished] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -191,6 +195,8 @@ export default function EventDetailScreen() {
     }, [isHeaderBusy]),
   );
 
+  const { handleGoBack } = useSmartNavigation(from);
+
   // ✅ Placeholder para manter header estável (evita “pulos”)
   const HeaderRightPlaceholder = useCallback(
     () => <View style={{ width: 64 }} />,
@@ -212,7 +218,7 @@ export default function EventDetailScreen() {
         ? HeaderLeftPlaceholder
         : () => (
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={handleGoBack}
               style={{ paddingHorizontal: 12 }}
             >
               <ArrowLeft size={24} color={colors.primary} />
@@ -250,13 +256,16 @@ export default function EventDetailScreen() {
                             style: 'destructive',
                             onPress: async () => {
                               try {
+                                setIsDeleting(true);
                                 await deleteEvent(event.id);
-                                router.replace('/');
+                                setIsDeletionFinished(true);
                               } catch {
                                 Alert.alert(
                                   'Erro',
                                   'Não foi possível excluir o evento.',
                                 );
+                              } finally {
+                                setIsDeleting(false);
                               }
                             },
                           },
@@ -277,6 +286,7 @@ export default function EventDetailScreen() {
     isHeaderBusy,
     HeaderLeftPlaceholder,
     HeaderRightPlaceholder,
+    handleGoBack,
     colors.primary,
     colors.text,
     colors.error,
@@ -336,6 +346,35 @@ export default function EventDetailScreen() {
       }
       style={styles.container}
     >
+      {/* ⏳ Overlay de Exclusão */}
+      {isDeleting && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.text }]}>Excluindo evento...</Text>
+        </View>
+      )}
+
+      {/* 🎉 Sucesso na Exclusão */}
+      {isDeletionFinished && (
+        <View style={styles.loadingOverlay}>
+          <CheckCircle size={80} color="#4CAF50" />
+          <Text style={[styles.successTitle, { color: colors.text }]}>
+            Evento Excluído!
+          </Text>
+          <Text style={[styles.successSub, { color: colors.textSecondary }]}>
+            O evento foi removido de todos os registros.
+          </Text>
+
+          <TouchableOpacity
+            onPress={() => router.replace('/')}
+            style={[styles.finishBtn, { backgroundColor: colors.primary }]}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.finishBtnText}>Ir para Meus Eventos</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* ✅ Header sempre consistente */}
       <Stack.Screen options={headerOptions} />
 
@@ -535,6 +574,47 @@ export default function EventDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,10,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+  },
+  successTitle: {
+    fontSize: 24,
+    fontFamily: 'Inter-Bold',
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  successSub: {
+    fontSize: 15,
+    fontFamily: 'Inter-Regular',
+    marginTop: 8,
+    marginBottom: 30,
+    textAlign: 'center',
+    paddingHorizontal: 40,
+  },
+  finishBtn: {
+    paddingVertical: 14,
+    paddingHorizontal: 30,
+    borderRadius: 12,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  finishBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+  },
 
   coverImage: {
     width: '100%',

@@ -76,7 +76,7 @@ export default function QRScannerScreen() {
       if (!k) {
         Alert.alert('Erro', 'QR Code inválido');
       } else {
-        router.replace({ pathname: '/(newevents)/search', params: { k } });
+        router.replace({ pathname: '/(auth)/invite-preview', params: { k } });
       }
     } catch (error) {
       Alert.alert('Erro', 'QR Code inválido');

@@ -7,7 +7,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthListener } from '@/hooks/useAuthListener';
@@ -17,6 +17,7 @@ const { height } = Dimensions.get('window');
 
 export default function AccountCreatedScreen() {
   const router = useRouter();
+  const { k } = useLocalSearchParams<{ k?: string }>();
   const { user, authLoading } = useAuthListener();
   const { cameFromRegister, setCameFromRegister } = useRegistrationFlow();
 
@@ -33,7 +34,17 @@ export default function AccountCreatedScreen() {
 
   const handleContinue = () => {
     setCameFromRegister(false); // limpa o estado após seguir
-    router.replace('/welcome');
+    
+    if (k) {
+      // ✅ Se veio de convite, volta pro preview
+      router.replace({
+        pathname: '/(auth)/invite-preview',
+        params: { k },
+      } as any);
+    } else {
+      // Fluxo normal
+      router.replace('/welcome');
+    }
   };
 
   if (authLoading || !cameFromRegister) {

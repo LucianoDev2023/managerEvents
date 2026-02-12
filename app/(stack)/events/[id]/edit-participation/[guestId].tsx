@@ -20,20 +20,22 @@ import { useColorScheme } from 'react-native';
 import Button from '@/components/ui/Button';
 import { Trash2 } from 'lucide-react-native';
 import {
-  getGuestParticipation,
+  getGuestParticipationByDocId,
   updateGuestParticipation,
 } from '@/hooks/guestService';
 
 export default function EditParticipationScreen() {
-  const { id: eventId } = useLocalSearchParams<{ id: string }>();
+  const { id: eventId, guestId } = useLocalSearchParams<{ id: string, guestId: string }>();
   const router = useRouter();
 
   const { user } = useAuthListener();
-  const uid = user?.uid;
+  // const uid = user?.uid; // Removido: usaremos o targetUserId do guest
 
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
+  const [targetUserId, setTargetUserId] = useState<string>('');
+  const [userName, setUserName] = useState('');
   const [family, setFamily] = useState<string[]>([]);
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -46,29 +48,26 @@ export default function EditParticipationScreen() {
     let mounted = true;
 
     (async () => {
-      if (!eventId || !uid) {
+      if (!eventId || !guestId) {
         if (mounted) setInitializing(false);
         return;
       }
 
       try {
-        const guest = await getGuestParticipation(uid!, eventId);
+        const guest = await getGuestParticipationByDocId(guestId);
 
         if (!mounted) return;
 
         if (!guest) {
           Alert.alert('Erro', 'Participação não encontrada.');
-          router.replace('/(tabs)/profile');
+          router.back();
           return;
         }
 
+        setTargetUserId(guest.userId);
+        setUserName(guest.userName ?? '');
         setFamily(Array.isArray(guest.family) ? guest.family : []);
       } catch (error: any) {
-        console.log(
-          'Erro ao carregar participação:',
-          error?.code,
-          error?.message
-        );
         Alert.alert('Erro', 'Não foi possível carregar a participação.');
       } finally {
         if (mounted) setInitializing(false);
@@ -78,14 +77,14 @@ export default function EditParticipationScreen() {
     return () => {
       mounted = false;
     };
-  }, [eventId, uid]);
+  }, [eventId, guestId, router]);
 
   // ========================
   // 🔙 Android back handling
   // ========================
   useEffect(() => {
     const onBackPress = () => {
-      router.replace('/(tabs)/profile');
+      router.back();
       return true;
     };
 
@@ -134,14 +133,18 @@ export default function EditParticipationScreen() {
   };
 
   const handleSave = async () => {
-    if (!eventId || !uid) return;
+    if (!eventId || !targetUserId) return;
+    if (userName.trim().length < 2) {
+      Alert.alert('Erro', 'Nome muito curto.');
+      return;
+    }
 
     setSaving(true);
     try {
       await updateGuestParticipation({
-        userId: uid!,
+        userId: targetUserId,
         eventId,
-        updates: { family },
+        updates: { family, userName: userName.trim() },
       });
 
       Alert.alert('✅ Sucesso', 'Participação atualizada!');
@@ -151,11 +154,6 @@ export default function EditParticipationScreen() {
         params: { id: eventId },
       } as any);
     } catch (error: any) {
-      console.log(
-        'Erro ao atualizar participação:',
-        error?.code,
-        error?.message
-      );
       Alert.alert('Erro', 'Não foi possível atualizar a participação.');
     } finally {
       setSaving(false);
@@ -183,7 +181,23 @@ export default function EditParticipationScreen() {
     >
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Nome do acompanhante
+          Nome do convidado
+        </Text>
+        <TextInput
+          value={userName}
+          onChangeText={setUserName}
+          placeholder="Nome do convidado"
+          placeholderTextColor={colors.textSecondary}
+          style={[
+            styles.input,
+            { borderColor: colors.border, color: colors.text },
+          ]}
+        />
+
+        <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 16, opacity: 0.3 }} />
+
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          Adicionar acompanhante
         </Text>
 
         <View style={styles.inputRow}>
@@ -231,7 +245,7 @@ export default function EditParticipationScreen() {
                 style={[
                   styles.nameRow,
                   {
-                    backgroundColor: colors.backGroundSecondary,
+                    backgroundColor: colors.backgroundSecondary,
                     borderColor: colors.border,
                   },
                 ]}

@@ -19,17 +19,25 @@ type InviteSummaryDoc = {
 };
 
 export async function createInviteForEvent(eventId: string) {
-  const uid = getAuth().currentUser?.uid;
-  if (!uid) throw new Error('not-authenticated');
+  const u = getAuth().currentUser;
+  if (!u) throw new Error('not-authenticated');
+  if (u.isAnonymous) throw new Error('anonymous-blocked');
+  const uid = u.uid;
 
   // 1) gera shareKey único
   const shareKey = await pickUniqueShareKey();
 
   // 2) grava eventShareKeys/{shareKey}
-  await setDoc(doc(db, 'eventShareKeys', shareKey), {
-    eventId,
-    createdAt: serverTimestamp(),
-  });
+  try {
+    await setDoc(doc(db, 'eventShareKeys', shareKey), {
+      eventId,
+      createdAt: serverTimestamp(),
+    });
+  } catch (e: any) {
+    if (e?.code === 'permission-denied')
+      throw new Error('invite-permission-denied');
+    throw e;
+  }
 
   // 3) lê evento (precisa ter permissão; normalmente owner)
   const eventSnap = await getDoc(doc(db, 'events', eventId));
@@ -49,16 +57,24 @@ export async function createInviteForEvent(eventId: string) {
     createdAt: serverTimestamp(),
   };
 
-  await setDoc(doc(db, 'eventInviteSummaries', shareKey), summary, {
-    merge: true,
-  });
+  try {
+    await setDoc(doc(db, 'eventInviteSummaries', shareKey), summary, {
+      merge: true,
+    });
+  } catch (e: any) {
+    if (e?.code === 'permission-denied')
+      throw new Error('invite-permission-denied');
+    throw e;
+  }
 
   return shareKey;
 }
 
 export async function createInviteSummary(shareKey: string, eventId: string) {
-  const uid = getAuth().currentUser?.uid;
-  if (!uid) throw new Error('not-authenticated');
+  const u = getAuth().currentUser;
+  if (!u) throw new Error('not-authenticated');
+  if (u.isAnonymous) throw new Error('anonymous-blocked');
+  const uid = u.uid;
 
   const eventSnap = await getDoc(doc(db, 'events', eventId));
   if (!eventSnap.exists()) throw new Error('event-not-found');
@@ -76,7 +92,13 @@ export async function createInviteSummary(shareKey: string, eventId: string) {
     createdAt: serverTimestamp(),
   };
 
-  await setDoc(doc(db, 'eventInviteSummaries', shareKey), summary, {
-    merge: true,
-  });
+  try {
+    await setDoc(doc(db, 'eventInviteSummaries', shareKey), summary, {
+      merge: true,
+    });
+  } catch (e: any) {
+    if (e?.code === 'permission-denied')
+      throw new Error('invite-permission-denied');
+    throw e;
+  }
 }

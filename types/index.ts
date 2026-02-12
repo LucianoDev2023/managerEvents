@@ -56,7 +56,7 @@ export type Photo = {
   publicId?: string;
   description?: string;
   comentarios?: string;
-  createdBy: string;
+  createdByUid: string;
 };
 
 export type FormValues = {

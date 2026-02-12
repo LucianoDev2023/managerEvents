@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -7,7 +7,6 @@ import {
   Text,
   Platform,
   StatusBar as RNStatusBar,
-  Image,
 } from 'react-native';
 import MapView, {
   Marker,
@@ -16,20 +15,35 @@ import MapView, {
 } from 'react-native-maps';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
-import Constants from 'expo-constants';
-import * as Location from 'expo-location';
+
 import Colors from '@/constants/Colors';
-import { LocateFixed } from 'lucide-react-native';
 import 'react-native-get-random-values';
 
-const GOOGLE_PLACES_API_KEY = 'AIzaSyAUJ6vHju5u1F6h1Y_nRqx2aUSaRlpC7y4';
+// ✅ env lida fora do componente (mais estável)
+const GOOGLE_PLACES_API_KEY =
+  process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY ?? '';
 
 export default function SelectLocationScreen() {
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
   const colorScheme = 'light';
   const colors = Colors[colorScheme];
-  const [mapReady, setMapReady] = useState(false);
+
+  const [selected, setSelected] = useState<{
+    latitude: number;
+    longitude: number;
+    name?: string;
+  } | null>(null);
+
+  const [mapRegion, setMapRegion] = useState({
+    latitude: -15.793889,
+    longitude: -47.882778,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
+
+  // ✅ para mostrar na tela o erro real do Places
+  const [placesError, setPlacesError] = useState<string | null>(null);
 
   const {
     id,
@@ -45,92 +59,40 @@ export default function SelectLocationScreen() {
     locationName?: string;
   }>();
 
-  const [selected, setSelected] = useState<{
-    latitude: number;
-    longitude: number;
-    name?: string;
-  } | null>(null);
-
-  const [mapRegion, setMapRegion] = useState({
-    latitude: -15.793889, // Brasília
-    longitude: -47.882778,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  });
-
   useEffect(() => {
-    const setupLocation = async () => {
-      if (mode === 'edit' && lat && lng) {
-        const latitude = parseFloat(lat);
-        const longitude = parseFloat(lng);
-        setSelected({
-          latitude,
-          longitude,
-          name: locationName ?? 'Local do evento',
-        });
-        setMapRegion({
-          latitude,
-          longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
-        mapRef.current?.animateToRegion({
-          latitude,
-          longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
-      } else {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const location = await Location.getCurrentPositionAsync({});
-          const { latitude, longitude } = location.coords;
-          const reverse = await Location.reverseGeocodeAsync({
-            latitude,
-            longitude,
-          });
-          const addr = reverse?.[0];
-          const name =
-            [addr?.street, addr?.name, addr?.district, addr?.city]
-              .filter(Boolean)
-              .join(', ') || 'Minha localização atual';
+    if (mode === 'edit' && lat && lng) {
+      const latitude = parseFloat(lat);
+      const longitude = parseFloat(lng);
 
-          setSelected({ latitude, longitude, name });
-          setMapRegion({
-            latitude,
-            longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          });
-          mapRef.current?.animateToRegion({
-            latitude,
-            longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          });
-        }
-      }
-    };
+      setSelected({
+        latitude,
+        longitude,
+        name: locationName ?? 'Local do evento',
+      });
 
-    setupLocation();
-  }, []);
+      const region = {
+        latitude,
+        longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+
+      setMapRegion(region);
+      mapRef.current?.animateToRegion(region);
+    }
+  }, [mode, lat, lng, locationName]);
 
   const handleMapPress = (e: MapPressEvent) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
-
     setSelected({ latitude, longitude, name: 'Local no Mapa' });
-
-    setMapRegion((prev) => ({
-      ...prev,
-      latitude,
-      longitude,
-    }));
+    setMapRegion((prev) => ({ ...prev, latitude, longitude }));
   };
 
   const handlePlaceSelect = (data: any, details: any | null = null) => {
     if (details) {
       const { lat, lng } = details.geometry.location;
       setSelected({ latitude: lat, longitude: lng, name: data.description });
+
       mapRef.current?.animateToRegion(
         {
           latitude: lat,
@@ -161,42 +123,15 @@ export default function SelectLocationScreen() {
     });
   };
 
-  const handleGoToUserLocation = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permissão negada',
-        'Ative a localização para usar essa funcionalidade.',
-      );
-      return;
-    }
-    const location = await Location.getCurrentPositionAsync({});
-    const { latitude, longitude } = location.coords;
-    const reverse = await Location.reverseGeocodeAsync({ latitude, longitude });
-    const addr = reverse?.[0];
-    const name =
-      [addr?.street, addr?.name, addr?.district, addr?.city]
-        .filter(Boolean)
-        .join(', ') || 'Minha localização';
-
-    setSelected({ latitude, longitude, name });
-
-    mapRef.current?.animateToRegion({
-      latitude,
-      longitude,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    });
-  };
-
   if (!GOOGLE_PLACES_API_KEY) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>
-          Chave de API do Google Places não configurada.
+          Chave do Google Places não configurada.
         </Text>
         <Text style={styles.errorDetails}>
-          Verifique seu app.json ou arquivos nativos.
+          Defina EXPO_PUBLIC_GOOGLE_PLACES_API_KEY no .env e no EAS
+          (env/secrets).
         </Text>
       </View>
     );
@@ -204,22 +139,41 @@ export default function SelectLocationScreen() {
 
   return (
     <View style={styles.container}>
+      {/* ✅ banner de erro do Places */}
+      {placesError ? (
+        <View style={styles.placesErrorBanner}>
+          <Text style={styles.placesErrorTitle}>Erro no Google Places</Text>
+          <Text style={styles.placesErrorMsg}>{placesError}</Text>
+        </View>
+      ) : null}
+
       <GooglePlacesAutocomplete
         placeholder="Pesquisar localização..."
         onPress={handlePlaceSelect}
+        fetchDetails
         query={{
           key: GOOGLE_PLACES_API_KEY,
           language: 'pt-BR',
-          location: '-15.793889,-47.882778', // Brasília (latitude, longitude)
+          location: '-15.793889,-47.882778',
           radius: 2000000,
-          // components: 'country:br',
         }}
-        fetchDetails
+        onFail={(error) => {
+          // 👇 aqui vem a verdade: REQUEST_DENIED, ApiNotActivatedMapError, etc.
+          const msg =
+            typeof error === 'string' ? error : JSON.stringify(error, null, 2);
+          setPlacesError(msg);
+        }}
+        onNotFound={() => {
+          setPlacesError('Nenhum resultado encontrado.');
+        }}
+        textInputProps={{
+          onFocus: () => setPlacesError(null),
+        }}
         styles={{
           container: {
             position: 'absolute',
             width: '90%',
-            zIndex: 1,
+            zIndex: 10,
             alignSelf: 'center',
             marginTop:
               Platform.OS === 'android'
@@ -234,10 +188,6 @@ export default function SelectLocationScreen() {
             marginTop: 10,
             borderWidth: 1,
             borderColor: colors.border,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 2,
             elevation: 3,
             paddingVertical: 0,
           },
@@ -253,23 +203,9 @@ export default function SelectLocationScreen() {
             borderBottomLeftRadius: 8,
             borderBottomRightRadius: 8,
             elevation: 3,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 2,
           },
-          description: {
-            color: colors.text,
-            fontWeight: 'bold',
-          },
-          predefinedPlacesDescription: {
-            color: colors.primary,
-          },
-          row: {
-            padding: 13,
-            height: 44,
-            flexDirection: 'row',
-          },
+          description: { color: colors.text, fontWeight: 'bold' },
+          row: { padding: 13, height: 44, flexDirection: 'row' },
           separator: {
             height: StyleSheet.hairlineWidth,
             backgroundColor: colors.border,
@@ -285,8 +221,6 @@ export default function SelectLocationScreen() {
         style={styles.map}
         onPress={handleMapPress}
         region={mapRegion}
-        showsUserLocation
-        onMapReady={() => setMapReady(true)}
       >
         {selected && (
           <Marker
@@ -311,16 +245,9 @@ export default function SelectLocationScreen() {
         style={[styles.button, { backgroundColor: colors.primary }]}
         onPress={handleConfirmLocation}
       >
-        <Text style={[styles.buttonText, { color: colors.text2 }]}>
+        <Text style={[styles.buttonText, { color: colors.textMaps }]}>
           Confirmar Localização
         </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.floatingButton}
-        onPress={handleGoToUserLocation}
-      >
-        <LocateFixed size={20} color="#fff" />
       </TouchableOpacity>
     </View>
   );
@@ -346,10 +273,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
+
+  placesErrorBanner: {
+    position: 'absolute',
+    top:
+      Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 0) + 70 : 100,
+    alignSelf: 'center',
+    width: '90%',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#fff3f3',
+    borderWidth: 1,
+    borderColor: '#ffb3b3',
+    zIndex: 20,
+  },
+  placesErrorTitle: { fontWeight: '800', color: '#b00020', marginBottom: 4 },
+  placesErrorMsg: { color: '#333', fontSize: 12 },
+
   map: { flex: 1 },
   button: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 40,
     left: 20,
     right: 20,
     padding: 16,
@@ -357,49 +301,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 25,
     elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
-  floatingButton: {
-    position: 'absolute',
-    bottom: 40,
-    right: 20,
-    width: 50,
-    height: 50,
-    backgroundColor: '#6e56cf',
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  buttonText: {
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
+  buttonText: { fontWeight: 'bold', fontSize: 16 },
+
   selectionInfo: {
     position: 'absolute',
     top:
-      Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 0) + 80 : 100,
+      Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 0) + 120 : 140,
     alignSelf: 'center',
     backgroundColor: '#fff',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 12,
     elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
-  selectionText: {
-    color: '#333',
-    fontSize: 14,
-    fontWeight: '500',
-  },
+  selectionText: { color: '#333', fontSize: 14, fontWeight: '500' },
 });

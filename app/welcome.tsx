@@ -38,7 +38,8 @@ export default function WelcomeScreen() {
     return () => clearTimeout(t);
   }, [router]);
 
-  const topPad = Platform.OS === 'android' ? RNStatusBar.currentHeight ?? 0 : 0;
+  const topPad =
+    Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 0) : 0;
 
   return (
     <LinearGradient
@@ -69,12 +70,12 @@ export default function WelcomeScreen() {
           <Text style={[styles.highlight, { color: theme.text }]}>EVENTOS</Text>
         </View>
 
-        <LottieView
+        {/* <LottieView
           source={require('../assets/images/loading.json')}
           autoPlay
           loop
           style={styles.lottie}
-        />
+        /> */}
       </View>
     </LinearGradient>
   );
@@ -93,6 +94,7 @@ const styles = StyleSheet.create({
   textBlock: {
     alignItems: 'center',
     marginBottom: 28,
+    gap: 10,
   },
 
   welcomeText: {
