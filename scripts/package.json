@@ -1,0 +1,12 @@
+{
+  "name": "plannix-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "setup-version": "tsx setup-version-config.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "firebase": "^10.7.1"
+  }
+}

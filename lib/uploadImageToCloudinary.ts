@@ -1,6 +1,7 @@
 import type { ImagePickerAsset } from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { getCloudinarySignature } from '@/lib/getCloudinarySignature';
+import logger from '@/lib/logger';
 
 type UploadOpts = {
   eventId: string;
@@ -70,7 +71,7 @@ export async function uploadPhotoToCloudinary(
 
   const uploadUrl = `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`;
 
-  console.log(`[Upload] 📤 Iniciando envio para Cloudinary (${(sizeBytes / 1024).toFixed(1)} KB)...`);
+  logger.debug(`[Upload] 📤 Iniciando envio para Cloudinary (${(sizeBytes / 1024).toFixed(1)} KB)...`);
   const tUploadStart = Date.now();
 
   const res = await fetch(uploadUrl, {
@@ -78,7 +79,7 @@ export async function uploadPhotoToCloudinary(
     body: data,
     signal: controller.signal,
   }).catch((err: any) => {
-    console.log('[Upload] ❌ Erro de rede ou timeout:', err.name, err.message);
+    logger.error('[Upload] ❌ Erro de rede ou timeout:', err);
     if (err.name === 'AbortError') {
       throw new Error('Tempo limite de upload excedido. Tente uma conexão mais rápida.');
     }
@@ -87,12 +88,12 @@ export async function uploadPhotoToCloudinary(
   .finally(() => clearTimeout(t));
 
   const uploadDuration = Date.now() - tUploadStart;
-  console.log(`[Upload] ✅ Resposta Cloudinary: status ${res.status} em ${uploadDuration}ms`);
+  logger.debug(`[Upload] ✅ Resposta Cloudinary: status ${res.status} em ${uploadDuration}ms`);
 
   const json = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    console.log('[Upload] 🚫 Erro retornado pelo Cloudinary:', json?.error?.message);
+    logger.error('[Upload] 🚫 Erro retornado pelo Cloudinary:', json?.error?.message);
     throw new Error(
       json?.error?.message || 'Erro ao enviar foto para Cloudinary',
     );

@@ -596,16 +596,34 @@ export default function ProfileScreen() {
                 placeholder="-- Escolha um evento --"
                 getItemLabel={(event) => event.title}
                 onSelect={(event) => {
-                  router.push({
-                    pathname: '/(stack)/events/[id]/edit-my-participation',
-                    params: { id: event.id },
-                  });
+                  try {
+                    console.log('🔍 [DEBUG] Evento selecionado:', event.title, 'ID:', event.id);
+                    console.log('🔍 [DEBUG] Navegando para edit-my-participation');
+                    console.log('🔍 [DEBUG] Pathname:', '/(stack)/events/[id]/edit-my-participation');
+                    console.log('🔍 [DEBUG] Params:', { id: event.id });
+                    
+                    router.push({
+                      pathname: '/(stack)/events/[id]/edit-my-participation',
+                      params: { id: event.id },
+                    });
+                    
+                    console.log('✅ [DEBUG] Navegação executada com sucesso');
+                  } catch (error) {
+                    console.error('❌ [DEBUG] Erro ao navegar:', error);
+                    Alert.alert('Erro', 'Não foi possível abrir a tela de edição.');
+                  }
                 }}
                 icon={<Bell size={20} color={textColor} />}
                 backgroundColor={colors.backgroundSecondary}
                 borderColor={colors.border}
                 textColor={textColor}
               />
+              {allAccessibleEvents.length === 0 && (
+                <Text style={{ color: textSecondary, fontSize: 12, marginTop: 8, textAlign: 'center' }}>
+                  Você não tem eventos disponíveis.{'\n'}
+                  Crie um evento ou seja convidado para um.
+                </Text>
+              )}
             </View>
 
             <Text style={[styles.sectionTitle, { color: textColor }]}>

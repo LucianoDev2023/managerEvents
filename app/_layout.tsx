@@ -9,6 +9,7 @@ import Colors from '../constants/Colors';
 import { useAuthListener } from '../hooks/useAuthListener';
 import { EventsProvider } from '../context/EventsContext';
 import { RegistrationFlowProvider } from '../context/RegistrationFlowContext';
+import { VersionChecker } from '../components/VersionChecker';
 
 export default function RootLayout() {
   const { user, authLoading } = useAuthListener();
@@ -52,13 +53,15 @@ export default function RootLayout() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <RegistrationFlowProvider>
-        <EventsProvider>
-          <Slot />
-        </EventsProvider>
-      </RegistrationFlowProvider>
-    </View>
+    <VersionChecker enableInDev={true}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <RegistrationFlowProvider>
+          <EventsProvider>
+            <Slot />
+          </EventsProvider>
+        </RegistrationFlowProvider>
+      </View>
+    </VersionChecker>
   );
 }
 

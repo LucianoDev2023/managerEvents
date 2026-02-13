@@ -17,6 +17,7 @@ import {
 import { db } from '@/config/firebase';
 import type { GuestParticipation } from '@/types/guestParticipation';
 import { GuestMode } from '@/types';
+import logger from '@/lib/logger';
 
 const makeParticipationId = (userId: string, eventId: string) =>
   `${userId}_${eventId}`;
@@ -74,7 +75,10 @@ export const upsertGuestParticipation = async (params: {
     } catch (e: any) {
       // 💡 Se não temos permissão para ler (comum para novos convidados),
       // assumimos que não há família anterior para preservar.
-      console.log('[GuestService] ℹ️ Ignorando erro de leitura na pré-verificação:', e.code);
+      logger.debug(
+        '[GuestService] ℹ️ Ignorando erro de leitura na pré-verificação:',
+        e.code,
+      );
       finalFamily = [];
     }
   }
@@ -100,10 +104,17 @@ export const getGuestParticipation = async (
   if (!userId || !eventId) return null;
 
   const id = makeParticipationId(userId, eventId);
-  const snap = await getDoc(doc(db, 'guestParticipations', id));
-  if (!snap.exists()) return null;
-
-  return mapParticipation(snap);
+  try {
+    const snap = await getDoc(doc(db, 'guestParticipations', id));
+    if (!snap.exists()) return null;
+    return mapParticipation(snap);
+  } catch (e: any) {
+    logger.debug(
+      '[GuestService] getGuestParticipation denied or failed:',
+      e?.code ?? e,
+    );
+    return null;
+  }
 };
 
 // -------------------------
@@ -235,7 +246,6 @@ export const removeGuestParticipation = async (
   const id = makeParticipationId(userId, eventId);
   await deleteDoc(doc(db, 'guestParticipations', id));
 };
-
 
 // -------------------------
 // MANUAL GUEST (Admin Only)

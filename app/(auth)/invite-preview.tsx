@@ -28,6 +28,7 @@ import { useAuthListener } from '@/hooks/useAuthListener';
 import { createInviteSummary } from '@/hooks/inviteService';
 import { useEvents } from '@/context/EventsContext';
 import { getOptimizedUrl } from '@/lib/cloudinary';
+import logger from '@/lib/logger';
 
 type GuestMode = 'confirmado' | 'acompanhando';
 
@@ -146,7 +147,7 @@ export default function InvitePreviewScreen() {
       if (fetchedForKey.current === shareKey) return;
       fetchedForKey.current = shareKey;
 
-      console.log(`[InviteDiag] 🛠️ Iniciando resolução: shareKey=${shareKey}, uid=${uid}`);
+      logger.debug(`[InviteDiag] 🛠️ Iniciando resolução: shareKey=${shareKey}, uid=${uid}`);
       setLoading(true);
       setSummary(null);
 
@@ -159,7 +160,7 @@ export default function InvitePreviewScreen() {
         try {
           snap = await getDoc(doc(db, 'eventInviteSummaries', shareKey));
         } catch (e: any) {
-          console.log('[InviteDiag] ⚠️ Erro na leitura primária (summary):', e.code);
+          logger.debug('[InviteDiag] ⚠️ Erro na leitura primária (summary):', e.code);
           // se for permissão negada, tenta mais uma vez em 1s
           if (e.code === 'permission-denied') {
              await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -174,66 +175,66 @@ export default function InvitePreviewScreen() {
         let usedFallback = false;
 
         if (snap?.exists()) {
-          console.log('[InviteDiag] ✅ eventInviteSummaries encontrado');
+          logger.debug('[InviteDiag] ✅ eventInviteSummaries encontrado');
           const raw = snap.data() as InviteSummary;
           if (raw?.shareKey === shareKey && raw?.v === 1 && raw?.eventId) {
             data = raw;
           }
         } else {
-          console.log('[InviteDiag] ⚠️ eventInviteSummaries não existe');
+          logger.debug('[InviteDiag] ⚠️ eventInviteSummaries não existe');
         }
 
         // Fallback: se não há summary válido, resolve eventId via eventShareKeys
         if (!data) {
-          console.log('[InviteDiag] ⏳ Tentando fallback via eventShareKeys...');
+          logger.debug('[InviteDiag] ⏳ Tentando fallback via eventShareKeys...');
           try {
             const keySnap = await getDoc(doc(db, 'eventShareKeys', shareKey));
             if (cancelled) return;
             if (keySnap.exists()) {
-              console.log('[InviteDiag] ✅ eventShareKeys (fallback) encontrado');
+              logger.debug('[InviteDiag] ✅ eventShareKeys (fallback) encontrado');
               const eventId = (keySnap.data() as any)?.eventId;
               if (typeof eventId === 'string' && eventId) {
                 data = { v: 1, shareKey, eventId, title: 'Convite' };
                 usedFallback = true;
               }
             } else {
-              console.log('[InviteDiag] ❌ eventShareKeys (fallback) NÃO existe');
+              logger.debug('[InviteDiag] ❌ eventShareKeys (fallback) NÃO existe');
             }
           } catch (keyErr: any) {
-            console.log('[InviteDiag] ❌ Erro ao ler eventShareKeys (fallback):', keyErr.code);
+            logger.debug('[InviteDiag] ❌ Erro ao ler eventShareKeys (fallback):', keyErr.code);
           }
         }
 
         if (!data) {
-          console.log('[InviteDiag] 🚫 Falha total: doc não encontrado ou sem permissão');
+          logger.debug('[InviteDiag] 🚫 Falha total: doc não encontrado ou sem permissão');
           setSummary(null);
           return;
         }
 
         try {
-          console.log(`[InviteDiag] ⏳ Verificando detalhes do evento: ${data?.eventId}`);
+          logger.debug(`[InviteDiag] ⏳ Verificando detalhes do evento: ${data?.eventId}`);
           const evSnap = await getDoc(doc(db, 'events', data!.eventId));
           if (evSnap.exists()) {
-            console.log('[InviteDiag] ✅ Evento principal acessível');
+            logger.debug('[InviteDiag] ✅ Evento principal acessível');
             const evData: any = evSnap.data();
             const isOwner = evData?.userId === uid;
             if (isOwner) {
-              console.log('[InviteDiag] 👑 Usuário é o dono, redirecionando direto');
+              logger.debug('[InviteDiag] 👑 Usuário é o dono, redirecionando direto');
               if (usedFallback) {
                 try {
                   await createInviteSummary(shareKey, data!.eventId);
                 } catch (healErr: any) {
-                  console.log('[InviteDiag] ⚠️ Erro ao curar summary:', healErr.message);
+                  logger.debug('[InviteDiag] ⚠️ Erro ao curar summary:', healErr.message);
                 }
               }
               goEvent(data!.eventId);
               return;
             }
           } else {
-            console.log('[InviteDiag] ❌ Evento principal não encontrado ou ACESSO NEGADO');
+            logger.debug('[InviteDiag] ❌ Evento principal não encontrado ou ACESSO NEGADO');
           }
         } catch (checkErr: any) {
-          console.log('[InviteDiag] ❌ Erro ao ler evento (ignorável pro preview):', checkErr.code);
+          logger.debug('[InviteDiag] ❌ Erro ao ler evento (ignorável pro preview):', checkErr.code);
         }
 
         setSummary(data);
@@ -241,7 +242,7 @@ export default function InvitePreviewScreen() {
         // Se já for logado, checa se já participa
         if (uid) {
           try {
-            console.log(`[InviteDiag] 🔍 Checando participação para uid=${uid}, eventId=${data.eventId}`);
+            logger.debug(`[InviteDiag] 🔍 Checando participação para uid=${uid}, eventId=${data.eventId}`);
             const existing = await getGuestParticipation(uid, data.eventId);
             if (cancelled) return;
 
@@ -249,7 +250,7 @@ export default function InvitePreviewScreen() {
               existing?.mode === 'confirmado' ||
               existing?.mode === 'acompanhando'
             ) {
-              console.log('[InviteDiag] ✅ Já participa, indo para Minha Participação');
+              logger.debug('[InviteDiag] ✅ Já participa, indo para Minha Participação');
               await refetchEventById(data.eventId);
               goMyParticipation(data.eventId);
               return;
@@ -259,15 +260,15 @@ export default function InvitePreviewScreen() {
              const msg = partErr.message || '';
              // 💡 Conforme solicitado: se der acesso negado, consideramos que o registro não existe
              if (code.includes('permission-denied') || msg.includes('permission-denied')) {
-               console.log('[InviteDiag] ℹ️ Acesso negado na participação (tratado como inexistente).');
+               logger.debug('[InviteDiag] ℹ️ Acesso negado na participação (tratado como inexistente).');
              } else {
-               console.log('[InviteDiag] ⚠️ Erro ao checar participação:', code || msg);
+               logger.debug('[InviteDiag] ⚠️ Erro ao checar participação:', code || msg);
              }
              // Não interrompe o fluxo de preview
           }
         }
       } catch (e: any) {
-        console.log('[InviteDiag] 🚨 ERRO FATAL no fluxo:', e.code, e.message);
+        logger.error('[InviteDiag] 🚨 ERRO FATAL no fluxo:', e.code, e.message);
         setSummary(null);
       } finally {
         if (!cancelled) setLoading(false);

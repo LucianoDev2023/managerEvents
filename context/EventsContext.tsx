@@ -54,6 +54,7 @@ import { GuestParticipation } from '@/types/guestParticipation';
 import { EventVM } from '@/types/eventView';
 import { pickUniqueShareKey } from '@/lib/utils/shareKey';
 import { createInviteSummary } from '@/hooks/inviteService';
+import logger from '@/lib/logger';
 
 type GuestMode = GuestParticipation['mode'];
 
@@ -517,13 +518,13 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const deleteEvent = async (eventId: string) => {
-    console.log(`[Diagnostic] 🛠️ Iniciando exclusão granular do evento: ${eventId}`);
+    logger.debug(`[Diagnostic] 🛠️ Iniciando exclusão granular do evento: ${eventId}`);
 
     const runStep = async (name: string, path: string, fn: () => Promise<void>) => {
       try {
-        console.log(`[Diagnostic] ⏳ Tentando: ${name} (Path: ${path})`);
+        logger.debug(`[Diagnostic] ⏳ Tentando: ${name} (Path: ${path})`);
         await fn();
-        console.log(`[Diagnostic] ✅ Sucesso: ${name}`);
+        logger.debug(`[Diagnostic] ✅ Sucesso: ${name}`);
       } catch (e: any) {
         console.error(`[Diagnostic] ❌ FALHA: ${name} (Path: ${path})`, {
           code: e?.code,
@@ -592,7 +593,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       await runStep('delete event doc', `events/${eventId}`, () => deleteDoc(doc(db, 'events', eventId)));
 
       dispatch({ type: 'DELETE_EVENT', payload: eventId });
-      console.log(`[Diagnostic] 🏁 Processo de exclusão finalizado para o evento ${eventId}`);
+      logger.debug(`[Diagnostic] 🏁 Processo de exclusão finalizado para o evento ${eventId}`);
     } catch (e: any) {
       console.error('[Diagnostic] 🆘 Erro catastrófico no flow de exclusão:', e);
       Alert.alert(

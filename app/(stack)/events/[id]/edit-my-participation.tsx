@@ -30,6 +30,7 @@ import { updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { auth } from '@/config/firebase';
+import logger from '@/lib/logger';
 
 export default function EditMyParticipationScreen() {
   const router = useRouter();
@@ -199,10 +200,10 @@ export default function EditMyParticipationScreen() {
         params: { id: eventId },
       } as any);
     } catch (error: any) {
-      console.log('❌ updateGuestParticipation error:', error);
-      console.log('code:', error?.code);
-      console.log('message:', error?.message);
-      console.log('details:', error?.details);
+      logger.error('❌ updateGuestParticipation error:', error);
+      logger.error('code:', error?.code);
+      logger.error('message:', error?.message);
+      logger.error('details:', error?.details);
 
       Alert.alert(
         'Erro',

@@ -50,7 +50,7 @@ export default function AddEventWithAutocomplete() {
           }
         }}
         query={{
-          key: 'AIzaSyD_UKirzoq-kOOBaxo63sct1QbH-',
+          key: Constants.expoConfig?.extra?.googlePlacesApiKey || '',
           language: 'pt-BR',
           components: 'country:br',
         }}

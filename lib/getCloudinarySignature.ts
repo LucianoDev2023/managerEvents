@@ -1,4 +1,5 @@
 import { getAuth } from 'firebase/auth';
+import logger from '@/lib/logger';
 
 const SIGN_BASE_URL = 'https://api.iafast.com.br';
 
@@ -25,7 +26,7 @@ export async function getCloudinarySignature(input: SignInput) {
 
   const url = `${SIGN_BASE_URL}/api/cloudinary/sign`;
 
-  console.log(`[Signature] ⏳ Solicitando assinatura para ${input.kind} (evento: ${input.eventId})`);
+  logger.debug(`[Signature] ⏳ Solicitando assinatura para ${input.kind} (evento: ${input.eventId})`);
   const tStart = Date.now();
   
   const res = await fetch(url, {
@@ -36,12 +37,12 @@ export async function getCloudinarySignature(input: SignInput) {
     },
     body: JSON.stringify(input),
   }).catch(err => {
-    console.log('[Signature] ❌ Falha na requisição de rede:', err.message);
+    logger.error('[Signature] ❌ Falha na requisição de rede:', err);
     throw new Error('Falha de conexão ao obter assinatura. Verifique sua internet.');
   });
 
   const duration = Date.now() - tStart;
-  console.log(`[Signature] ✅ Resposta recebida em ${duration}ms (status: ${res.status})`);
+  logger.debug(`[Signature] ✅ Resposta recebida em ${duration}ms (status: ${res.status})`);
 
   const text = await res.text();
   let json: any = null;
