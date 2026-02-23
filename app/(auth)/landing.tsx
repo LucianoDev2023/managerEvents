@@ -1,9 +1,9 @@
 import React, {
-  useRef,
   useEffect,
   useCallback,
   useState,
   useMemo,
+  useRef,
 } from 'react';
 import {
   View,
@@ -16,6 +16,7 @@ import {
   StatusBar as RNStatusBar,
   Pressable,
   Dimensions,
+  Image,
 } from 'react-native';
 import { useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -24,94 +25,92 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { signInAnonymously } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 
-import Animated, { FadeInDown, Easing } from 'react-native-reanimated';
+import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import Colors from '@/constants/Colors';
-import { Check } from 'lucide-react-native';
+import Fonts from '@/constants/Fonts';
+import { Check, Users, DollarSign, Camera, Calendar, ArrowRight, Sparkles, ClipboardList, FileDown, MessageCircle } from 'lucide-react-native';
 import LottieView from 'lottie-react-native';
 
 import { useAuthListener } from '@/hooks/useAuthListener';
 
-const mockups = [
-  require('@/assets/kup/mockup1.png'),
-  require('@/assets/kup/mockup2.png'),
-  require('@/assets/kup/mockup3.png'),
-  require('@/assets/kup/mockup4.png'),
-  require('@/assets/kup/mockup5.png'),
-];
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = width * 0.65;
+const SPACING = 12;
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const MOCKUP_WIDTH = SCREEN_WIDTH * 0.6;
-const SIDE_SPACING = (SCREEN_WIDTH - MOCKUP_WIDTH) / 3;
-
-// ✅ Largura única para os dois botões (igual ao guestButton)
-const BUTTON_WIDTH = 220;
-
-// ✅ Altura real de botão (mais coerente)
-const PRIMARY_BUTTON_HEIGHT = 48;
-
-const features = [
-  'Organize seus eventos em um só lugar',
-  'Gerencie convidados, presenças e acompanhantes com facilidade',
-  'Convites rápidos via QR Code ou link compartilhável',
-  'Fotos privadas organizadas por atividade do evento',
-  'Permissões inteligentes para múltiplos administradores',
-  'Perfeito para festas, casamentos, encontros e eventos sociais',
+const benefits = [
+    {
+        id: '1',
+        title: 'Lista de Convidados',
+        description: 'Saiba exatamente quem confirmou presença. Tudo em tempo real, sem planilhas chatas.',
+        icon: Users,
+        color: '#4ECDC4'
+    },
+    {
+        id: '2',
+        title: 'Financeiro',
+        description: 'Seu orçamento sob controle. Registre gastos e evite surpresas no final.',
+        icon: DollarSign,
+        color: '#FF6B6B'
+    },
+    {
+        id: '3',
+        title: 'Tarefas & Notas',
+        description: 'Não esqueça de nada. Checklists e anotações para organizar cada detalhe.',
+        icon: ClipboardList,
+        color: '#A06CD5'
+    },
+    {
+        id: '4',
+        title: 'Relatórios em PDF',
+        description: 'Exporte e compartilhe o controle financeiro do seu evento com um clique.',
+        icon: FileDown,
+        color: '#FF9F1C'
+    },
+    {
+        id: '5',
+        title: 'Galeria Interativa',
+        description: 'Um álbum privado onde convidados podem enviar fotos e comentar em tempo real.',
+        icon: Camera,
+        color: '#E056FD'
+    }
 ];
 
 export default function LandingScreen() {
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
-
   const router = useRouter();
-
   const { user } = useAuthListener();
   const [guestLoading, setGuestLoading] = useState(false);
 
+  // Gradiente "Premium Night"
   const gradientColors: [string, string, ...string[]] = useMemo(
     () =>
       colorScheme === 'dark'
-        ? ['#0a0a10', '#151326', '#2a2150']
-        : ['#ffffff', '#f7f7ff', '#efecff'],
+      ? ['#0F0F1A', '#1A1129', '#2D1B4E'] 
+      : ['#FFFFFF', '#F0F4FF', '#E2E8FF'],
     [colorScheme],
   );
 
-  const scrollRef = useRef<ScrollView>(null);
-  const mockupIndex = useRef(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      mockupIndex.current = (mockupIndex.current + 1) % mockups.length;
-      scrollRef.current?.scrollTo({
-        x: mockupIndex.current * (MOCKUP_WIDTH + 10),
-        animated: true,
-      });
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleNavigate = useCallback(() => {
+  const handleNavigateLogin = useCallback(() => {
     router.push('/(auth)/login');
+  }, [router]);
+  
+  const handleNavigateRegister = useCallback(() => {
+    router.push('/(auth)/register');
   }, [router]);
 
   const handleGuest = useCallback(async () => {
     try {
       if (guestLoading) return;
-
-      // se já estiver logado (anon ou não), só entra
       if (user) {
         router.replace('/(tabs)');
         return;
       }
-
       setGuestLoading(true);
       await signInAnonymously(auth);
       router.replace('/(tabs)');
     } catch (e: any) {
-      Alert.alert(
-        'Não foi possível entrar como visitante',
-        e?.message ?? 'Tente novamente.',
-      );
+      Alert.alert('Erro', e?.message ?? 'Tente novamente.');
     } finally {
       setGuestLoading(false);
     }
@@ -119,7 +118,7 @@ export default function LandingScreen() {
 
   return (
     <LinearGradient colors={gradientColors} style={styles.gradient}>
-      <StatusBar translucent style="light" backgroundColor="transparent" />
+      <StatusBar translucent style={colorScheme === 'dark' ? 'light' : 'dark'} backgroundColor="transparent" />
 
       <ScrollView
         contentContainerStyle={[
@@ -130,140 +129,116 @@ export default function LandingScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        
+        {/* --- HEADER / HERO --- */}
         <Animated.View
-          entering={FadeInDown.duration(550)
-            .easing(Easing.out(Easing.cubic))
-            .delay(100)}
-          style={styles.centeredBlock}
+          entering={FadeInDown.duration(800).delay(200)}
+          style={styles.heroSection}
         >
-          <Text style={[styles.title, { color: colors.primary }]}>PLANNIX</Text>
-          <Text style={[styles.slogan, { color: colors.text }]}>
-            Sua experiência de eventos no seu tempo, no seu estilo.
-          </Text>
-        </Animated.View>
-
-        <Animated.View
-          entering={FadeInDown.delay(200)}
-          style={styles.lottieBox}
-        >
-          <LottieView
-            source={require('@/assets/images/start.json')}
-            autoPlay
-            loop
-            style={styles.lottie}
-          />
-        </Animated.View>
-
-        <Animated.View
-          entering={FadeInDown.delay(250)}
-          style={styles.mockupGallery}
-        >
-          <ScrollView
-            ref={scrollRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingHorizontal: SIDE_SPACING,
-            }}
-            snapToInterval={MOCKUP_WIDTH + 10}
-            decelerationRate="fast"
-            scrollEventThrottle={16}
-          >
-            {/* {mockups.map((img, index) => (
-              <Animated.Image
-                key={index}
-                source={img}
-                style={[
-                  styles.mockupImage,
-                  index === mockups.length - 1 && { marginRight: 0 },
-                ]}
-                entering={FadeInDown.delay(300 + index * 100)}
-              />
-            ))} */}
-          </ScrollView>
-        </Animated.View>
-
-        <Animated.View
-          entering={FadeInDown.delay(300)}
-          style={styles.featureList}
-        >
-          {features.map((item, index) => (
-            <View key={index} style={styles.featureItem}>
-              <Check
-                size={18}
-                color={colors.primary}
-                style={styles.featureIcon}
-              />
-              <Text style={[styles.featureText, { color: colors.text }]}>
-                {item}
-              </Text>
+            <View style={styles.badge}>
+                <Sparkles size={12} color={colors.primary} />
+                <Text style={[styles.badgeText, { color: colors.primary }]}>Eventos reinventados</Text>
             </View>
-          ))}
+
+            <Text style={[styles.heroTitle, { color: colors.text }]}>
+                Celebre momentos,{'\n'}
+                <Text style={{ color: colors.primary }}>não preocupações.</Text>
+            </Text>
+
+            <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+                O jeito mais fácil e elegante de gerenciar listas, finanças e memórias do seu evento.
+            </Text>
         </Animated.View>
 
+        {/* --- ILLUSTRATION --- */}
         <Animated.View
-          entering={FadeInDown.duration(550)
-            .easing(Easing.out(Easing.cubic))
-            .delay(400)}
-          style={styles.buttonContainer}
+            entering={ZoomIn.duration(800).delay(400)}
+            style={styles.illustrationContainer}
         >
-          {/* ✅ Botão principal (Lottie vira só “efeito” e não quebra clicks) */}
-          <Pressable
-            onPress={handleNavigate}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              { backgroundColor: colors.primary },
-              {
-                opacity: pressed ? 0.95 : 1,
-                transform: [{ scale: pressed ? 0.985 : 1 }],
-              },
-            ]}
-            accessible
-            accessibilityRole="button"
-          >
-            {/* ✅ wrapper com pointerEvents="none" (TypeScript OK) */}
-            <View style={styles.primaryLottieWrap} pointerEvents="none">
-              <LottieView
-                source={require('@/assets/images/action.json')}
+             <LottieView
+                source={require('@/assets/images/start.json')}
                 autoPlay
                 loop
-                resizeMode="cover"
-                style={styles.primaryLottieBg}
-              />
-            </View>
-
-            <Text style={styles.primaryText}>Comece agora</Text>
-          </Pressable>
-
-          {/* Botão secundário: Visitante */}
-          <Pressable
-            onPress={handleGuest}
-            disabled={guestLoading}
-            style={({ pressed }) => [
-              styles.guestButton,
-              {
-                opacity: guestLoading ? 0.7 : pressed ? 0.85 : 1,
-                borderColor: colors.primary,
-                transform: [{ scale: pressed ? 0.99 : 1 }],
-              },
-            ]}
-            accessible
-            accessibilityRole="button"
-          >
-            {guestLoading ? (
-              <View style={styles.guestRow}>
-                <ActivityIndicator color={colors.text} size="small" />
-                <Text style={[styles.guestText, { color: colors.text }]}>
-                  Entrando...
-                </Text>
-              </View>
-            ) : (
-              <Text style={[styles.guestText, { color: colors.text }]}>
-                Explorar sem conta
-              </Text>
-            )}
-          </Pressable>
+                style={styles.lottie}
+             />
         </Animated.View>
+
+        {/* --- CAROUSEL DE BENEFÍCIOS --- */}
+        <Animated.View
+            entering={FadeInDown.duration(800).delay(600)}
+            style={styles.carouselSection}
+        >
+            <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 20 }}
+                snapToInterval={CARD_WIDTH + SPACING}
+                decelerationRate="fast"
+            >
+                {benefits.map((item, index) => (
+                    <View 
+                        key={item.id} 
+                        style={[
+                            styles.benefitCard, 
+                            { 
+                                backgroundColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.05)' : '#fff',
+                                borderColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.1)' : '#eee',
+                                marginRight: index === benefits.length - 1 ? 0 : SPACING
+                            }
+                        ]}
+                    >
+                        <View style={[styles.iconBox, { backgroundColor: item.color + '20' }]}>
+                            <item.icon size={28} color={item.color} />
+                        </View>
+                        <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
+                        <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{item.description}</Text>
+                    </View>
+                ))}
+            </ScrollView>
+        </Animated.View>
+
+        {/* --- ACTIONS --- */}
+        <Animated.View
+            entering={FadeInDown.duration(800).delay(800)}
+            style={styles.actionSection}
+        >
+             <Pressable
+                onPress={handleNavigateRegister}
+                style={({ pressed }) => [
+                    styles.primaryBtn,
+                    { 
+                        backgroundColor: colors.primary,
+                        transform: [{ scale: pressed ? 0.98 : 1 }],
+                        opacity: pressed ? 0.9 : 1
+                    }
+                ]}
+             >
+                 <Text style={styles.primaryBtnText}>Criar meu Evento</Text>
+                 <ArrowRight size={20} color="#fff" />
+             </Pressable>
+
+             <Pressable
+                onPress={handleNavigateLogin}
+                style={({ pressed }) => [
+                    styles.secondaryBtn,
+                    { 
+                        borderColor: colors.border,
+                        backgroundColor: pressed ? colors.backgroundSecondary : 'transparent'
+                    }
+                ]}
+             >
+                 <Text style={[styles.secondaryBtnText, { color: colors.text }]}>Já tenho conta</Text>
+             </Pressable>
+             
+             <Pressable onPress={handleGuest} disabled={guestLoading} style={{ marginTop: 16 }}>
+                 <Text style={{ fontFamily: Fonts.medium, color: colors.textSecondary, fontSize: 13, textDecorationLine: 'underline' }}>
+                    {guestLoading ? 'Entrando...' : 'Apenas dar uma olhadinha (Visitante)'}
+                 </Text>
+             </Pressable>
+
+        </Animated.View>
+
+        <View style={{ height: 40 }} />
       </ScrollView>
     </LinearGradient>
   );
@@ -273,112 +248,128 @@ const styles = StyleSheet.create({
   gradient: { flex: 1 },
   container: {
     flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingVertical: 24,
-    paddingBottom: 40,
+  },
+  
+  // Hero
+  heroSection: {
+      paddingHorizontal: 24,
+      alignItems: 'center',
+      marginTop: 20, // Reduced from 40
+      marginBottom: 10, // Reduced from 20
+  },
+  badge: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     gap: 6,
+     backgroundColor: 'rgba(110, 86, 207, 0.15)', 
+     paddingHorizontal: 10, // Reduced from 12
+     paddingVertical: 4,  // Reduced from 6
+     borderRadius: 16,
+     marginBottom: 12, // Reduced from 16
+  },
+  badgeText: {
+      fontSize: 11, // Reduced from 12
+      fontFamily: Fonts.bold,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+  },
+  heroTitle: {
+      fontSize: 28, // Reduced from 36
+      fontFamily: Fonts.bold, 
+      textAlign: 'center',
+      lineHeight: 34, // Reduced from 42
+      letterSpacing: -0.5, // Reduced from -1
+      marginBottom: 8, // Reduced from 12
+  },
+  heroSubtitle: {
+      fontSize: 14, // Reduced from 16
+      fontFamily: Fonts.regular,
+      textAlign: 'center',
+      lineHeight: 20, // Reduced from 24
+      maxWidth: '90%', // Increased width to prevent wrapping
   },
 
-  centeredBlock: { alignItems: 'center', marginTop: 24 },
-  title: {
-    fontSize: 40,
-    fontFamily: 'Inter-Bold',
-    textAlign: 'center',
-    marginBottom: 4,
-    letterSpacing: 1,
-    textShadowColor: 'rgba(0,0,0,0.35)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
+  // Illustration
+  illustrationContainer: {
+      alignItems: 'center',
+      marginBottom: 10, // Reduced from 20
+      height: 160, // Reduced from 200
+      justifyContent: 'center',
   },
-  slogan: {
-    fontSize: 16,
-    fontFamily: 'Inter-Medium',
-    textAlign: 'center',
-    marginBottom: 8,
-    lineHeight: 22,
+  lottie: {
+      width: 180, // Reduced from 250
+      height: 180,
   },
 
-  lottieBox: { marginVertical: 20, alignItems: 'center' },
-  lottie: { width: 300, height: 150 },
-
-  mockupGallery: { width: '100%' },
-  mockupImage: {
-    width: MOCKUP_WIDTH,
-    height: 340,
-    resizeMode: 'contain',
-    borderRadius: 16,
-    marginRight: 10,
+  // Carousel
+  carouselSection: {
+      marginBottom: 24, // Reduced from 40
+  },
+  benefitCard: {
+      width: CARD_WIDTH,
+      padding: 16, // Reduced from 24
+      borderRadius: 16, // Reduced from 24
+      borderWidth: 1,
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+  },
+  iconBox: {
+      width: 44, // Reduced from 56
+      height: 44,
+      borderRadius: 16, // Reduced from 18
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 12, // Reduced from 16
+  },
+  cardTitle: {
+      fontSize: 16, // Reduced from 20
+      fontFamily: Fonts.bold,
+      marginBottom: 6, // Reduced from 8
+  },
+  cardDesc: {
+      fontSize: 13, // Reduced from 15
+      fontFamily: Fonts.regular,
+      lineHeight: 18, // Reduced from 22
   },
 
-  featureList: { width: '100%', paddingHorizontal: 6, marginBottom: 32 },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
+  // Actions
+  actionSection: {
+      paddingHorizontal: 24,
+      alignItems: 'center',
+      gap: 10, // Reduced from 12
   },
-  featureIcon: { marginRight: 10 },
-  featureText: {
-    fontSize: 15,
-    fontFamily: 'Inter-Regular',
-    flexShrink: 1,
+  primaryBtn: {
+      width: '100%',
+      height: 48, // Reduced from 56
+      borderRadius: 16, // Reduced from 28
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      shadowColor: '#6e56cf',
+      shadowOffset: { width: 0, height: 4 }, // Reduced shadow
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 6,
   },
-
-  buttonContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
+  primaryBtnText: {
+      fontSize: 16, // Reduced from 18
+      fontFamily: Fonts.bold,
+      color: '#fff',
   },
-
-  // ✅ Botão principal (cara de botão)
-  primaryButton: {
-    width: BUTTON_WIDTH,
-    height: PRIMARY_BUTTON_HEIGHT,
-    borderRadius: PRIMARY_BUTTON_HEIGHT / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
+  secondaryBtn: {
+      width: '100%',
+      height: 48, // Reduced from 56
+      borderRadius: 16,
+      borderWidth: 1.5,
+      alignItems: 'center',
+      justifyContent: 'center',
   },
-
-  // ✅ wrapper absoluto do Lottie (onde aplicamos pointerEvents)
-  primaryLottieWrap: {
-    ...StyleSheet.absoluteFillObject,
-  },
-
-  // ✅ Lottie como textura/efeito (não “desenha” o botão)
-  primaryLottieBg: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.22,
-    transform: [{ scale: 1.35 }],
-  },
-
-  primaryText: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: 'white',
-    textAlign: 'center',
-    paddingHorizontal: 10,
-  },
-
-  guestButton: {
-    width: BUTTON_WIDTH,
-    paddingVertical: 12,
-    borderRadius: PRIMARY_BUTTON_HEIGHT / 2,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-  },
-  guestRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  guestText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    textAlign: 'center',
+  secondaryBtnText: {
+      fontSize: 15, // Reduced from 16
+      fontFamily: Fonts.bold,
   },
 });

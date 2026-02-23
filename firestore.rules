@@ -1,6 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+  
+   // ✅ Permitir leitura pública da configuração de versão
+    match /config/appVersion {
+      allow read: if true;  // Todos podem ler
+      allow write: if false; // Apenas via console/admin
+    }
 
     // =========================================================
     // Helpers globais
@@ -56,19 +62,24 @@ service cloud.firestore {
     }
 
     function isShareKeyPossessor(eventId) {
-      // Se o evento tem uma shareKey e ela existe na coleção global, permitimos ler o básico
+      // shareKey válida: existe E não expirou
       let shareKey = eventDocById(eventId).data.get('shareKey', null);
-      return signedIn() && shareKey != null && exists(/databases/$(database)/documents/eventShareKeys/$(shareKey));
+      let keyDoc = shareKey != null
+        ? get(/databases/$(database)/documents/eventShareKeys/$(shareKey))
+        : null;
+      return signedIn()
+        && shareKey != null
+        && exists(/databases/$(database)/documents/eventShareKeys/$(shareKey))
+        && keyDoc.data.get('expiresAt', null) != null
+        && keyDoc.data.expiresAt > request.time;
     }
 
     function canReadEventTree(eventId) {
       // Usamos exists para evitar ciclos de get()
-      return (signedIn() && exists(/databases/$(database)/documents/events/$(eventId)) && get(/databases/$(database)/documents/events/$(eventId)).data.get('isPublic', false) == true)
+      return (exists(/databases/$(database)/documents/events/$(eventId)) && get(/databases/$(database)/documents/events/$(eventId)).data.get('isPublic', false) == true)
         || isOwnerOfEventId(eventId) 
         || isSubAdminOfEventId(eventId) 
         || isParticipantOfEventId(eventId);
-        // Note: isShareKeyPossessor removido daqui para evitar loop de leitura no tree; 
-        // a gente costuma ler o eventInviteSummary em vez disso para previews.
     }
 
     function canManageEventTree(eventId) {
@@ -85,6 +96,7 @@ service cloud.firestore {
       return request.resource.data.uid is string
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 50
         && (
           !('name' in request.resource.data)
           || request.resource.data.name is string
@@ -96,7 +108,7 @@ service cloud.firestore {
     // =========================================================
     match /eventShareKeys/{shareKey} {
       // ✅ permitir GET de uma chave específica (resolver shareKey -> eventId)
-      allow get: if signedIn();
+      allow get: if true;
 
       // ❌ bloquear enumeração
       allow list: if false;
@@ -132,8 +144,8 @@ service cloud.firestore {
     // =========================================================
     match /eventInviteSummaries/{shareKey} {
 
-      // ✅ leitura do preview: usuário autenticado
-      allow get: if signedIn();
+      // ✅ leitura do preview: qualquer pessoa com a chave pode ver (público)
+      allow get: if true;
 
       // ❌ bloqueia enumeração (não permitir varredura de convites)
       allow list: if false;
@@ -179,6 +191,11 @@ service cloud.firestore {
           && (
             !('isPublic' in request.resource.data) 
             || request.resource.data.isPublic is bool
+          )
+          // Limite de 10 tarefas por evento (evitar doc > 1MB e abuso)
+          && (
+            !('tasks' in request.resource.data)
+            || (request.resource.data.tasks is list && request.resource.data.tasks.size() <= 10)
           );
       }
 
@@ -212,9 +229,19 @@ service cloud.firestore {
       }
 
       // Regras do Documento do Evento
-      allow get: if signedIn() && canRead();
+      // LEITURA: get usa canRead() (inclui participantes e shareKey).
+      // list usa regra mais restrita: apenas campos do próprio documento,
+      // sem cross-document reads que são caros/não confiáveis em queries.
+      allow get: if canRead();
       
-      allow list: if signedIn() && canRead();
+      allow list: if signedIn() && (
+        // Dono do evento (client query: where('userId', '==', uid))
+        resource.data.userId == request.auth.uid
+        // Subadmin (client query: where('subAdminUids', 'array-contains', uid))
+        || isSubAdmin()
+        // Evento público
+        || resource.data.get('isPublic', false) == true
+      );
 
       allow create: if signedIn() 
         && request.resource.data.userId == request.auth.uid
@@ -274,11 +301,17 @@ service cloud.firestore {
       }
 
       match /notes/{noteId} {
-        allow read, write: if canManageEventTree(eventId);
+        // Somente admins do evento podem ler/escrever anotações do organizador
+        allow read: if canManageEventTree(eventId);
+        // Limite de 10 campos por documento de nota (evitar crescimento ilimitado do doc)
+        allow write: if canManageEventTree(eventId)
+          && (
+            !('fields' in request.resource.data)
+            || (request.resource.data.fields is list && request.resource.data.fields.size() <= 10)
+          );
       }
     }
 
-    // =========================================================
     // GUEST PARTICIPATIONS
     // =========================================================
     match /guestParticipations/{docId} {
@@ -302,26 +335,29 @@ service cloud.firestore {
           );
       }
 
-      // LEITURA
+      // LEITURA: Apenas participantes confirmados ou administradores podem ver os dados de participação.
       allow get: if signedIn() && (
         isParticipationOwner()
         || (resource != null && resource.data.get('eventId', null) != null && canReadEventTree(resource.data.eventId))
       );
       
       allow list: if signedIn() && (
-        (resource.data.userId == request.auth.uid)
+        (isParticipationOwner())
         || (resource.data.get('eventId', null) != null && canReadEventTree(resource.data.eventId))
       );
 
       // CRIAÇÃO
       allow create: if signedIn() && (
-        // Opção 1: User criando pra si mesmo (padrão)
+        // Opção 1: User criando pra si mesmo (padrão: docId = uid_eventId)
         (
           docId == (request.auth.uid + "_" + request.resource.data.eventId)
           && request.resource.data.userId == request.auth.uid
           && eventExists(request.resource.data.eventId)
         )
-        // Opção 2: Admin do evento criando convidado manual
+        // Opção 2: Admin do evento criando convidado manual.
+        // ⚠️ Convidados manuais usam docId = manual_{ts}_{rand} e userId = manual_{ts}.
+        // Isso é intencional: não possuem UID real do Firebase Auth.
+        // A segurança é garantida por canManageEventTree (dono/subadmin do evento).
         || (
           canManageEventTree(request.resource.data.eventId)
         )
@@ -358,12 +394,43 @@ service cloud.firestore {
       allow list: if false;
       allow write: if signedIn() && uid == request.auth.uid;
     }
-
     // =========================================================
     // Default deny
     // =========================================================
     match /{document=**} {
       allow read, write: if false;
     }
+
+    match /reports/{reportId} {
+      function eventDoc(eid) {
+        return get(/databases/$(database)/documents/events/$(eid));
+      }
+
+      function canManageReport(eid) {
+        let d = eventDoc(eid).data;
+        return d.userId == request.auth.uid
+          || (d.get('subAdminsByUid', {})[request.auth.uid] == 'Super Admin');
+      }
+
+      // Apenas participantes autorizados do evento podem criar denúncias
+      allow create: if request.auth != null 
+        && request.resource.data.reportedBy == request.auth.uid
+        && request.resource.data.eventId != null
+        && (
+          eventDoc(request.resource.data.eventId).data.userId == request.auth.uid
+          || (eventDoc(request.resource.data.eventId).data.get('subAdminsByUid', {})[request.auth.uid] in ['Super Admin', 'Admin parcial'])
+          || exists(/databases/$(database)/documents/guestParticipations/$(request.auth.uid + '_' + request.resource.data.eventId))
+        );
+      
+      // Apenas admins dos eventos podem ler e modificar denúncias
+      allow read, update, delete: if request.auth != null && canManageReport(resource.data.eventId);
+    }
+
+    // ✅ Nova regra para fotos bloqueadas
+    match /users/{userId}/blockedPhotos/{photoId} {
+      allow read: if request.auth.uid == userId;
+      allow write: if request.auth.uid == userId;
+    }
+
   }
 }

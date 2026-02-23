@@ -66,24 +66,35 @@ export default function QRScannerScreen() {
   }));
 
   const handleBarCodeScanned = (scanningResult: BarcodeScanningResult) => {
-    const qrData = JSON.parse(scanningResult.data);
     if (scanned) return;
 
     setScanned(true);
     try {
+      // Tenta parsear como JSON
+      let qrData;
+      try {
+        qrData = JSON.parse(scanningResult.data);
+      } catch (e) {
+        // Se falhar o parse, não é um JSON válido do nosso app
+        throw new Error('Formato inválido');
+      }
+
       const k =
-        typeof qrData.shareKey === 'string' ? qrData.shareKey.trim() : '';
+        typeof qrData === 'object' && qrData !== null && typeof qrData.shareKey === 'string' 
+          ? qrData.shareKey.trim() 
+          : '';
+          
       if (!k) {
-        Alert.alert('Erro', 'QR Code inválido');
+        Alert.alert('Aviso', 'Este QR Code não é um convite válido.');
       } else {
         router.replace({ pathname: '/(auth)/invite-preview', params: { k } });
       }
     } catch (error) {
-      Alert.alert('Erro', 'QR Code inválido');
+      Alert.alert('Aviso', 'Este QR Code não é um convite válido.');
     } finally {
       scanTimeoutRef.current = setTimeout(() => {
         setScanned(false);
-      }, 1000);
+      }, 2000); // Aumentei um pouco o tempo para não ficar "pipocando" alerta
     }
   };
 

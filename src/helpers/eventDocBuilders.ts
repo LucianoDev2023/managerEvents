@@ -37,6 +37,12 @@ export function buildEventCreateDoc(
     subAdminsByUid,
     subAdminUids,
 
+    // ✅ Novos campos administrativos
+    targetBudget: data.targetBudget ?? 0,
+    financials: data.financials ?? [],
+    tasks: data.tasks ?? [],
+    buffet: data.buffet ?? [],
+
     // datas
     startDate: Timestamp.fromDate(new Date(data.startDate)),
     endDate: Timestamp.fromDate(new Date(data.endDate)),
@@ -61,6 +67,12 @@ export function buildEventUpdateDoc(event: Event) {
     // ✅ mantém shareKey se existir no objeto "event"
     // (se você não mandar shareKey no updateEvent, isso não altera nada)
     ...(event.shareKey ? { shareKey: event.shareKey } : {}),
+
+    // ✅ Novos campos administrativos
+    targetBudget: event.targetBudget ?? 0,
+    financials: event.financials ?? [],
+    tasks: event.tasks ?? [],
+    buffet: event.buffet ?? [],
 
     titleLower,
 

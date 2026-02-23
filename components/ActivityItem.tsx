@@ -6,23 +6,22 @@ import {
   TouchableOpacity,
   Pressable,
   Platform,
+  useColorScheme,
 } from 'react-native';
-import { ChevronRight, Clock, Edit, LucideCamera } from 'lucide-react-native';
+import { ChevronRight, Clock, Edit, LucideCamera, Plus } from 'lucide-react-native';
 import Colors from '@/constants/Colors';
-import { useColorScheme } from 'react-native';
 import type { Activity, PermissionLevel } from '@/types';
 import { router } from 'expo-router';
 import { getAuth } from 'firebase/auth';
-import { scheduleNotification } from '@/lib/utils/notifications';
+import Fonts from '@/constants/Fonts';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 
 interface ActivityItemProps {
   activity: Activity;
   eventId: string;
   programId: string;
-
   creatorUid: string;
   subAdminsByUid?: Record<string, PermissionLevel>;
-
   programDate: string | Date;
 }
 
@@ -34,22 +33,18 @@ export default function ActivityItem({
   subAdminsByUid = {},
   programDate,
 }: ActivityItemProps) {
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = (useColorScheme() ?? 'dark') as 'light' | 'dark';
   const colors = Colors[colorScheme];
 
   const myUid = getAuth().currentUser?.uid ?? '';
 
   const hasPermission = useMemo(() => {
     if (!myUid) return false;
-
     const isCreator = creatorUid === myUid;
-
     const level = subAdminsByUid?.[myUid];
-    // Se PermissionLevel for union type, prefira o includes direto (caminho B).
     const levelNorm = String(level ?? '').toLowerCase();
     const isSubAdmin =
       levelNorm === 'super admin' || levelNorm === 'admin parcial';
-
     return isCreator || isSubAdmin;
   }, [myUid, creatorUid, subAdminsByUid]);
 
@@ -74,120 +69,199 @@ export default function ActivityItem({
   };
 
   return (
-    <Pressable
-      onPress={handleViewPhotos}
-      android_ripple={{ color: colors.primary, borderless: false }}
-      style={({ pressed }) => [
-        styles.cardWrapper,
-        pressed && Platform.OS === 'ios' && { opacity: 0.7 },
-      ]}
-    >
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: colors.background, borderRadius: 10 },
+    <Animated.View entering={FadeInUp.delay(50)}>
+      <Pressable
+        onPress={handleViewPhotos}
+        android_ripple={{ color: colors.primary, borderless: false }}
+        style={({ pressed }) => [
+          styles.cardWrapper,
+          pressed && Platform.OS === 'ios' && { opacity: 0.9, transform: [{ scale: 0.98 }] },
         ]}
       >
-        <View style={styles.header}>
-          <View style={styles.timeContainer}>
-            <Clock size={18} color={colors.primary} />
-            <Text style={[styles.time, { color: colors.text, marginLeft: 6 }]}>
-              {activity.time}
-            </Text>
-
-            <Pressable
-              onPress={() =>
-                scheduleNotification({
-                  title: activity.title,
-                  date: programDate,
-                  time: activity.time,
-                })
-              }
-              style={styles.inlineNotifyButton}
-            >
-              <Text style={styles.inlineNotifyButtonText}>🔔</Text>
-            </Pressable>
-          </View>
-
-          {hasPermission && (
-            <View style={styles.buttonGroup}>
-              <TouchableOpacity
-                onPress={handleAddPhoto}
-                style={styles.iconButton}
-              >
-                <Text style={{ color: colors.textSecondary }}>Adicionar</Text>
-                <LucideCamera size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleEditActivity}
-                style={styles.iconButton}
-              >
-                <Text style={{ color: colors.textSecondary }}>Editar</Text>
-                <Edit size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
+        <View
+          style={[
+            styles.card,
+            { 
+              backgroundColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.9)',
+              borderColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+            },
+          ]}
+        >
+          <View style={styles.header}>
+            <View style={[styles.timeBadge, { backgroundColor: colors.primary + '15' }]}>
+              <Clock size={14} color={colors.primary} />
+              <Text style={[styles.timeText, { color: colors.primary }]}>
+                {activity.time}
+              </Text>
             </View>
-          )}
-        </View>
 
-        <Text style={[styles.title, { color: colors.text }]}>
-          {activity.title}
-        </Text>
-
-        {!!activity.description && (
-          <View style={styles.setaCard}>
-            <Text style={[styles.description, { color: colors.textSecondary }]}>
-              {activity.description}
-            </Text>
-            <ChevronRight size={24} color={colors.primary} />
+            <View style={styles.actions}>
+              {hasPermission && (
+                <View style={styles.adminActions}>
+                  <TouchableOpacity
+                    onPress={handleEditActivity}
+                    style={styles.actionIcon}
+                  >
+                    <Edit size={18} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           </View>
-        )}
 
-        <View style={styles.photoRow}>
-          <LucideCamera size={16} color={colors.textSecondary} />
-          <Text style={[styles.photoCount, { color: colors.textSecondary }]}>
-            {activity.photos?.length || 0}{' '}
-            {activity.photos?.length === 0
-              ? ''
-              : activity.photos?.length === 1
-              ? 'foto'
-              : 'fotos'}
-          </Text>
+          <View style={styles.content}>
+            <View style={styles.titleRow}>
+              <Text style={[styles.titleText, { color: colors.text }]}>
+                {activity.title}
+              </Text>
+              <ChevronRight size={18} color={colors.textSecondary} opacity={0.5} />
+            </View>
+
+            {!!activity.description && (
+              <Text 
+                style={[styles.descriptionText, { color: colors.textSecondary }]}
+                numberOfLines={2}
+              >
+                {activity.description}
+              </Text>
+            )}
+
+            <View style={[styles.footer, { borderTopColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+              <View style={styles.photoCount}>
+                <LucideCamera size={14} color={colors.textSecondary} />
+                <Text style={[styles.photoCountText, { color: colors.textSecondary }]}>
+                  {activity.photos?.length || 0} {activity.photos?.length === 1 ? 'foto' : 'fotos'}
+                </Text>
+              </View>
+
+              {hasPermission && (
+                <TouchableOpacity
+                  onPress={handleAddPhoto}
+                  activeOpacity={0.7}
+                  style={[styles.addPhotoButton, { borderColor: colors.primary + '40' }]}
+                >
+                  <Plus size={14} color={colors.primary} />
+                  <Text style={[styles.addPhotoText, { color: colors.primary }]}>Adicionar Foto</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { padding: 14, paddingLeft: 18, margin: 2, marginHorizontal: 14 },
+  cardWrapper: {
+    marginHorizontal: 16,
+    marginVertical: 6,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  card: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 1,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 10,
   },
-  timeContainer: { flexDirection: 'row', alignItems: 'center' },
-  time: { marginLeft: 4, fontSize: 14, fontFamily: 'Inter-Medium' },
-  buttonGroup: { flexDirection: 'row', alignItems: 'center' },
-  iconButton: { alignItems: 'center', padding: 4, marginLeft: 8 },
-  title: { fontSize: 16, fontFamily: 'Inter-Bold', marginBottom: 4 },
-  description: { fontSize: 14, fontFamily: 'Inter-Regular', lineHeight: 20 },
-  cardWrapper: { borderRadius: 10, overflow: 'hidden' },
-  setaCard: {
+  timeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(110, 86, 207, 0.1)',
+  },
+  timeText: {
+    fontSize: 13,
+    fontFamily: Fonts.bold,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  notifyButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notifyIcon: {
+    fontSize: 14,
+  },
+  adminActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionIcon: {
+    padding: 6,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderRadius: 8,
+  },
+  content: {
+    gap: 4,
+  },
+  titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  photoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  photoCount: { marginLeft: 6, fontSize: 14, fontFamily: 'Inter-Regular' },
-  inlineNotifyButton: {
-    marginLeft: 12,
-    backgroundColor: '#6e56cf',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+  titleText: {
+    fontSize: 17,
+    fontFamily: Fonts.bold,
+    flex: 1,
   },
-  inlineNotifyButtonText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  descriptionText: {
+    fontSize: 14,
+    fontFamily: Fonts.regular,
+    lineHeight: 20,
+    marginTop: 2,
+    opacity: 0.8,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  photoCount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  photoCountText: {
+    fontSize: 13,
+    fontFamily: Fonts.medium,
+  },
+  addPhotoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: 'rgba(110, 86, 207, 0.03)',
+  },
+  addPhotoText: {
+    fontSize: 12,
+    fontFamily: Fonts.semiBold,
+  },
 });

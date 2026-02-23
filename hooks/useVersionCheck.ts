@@ -3,7 +3,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import Constants from 'expo-constants';
 import { Alert, Linking, Platform } from 'react-native';
-import logger from '@/lib/logger';
+import { logger } from '@/lib/logger';
 
 type VersionConfig = {
   minVersion: string;
@@ -34,6 +34,10 @@ export function useVersionCheck(enableInDev = true) {
         setIsChecking(false);
         return;
       }
+
+      Linking.addEventListener('url', (event) => {
+        // Log deep links only in debug if needed
+      });
 
       try {
         const appVersion = Constants.expoConfig?.version || '1.0.0';

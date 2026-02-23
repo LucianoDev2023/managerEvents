@@ -12,6 +12,7 @@ import {
   Pressable,
   Image,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useColorScheme } from 'react-native';

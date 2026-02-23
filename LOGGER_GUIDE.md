@@ -11,7 +11,7 @@ O sistema de logger foi criado para **desabilitar automaticamente logs de debug 
 ### Importar o Logger
 
 ```typescript
-import logger from '@/lib/logger';
+import { logger } from '@/lib/logger';
 ```
 
 ### Métodos Disponíveis

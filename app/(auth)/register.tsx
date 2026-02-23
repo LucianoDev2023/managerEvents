@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,11 @@ import {
   ActivityIndicator,
   Pressable,
   Alert,
+  useColorScheme,
+  Image,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import Colors from '@/constants/Colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -19,17 +23,22 @@ import {
   linkWithCredential,
   User,
 } from 'firebase/auth';
+import { Eye, EyeOff } from 'lucide-react-native';
 import { auth } from '@/config/firebase';
 import { useRegistrationFlow } from '@/context/RegistrationFlowContext';
 import { useEvents } from '@/context/EventsContext';
-import { doc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/config/firebase';
-import { serverTimestamp } from 'firebase/firestore';
 import * as WebBrowser from 'expo-web-browser';
 import { LEGAL_URLS } from '@/constants/Legal';
+import { useGoogleAuth } from '@/hooks/useGoogleAuth';
+import { GoogleLoginButton } from '@/components/GoogleLoginButton';
+import Fonts from '@/constants/Fonts';
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
   const { k } = useLocalSearchParams<{ k?: string }>();
   const { setCameFromRegister } = useRegistrationFlow();
   const { fetchEvents } = useEvents();
@@ -38,8 +47,18 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(true);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const { signIn, loading: googleLoading } = useGoogleAuth({
+    onSuccess: (data) => {
+      router.replace({
+        pathname: '/accountCreatedScreen',
+        params: k ? { k } : {},
+      } as any);
+    },
+  });
 
   const PRIVACY_VERSION = 'v1.0';
   const TERMS_VERSION = 'v1.0';
@@ -133,6 +152,7 @@ export default function RegisterScreen() {
         doc(db, 'publicUsers', finalUser.uid),
         {
           uid: finalUser.uid,
+          name: name, // ✅ Adiciona o nome ao índice público para resolução na galeria
           updatedAt: serverTimestamp(),
         },
         { merge: true },
@@ -143,8 +163,7 @@ export default function RegisterScreen() {
       // ✅ Foça reload dos eventos para garantir que o contexto atualize com o usuário "convertido"
       try {
         await fetchEvents();
-      } catch (e) {
-      }
+      } catch (e) {}
 
       router.replace({
         pathname: '/accountCreatedScreen',
@@ -160,47 +179,92 @@ export default function RegisterScreen() {
 
   return (
     <LinearGradient
-      colors={['#0b0b0f', '#1b0033', '#3e1d73']}
+      colors={colors.gradients}
       locations={[0, 0.7, 1]}
       style={styles.container}
     >
-      <Text style={styles.title}>Criar Conta</Text>
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      <Text style={[styles.title, { color: colors.text }]}>Criar Conta</Text>
 
       <TextInput
         placeholder="Nome"
-        placeholderTextColor="#aaa"
-        style={styles.input}
+        placeholderTextColor={colors.textSecondary}
+        style={[
+          styles.input,
+          {
+            backgroundColor: colors.backgroundCard,
+            color: colors.text,
+            borderColor: colors.border,
+            borderWidth: 1,
+          },
+        ]}
         value={name}
         onChangeText={setName}
       />
 
       <TextInput
         placeholder="Email"
-        placeholderTextColor="#aaa"
-        style={styles.input}
+        placeholderTextColor={colors.textSecondary}
+        style={[
+          styles.input,
+          {
+            backgroundColor: colors.backgroundCard,
+            color: colors.text,
+            borderColor: colors.border,
+            borderWidth: 1,
+          },
+        ]}
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
       />
 
-      <TextInput
-        placeholder="Senha"
-        placeholderTextColor="#aaa"
-        style={styles.input}
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
+      <View style={styles.passwordContainer}>
+        <TextInput
+          placeholder="Senha"
+          placeholderTextColor={colors.textSecondary}
+          style={[
+            styles.passwordInput,
+            {
+              backgroundColor: colors.backgroundCard,
+              color: colors.text,
+              borderColor: colors.border,
+            },
+          ]}
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={showPassword}
+        />
+        <TouchableOpacity
+          onPress={() => setShowPassword((prev) => !prev)}
+          style={styles.eyeButton}
+        >
+          {showPassword ? (
+            <EyeOff size={20} color={colors.textSecondary} />
+          ) : (
+            <Eye size={20} color={colors.textSecondary} />
+          )}
+        </TouchableOpacity>
+      </View>
 
-      <TextInput
-        placeholder="Confirmar senha"
-        placeholderTextColor="#aaa"
-        style={styles.input}
-        value={confirm}
-        onChangeText={setConfirm}
-        secureTextEntry
-      />
+      <View style={styles.passwordContainer}>
+        <TextInput
+          placeholder="Confirmar senha"
+          placeholderTextColor={colors.textSecondary}
+          style={[
+            styles.passwordInput,
+            {
+              backgroundColor: colors.backgroundCard,
+              color: colors.text,
+              borderColor: colors.border,
+            },
+          ]}
+          value={confirm}
+          onChangeText={setConfirm}
+          secureTextEntry={showPassword}
+        />
+      </View>
 
       {/* ✅ LGPD: aceite explícito */}
       <Pressable
@@ -208,19 +272,25 @@ export default function RegisterScreen() {
         onPress={() => setAcceptedTerms((prev) => !prev)}
       >
         <View
-          style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}
+          style={[
+            styles.checkbox,
+            { borderColor: colors.primary },
+            acceptedTerms && { backgroundColor: colors.primary },
+          ]}
         />
-        <Text style={styles.checkboxText}>
+        <Text style={[styles.checkboxText, { color: colors.textSecondary }]}>
           Li e aceito a{' '}
           <Text
-            style={styles.link}
-            onPress={() => WebBrowser.openBrowserAsync(LEGAL_URLS.PRIVACY_POLICY)}
+            style={[styles.link, { color: colors.primary }]}
+            onPress={() =>
+              WebBrowser.openBrowserAsync(LEGAL_URLS.PRIVACY_POLICY)
+            }
           >
             Política de Privacidade
           </Text>{' '}
           e os{' '}
           <Text
-            style={styles.link}
+            style={[styles.link, { color: colors.primary }]}
             onPress={() => WebBrowser.openBrowserAsync(LEGAL_URLS.TERMS_OF_USE)}
           >
             Termos de Uso
@@ -231,20 +301,36 @@ export default function RegisterScreen() {
 
       <TouchableOpacity
         onPress={handleRegister}
-        style={styles.registerButton}
+        style={[styles.registerButton, { backgroundColor: colors.primary }]}
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={colors.textOnPrimary} />
         ) : (
-          <Text style={styles.registerText}>Registrar</Text>
+          <Text style={[styles.registerText, { color: colors.textOnPrimary }]}>
+            Registrar
+          </Text>
         )}
       </TouchableOpacity>
 
-      <Text style={styles.bottomText}>
+      <View style={styles.divider}>
+        <View style={[styles.line, { backgroundColor: colors.border }]} />
+        <Text style={[styles.dividerText, { color: colors.textSecondary }]}>
+          ou
+        </Text>
+        <View style={[styles.line, { backgroundColor: colors.border }]} />
+      </View>
+
+      <GoogleLoginButton
+        onPress={signIn}
+        loading={googleLoading}
+        disabled={loading}
+      />
+
+      <Text style={[styles.bottomText, { color: colors.textSecondary }]}>
         Já tem uma conta?{' '}
         <Text
-          style={styles.signInText}
+          style={[styles.signInText, { color: colors.primary }]}
           onPress={() => router.push('/(auth)/login')}
         >
           Fazer login
@@ -264,19 +350,18 @@ const styles = StyleSheet.create({
     paddingRight: 40,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#fff',
+    fontSize: 32,
+    fontFamily: Fonts.bold,
     marginBottom: 28,
   },
   input: {
-    backgroundColor: '#1f1f25',
-    color: '#fff',
     width: '100%',
-    borderRadius: 12,
+    borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 16,
     marginBottom: 14,
+    borderWidth: 1,
+    fontFamily: Fonts.regular,
   },
 
   checkboxContainer: {
@@ -298,20 +383,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#b18aff',
   },
   checkboxText: {
-    color: 'rgba(255,255,255,0.8)',
     fontSize: 12,
-    lineHeight: 16,
+    lineHeight: 18,
     flex: 1,
+    fontFamily: Fonts.medium,
   },
   link: {
-    color: '#b18aff',
     textDecorationLine: 'underline',
-    fontWeight: '600',
+    fontFamily: Fonts.bold,
   },
 
   registerButton: {
-    backgroundColor: '#b18aff',
-    borderRadius: 25,
+    borderRadius: 16,
     width: '100%',
     paddingVertical: 14,
     alignItems: 'center',
@@ -319,15 +402,48 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   registerText: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: Fonts.bold,
   },
   bottomText: {
-    color: '#aaa',
     fontSize: 14,
+    fontFamily: Fonts.medium,
   },
   signInText: {
-    color: '#b18aff',
+    fontFamily: Fonts.bold,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 14,
+    width: '100%',
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  dividerText: {
+    paddingHorizontal: 10,
+    fontSize: 14,
+    fontFamily: Fonts.medium,
+  },
+  passwordContainer: {
+    width: '100%',
+    position: 'relative',
+    marginBottom: 14,
+  },
+  passwordInput: {
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingRight: 45,
+    borderWidth: 1,
+    fontFamily: Fonts.regular,
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 12,
+    top: 10,
   },
 });

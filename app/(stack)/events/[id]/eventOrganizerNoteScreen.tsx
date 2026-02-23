@@ -9,11 +9,13 @@ import {
   TextInput as RNTextInput,
   Pressable,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 import Colors from '@/constants/Colors';
 import { auth, db } from '@/config/firebase';
+import Fonts from '@/constants/Fonts';
+import { logger } from '@/lib/logger';
 import TextInput from '@/components/ui/TextInput';
 import Button from '@/components/ui/Button';
 
@@ -45,6 +47,15 @@ export default function EventOrganizerNoteScreen() {
           ? snap.data()?.fields
           : [];
 
+      // Limite de 10 anotações por evento
+      if (existingFields.length >= 10) {
+        Alert.alert(
+          'Limite atingido',
+          'Você já tem 10 anotações neste evento. Remova uma antes de adicionar outra.',
+        );
+        return;
+      }
+
       const updatedFields = [...existingFields, { label: label.trim(), value }];
 
       await setDoc(
@@ -59,7 +70,7 @@ export default function EventOrganizerNoteScreen() {
       Alert.alert('Sucesso', 'Anotação adicionada!');
       router.push(`/events/${eventId}/eventOrganizerNoteViewScreen`);
     } catch (error) {
-      console.error('Erro ao salvar anotação:', error);
+      logger.error('Erro ao salvar anotação:', error);
       Alert.alert('Erro', 'Não foi possível salvar a anotação.');
     } finally {
       setIsSaving(false);
@@ -73,85 +84,48 @@ export default function EventOrganizerNoteScreen() {
         { backgroundColor: colors.background },
       ]}
     >
-      <Text style={[styles.title, { color: colors.text }]}>Nova Anotação</Text>
+      <Stack.Screen options={{ title: 'Nova Anotação' }} />
+      
+      <View style={styles.formCard}>
+        <TextInput
+          label="Título"
+          placeholder="Ex: Reunião com Buffet"
+          value={label}
+          onChangeText={setLabel}
+        />
 
-      <RNTextInput
-        placeholder="Assunto"
-        placeholderTextColor={colors.textSecondary}
-        value={label}
-        onChangeText={setLabel}
-        style={[
-          styles.labelInput,
-          {
-            color: colors.text,
-            borderColor: colors.border,
-            backgroundColor: colors.background,
-          },
-        ]}
-      />
+        <TextInput
+          label="Conteúdo"
+          value={value}
+          onChangeText={setValue}
+          placeholder="Digite os detalhes da anotação..."
+          multiline
+          numberOfLines={6}
+          inputStyle={{
+            minHeight: 120,
+            textAlignVertical: 'top',
+          }}
+        />
 
-      <TextInput
-        value={value}
-        onChangeText={setValue}
-        placeholder="Digite a anotação"
-        inputStyle={{
-          color: colors.text,
-          minHeight: 100,
-          textAlignVertical: 'top',
-        }}
-        multiline
-      />
-
-      <View style={{ height: 16 }} />
-      <Pressable
-        onPress={handleSave}
-        disabled={isSaving}
-        style={[
-          styles.saveButton,
-          {
-            backgroundColor: isSaving ? colors.primary + '99' : colors.primary,
-            opacity: isSaving ? 0.7 : 1,
-          },
-        ]}
-      >
-        <Text style={[styles.saveButtonText]}>
-          {isSaving ? 'Salvando...' : 'Salvar anotação'}
-        </Text>
-      </Pressable>
+        <View style={{ marginTop: 24 }}>
+          <Button 
+            title="Salvar Anotação" 
+            onPress={handleSave} 
+            loading={isSaving} 
+            fullWidth
+          />
+        </View>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flexGrow: 1,
     padding: 20,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  labelInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    fontSize: 15,
-    marginBottom: 4,
-  },
-  saveButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
+  formCard: {
     marginTop: 10,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 });

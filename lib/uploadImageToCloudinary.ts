@@ -1,7 +1,7 @@
 import type { ImagePickerAsset } from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { getCloudinarySignature } from '@/lib/getCloudinarySignature';
-import logger from '@/lib/logger';
+import { logger } from '@/lib/logger';
 
 type UploadOpts = {
   eventId: string;

@@ -1,3 +1,44 @@
+import { getAuth } from 'firebase/auth';
+import { logger } from '@/lib/logger';
+
+const SIGN_BASE_URL = 'https://api.iafast.com.br';
+
+/**
+ * Deletes an image from Cloudinary via the backend proxy.
+ */
+export async function destroyCloudinaryImage(publicId: string | null | undefined) {
+  if (!publicId) return;
+
+  try {
+    const user = getAuth().currentUser;
+    if (!user) throw new Error('Usuário não autenticado');
+
+    const token = await user.getIdToken(true);
+    const url = `${SIGN_BASE_URL}/api/cloudinary/destroy`;
+
+    logger.debug(`[Cloudinary] 🗑️ Solicitando exclusão da imagem: ${publicId}`);
+    
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ publicId }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      logger.error('[Cloudinary] ❌ Falha ao excluir imagem:', errorData);
+      return; // Falha silenciosa para não travar o fluxo de exclusão principal
+    }
+
+    logger.debug(`[Cloudinary] ✅ Imagem excluída com sucesso: ${publicId}`);
+  } catch (error) {
+    logger.error('[Cloudinary] ❌ Erro inesperado ao excluir imagem:', error);
+  }
+}
+
 /**
  * Cloudinary image optimization utility
  */

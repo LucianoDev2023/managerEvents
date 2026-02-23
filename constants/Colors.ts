@@ -1,6 +1,6 @@
 export default {
   light: {
-    background: '#ffffff',
+    background: '#f8f9fa',
     backgroundSecondary: '#f0f0ff',
     backgroundCard: '#f8f8ff',
     backgroundComments: '#ffffff',
@@ -13,6 +13,8 @@ export default {
     textMaps: '#eeeeee',
     primaryLight: '#b9b6ff',
     error: '#e63946',
+    success: '#2e7d32',
+    warning: '#ed6c02',
     backgroundPhotos: '#f2f2f5',
     gradients: ['#ffffff', '#f0f0ff', '#e9e6ff'] as const,
   },
@@ -30,6 +32,8 @@ export default {
     primaryDark: '#483887',
     primaryLight: '#6e56cf',
     error: '#f44336',
+    success: '#66bb6a',
+    warning: '#ffa726',
     backgroundPhotos: '#2d2442',
     gradients: ['#0b0b0f', '#1b0033', '#3e1d73'] as const,
   },

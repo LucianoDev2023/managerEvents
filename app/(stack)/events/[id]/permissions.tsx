@@ -16,8 +16,10 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
 import { useColorScheme } from 'react-native';
 import Colors from '@/constants/Colors';
-import { MapPin, Pencil, Trash2 } from 'lucide-react-native';
+import { MapPin, Edit, Trash2, Shield, Search, Users, X, Plus } from 'lucide-react-native';
+import Fonts from '@/constants/Fonts';
 import Button from '@/components/ui/Button';
+import { logger } from '@/lib/logger';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { getAuth } from 'firebase/auth';
@@ -196,7 +198,7 @@ export default function PermissionConfirmationScreen() {
 
       setGuestParts(normalized);
     } catch (e) {
-      console.error('loadGuestsaas', e);
+      logger.error('loadGuestsaas', e);
       Alert.alert('Erro', 'Não foi possível carregar os convidados.');
       setGuestParts([]);
     } finally {
@@ -458,23 +460,6 @@ export default function PermissionConfirmationScreen() {
           </View>
         </Pressable>
 
-        {/* Header Permissões */}
-        <View style={{ paddingHorizontal: 12, marginTop: 10 }}>
-          {canManage && (
-            <Button
-              title="Add Permissão"
-              onPress={openAdd}
-              style={{
-                backgroundColor: colors.primary,
-                alignSelf: 'flex-end',
-                paddingHorizontal: 16,
-                paddingVertical: 8,
-                borderRadius: 10,
-              }}
-              textStyle={{ color: '#fff' }}
-            />
-          )}
-        </View>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           Permissões Atribuídas
@@ -552,7 +537,7 @@ export default function PermissionConfirmationScreen() {
                         onPress={() => openEdit(uid, level)}
                         style={{ padding: 6 }}
                       >
-                        <Pencil size={20} color={colors.primary} />
+                        <Edit size={20} color={colors.primary} />
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -572,6 +557,18 @@ export default function PermissionConfirmationScreen() {
         </View>
       </ScrollView>
 
+      {/* Floating Action Button */}
+      {canManage && (
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: colors.primary }]}
+          onPress={openAdd}
+          activeOpacity={0.8}
+        >
+          <Plus size={24} color="white" />
+          <Text style={styles.fabText}>Novo</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Modal: escolher nível + salvar */}
       <Modal
         visible={modalVisible}
@@ -585,38 +582,48 @@ export default function PermissionConfirmationScreen() {
           <Animated.View
             entering={FadeIn}
             exiting={FadeOut}
-            style={styles.animatedContainer}
+            style={styles.modalContentWrapper}
           >
             <LinearGradient
               colors={gradientColors}
               locations={[0, 0.7, 1]}
               style={[styles.modalContent, { borderColor: colors.primary }]}
             >
-              <Text style={[styles.modalTitle, { color: colors.primary }]}>
-                🔐 Permissões
-              </Text>
+                <View style={[styles.roleInfoBox, { backgroundColor: colors.background + '80', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border }]}>
+                  <View style={{ marginBottom: 16 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <Shield size={16} color={colors.primary} />
+                      <Text style={{ fontWeight: 'bold', color: colors.primary, fontSize: 14 }}>Super Admin</Text>
+                    </View>
+                    <Text style={[styles.roleInfoText, { color: colors.textSecondary, fontSize: 13 }]}>
+                      • Controle total e gestão de equipe{"\n"}
+                      • <Text style={{ fontWeight: '600', color: colors.text }}>Pode editar</Text> tudo: título, local, datas, desc. e capa{"\n"}
+                      • <Text style={{ fontWeight: '600', color: colors.error }}>Não pode apagar</Text> o evento
+                    </Text>
+                  </View>
 
-              <Text style={[styles.modalText, { color: colors.text }]}>
-                <Text style={[styles.roleHighlight, { color: colors.primary }]}>
-                  Super admin:
-                </Text>{' '}
-                Controle total e gerenciamento de permissões.
-              </Text>
+                  <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <Shield size={16} color={colors.primary} opacity={0.6} />
+                      <Text style={{ fontWeight: 'bold', color: colors.primary, fontSize: 14, opacity: 0.8 }}>Admin Parcial</Text>
+                    </View>
+                    <Text style={[styles.roleInfoText, { color: colors.textSecondary, fontSize: 13 }]}>
+                      • Gestão de programação e fotos{"\n"}
+                      • <Text style={{ fontWeight: '600', color: colors.text }}>Pode editar</Text> info básica: título, local, datas e capa{"\n"}
+                      • <Text style={{ fontWeight: '600', color: colors.error }}>Sem permissão</Text> para apagar o evento
+                    </Text>
+                  </View>
+                </View>
 
-              <Text style={[styles.modalText, { color: colors.text }]}>
-                <Text style={[styles.roleHighlight, { color: colors.primary }]}>
-                  Admin parcial:
-                </Text>{' '}
-                Pode adicionar programas, atividades e fotos (conforme regras do
-                app).
-              </Text>
+                {/* Divider */}
+                <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 20, width: '100%' }} />
 
-              <Text style={[styles.modalSubtitle, { color: colors.text }]}>
-                👥 {editingUid ? 'Editar permissão' : 'Adicionar permissão'}
-              </Text>
+                <Text style={{ fontSize: 16, fontFamily: Fonts.bold, color: colors.text, marginBottom: 12, textAlign: 'center' }}>
+                   {editingUid ? '⚙️ Ajustar Acesso' : '✨ Atribuir Novo Acesso'}
+                </Text>
 
-              <Text style={[styles.modalLabel, { color: colors.text }]}>
-                Tipo de permissão
+              <Text style={[styles.modalLabel, { color: colors.text, marginTop: 12 }]}>
+                Nível de acesso
               </Text>
 
               <View style={styles.toggleRow}>
@@ -635,9 +642,9 @@ export default function PermissionConfirmationScreen() {
                         styles.toggleBtn,
                         {
                           backgroundColor:
-                            permissionLevel === lvl ? '#471C7A' : 'transparent',
+                            permissionLevel === lvl ? colors.primary : 'transparent',
                           borderColor:
-                            permissionLevel === lvl ? '#471C7A' : colors.border,
+                            permissionLevel === lvl ? colors.primary : colors.border,
                         },
                       ]}
                     >
@@ -645,6 +652,7 @@ export default function PermissionConfirmationScreen() {
                         style={{
                           color: permissionLevel === lvl ? '#fff' : colors.text,
                           fontWeight: '600',
+                          fontSize: 13,
                         }}
                       >
                         {lvl}
@@ -653,13 +661,13 @@ export default function PermissionConfirmationScreen() {
                   ))}
               </View>
 
-              <View style={styles.buttonRow}>
+              <View style={[styles.modalActions, { marginTop: 24 }]}>
                 <Button
                   title="Cancelar"
                   variant="cancel"
                   onPress={closePermissionModal}
                   disabled={saving}
-                  style={{ flex: 1, marginRight: 8, opacity: saving ? 0.7 : 1 }}
+                  style={{ flex: 1 }}
                   textStyle={{ color: 'white' }}
                 />
 
@@ -669,8 +677,7 @@ export default function PermissionConfirmationScreen() {
                   disabled={saving}
                   style={{
                     backgroundColor: colors.primary,
-                    flex: 1,
-                    opacity: saving ? 0.7 : 1,
+                    flex: 1.5,
                   }}
                   textStyle={{ color: '#fff' }}
                 />
@@ -681,17 +688,12 @@ export default function PermissionConfirmationScreen() {
                   style={{
                     ...StyleSheet.absoluteFillObject,
                     backgroundColor: 'rgba(0,0,0,0.35)',
-                    borderRadius: 18,
+                    borderRadius: 24,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
                   <ActivityIndicator size="large" color="#fff" />
-                  <Text
-                    style={{ color: '#fff', marginTop: 10, fontWeight: '600' }}
-                  >
-                    Salvando…
-                  </Text>
                 </View>
               )}
             </LinearGradient>
@@ -702,188 +704,145 @@ export default function PermissionConfirmationScreen() {
       {/* Modal: selecionar convidado */}
       <Modal visible={selectGuestModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.selectCard,
-              {
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-              },
-            ]}
+          <Animated.View 
+            entering={FadeIn} 
+            exiting={FadeOut}
+            style={styles.modalContentWrapper}
           >
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Selecionar convidado
-            </Text>
-
             <View
-              style={{
-                marginTop: 10,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 12,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                backgroundColor: colors.backgroundSecondary,
-              }}
+              style={[
+                styles.selectCard,
+                {
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                  padding: 24,
+                  borderRadius: 24,
+                  width: '100%',
+                },
+              ]}
             >
-              <Text
+              <View style={[styles.modalHeader, { justifyContent: 'space-between', width: '100%' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Users size={24} color={colors.primary} />
+                  <Text style={[styles.modalTitle, { color: colors.text, marginBottom: 0 }]}>
+                    Convidados
+                  </Text>
+                </View>
+                <Pressable onPress={() => setSelectGuestModal(false)}>
+                  <X size={20} color={colors.textSecondary} />
+                </Pressable>
+              </View>
+
+              <View
                 style={{
-                  color: colors.textSecondary,
-                  fontSize: 12,
-                  marginBottom: 6,
-                  fontWeight: '600',
+                  marginTop: 16,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  backgroundColor: colors.backgroundSecondary,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
                 }}
               >
-                Buscar por nome / status
-              </Text>
-
-              <TextInput
-                value={guestQuery}
-                onChangeText={setGuestQuery}
-                placeholder="Ex: João, confirmado..."
-                placeholderTextColor={colors.textSecondary}
-                style={{ fontSize: 14, paddingVertical: 6, color: colors.text }}
-              />
-            </View>
-
-            {guestsLoading ? (
-              <View style={{ marginTop: 16 }}>
-                <ActivityIndicator />
+                <Search size={18} color={colors.textSecondary} />
+                <TextInput
+                  value={guestQuery}
+                  onChangeText={setGuestQuery}
+                  placeholder="Buscar por nome ou status..."
+                  placeholderTextColor={colors.textSecondary}
+                  style={{ flex: 1, fontSize: 14, color: colors.text, fontFamily: Fonts.regular }}
+                />
               </View>
-            ) : allGuestsCount === 0 ? (
-              <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
-                Nenhum convidado encontrado. (Somente quem confirmou/acompanhou
-                aparece aqui.)
-              </Text>
-            ) : selectableCount === 0 ? (
-              <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
-                Não há usuários disponíveis para adicionar permissões.
-                {'\n'}
-                Todos os convidados listados já possuem permissão (veja em
-                “Permissões Atribuídas” para editar/remover).
-              </Text>
-            ) : (
-              <ScrollView style={{ maxHeight: 340, marginTop: 12 }}>
-                {selectableGuests.map((p) => {
-                  const label =
-                    p.userName?.trim() ||
-                    (p.userId === userUid ? '(Você)' : 'Usuário');
 
-                  const subtitle =
-                    p.mode === 'confirmado'
-                      ? 'Confirmado'
-                      : p.mode === 'acompanhando'
-                        ? 'Acompanhando'
-                        : 'Interessado';
+              {guestsLoading ? (
+                <View style={{ marginTop: 24, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                </View>
+              ) : allGuestsCount === 0 ? (
+                <Text style={{ color: colors.textSecondary, marginTop: 20, textAlign: 'center', fontFamily: Fonts.regular }}>
+                  Nenhum convidado encontrado.
+                </Text>
+              ) : selectableCount === 0 ? (
+                <Text style={{ color: colors.textSecondary, marginTop: 20, textAlign: 'center', fontFamily: Fonts.regular, fontSize: 13, lineHeight: 18 }}>
+                  Não há mais convidados disponíveis para adicionar permissões.
+                </Text>
+              ) : (
+                <ScrollView style={{ maxHeight: 300, marginTop: 16 }} showsVerticalScrollIndicator={false}>
+                  {selectableGuests.map((p) => {
+                    const label =
+                      p.userName?.trim() ||
+                      (p.userId === userUid ? '(Você)' : 'Usuário');
 
-                  const selected = selectedGuestUid === p.userId;
+                    const subtitle =
+                      p.mode === 'confirmado'
+                        ? 'Confirmado'
+                        : p.mode === 'acompanhando'
+                          ? 'Acompanhando'
+                          : 'Pendente';
 
-                  const selectedBg =
-                    colorScheme === 'dark'
-                      ? 'rgba(177, 138, 255, 0.12)'
-                      : 'rgba(110, 86, 207, 0.08)';
+                    const selected = selectedGuestUid === p.userId;
+                    const selectedBg = colorScheme === 'dark' ? 'rgba(177, 138, 255, 0.1)' : 'rgba(110, 86, 207, 0.05)';
 
-                  return (
-                    <Pressable
-                      key={p.userId}
-                      onPress={() => {
-                        setSelectedGuestUid(p.userId);
-                        setSelectedGuestLabel(label);
-                      }}
-                      style={[
-                        styles.guestRow,
-                        {
-                          borderColor: selected
-                            ? colors.primary
-                            : colors.border,
-                          backgroundColor: selected
-                            ? selectedBg
-                            : 'transparent',
-                        },
-                      ]}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={{ color: colors.text, fontWeight: '700' }}
-                          numberOfLines={1}
-                        >
-                          {label}
-                        </Text>
-                        <Text
-                          style={{ color: colors.textSecondary, marginTop: 2 }}
-                        >
-                          {subtitle}
-                        </Text>
-                      </View>
-
-                      <View
+                    return (
+                      <Pressable
+                        key={p.userId}
+                        onPress={() => {
+                          setSelectedGuestUid(p.userId);
+                          setSelectedGuestLabel(label);
+                        }}
                         style={[
-                          styles.dot,
+                          styles.guestRow,
                           {
-                            backgroundColor: selected
-                              ? colors.primary
-                              : colors.border,
+                            borderColor: selected ? colors.primary : colors.border,
+                            backgroundColor: selected ? selectedBg : 'transparent',
                           },
                         ]}
-                      />
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            )}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: colors.text, fontWeight: '600', fontSize: 14, fontFamily: Fonts.semiBold }}>
+                            {label}
+                          </Text>
+                          <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2, fontFamily: Fonts.regular }}>
+                            {subtitle}
+                          </Text>
+                        </View>
+                        {selected && (
+                          <View style={{ backgroundColor: colors.primary, borderRadius: 10, padding: 2 }}>
+                             <Shield size={12} color="#fff" />
+                          </View>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
 
-            {/* {!!selectedGuestUid && (
-              <View
-                style={[
-                  styles.selectedGuestBox,
-                  { borderColor: colors.border },
-                ]}
-              >
-                <Text style={{ color: colors.text, fontWeight: '700' }}>
-                  Selecionado:
-                </Text>
-                <Text style={{ color: colors.textSecondary, marginTop: 4 }}>
-                  {selectedGuestLabel ||
-                    `Usuário ${shortUid(selectedGuestUid)}`}
-                </Text>
+              <View style={[styles.modalActions, { marginTop: 24 }]}>
+                <Button
+                  title="Fechar"
+                  variant="cancel"
+                  onPress={() => setSelectGuestModal(false)}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  title="Continuar"
+                  onPress={() => {
+                    if (!selectedGuestUid) {
+                      Alert.alert('Aviso', 'Selecione um convidado primeiro.');
+                      return;
+                    }
+                    setSelectGuestModal(false);
+                    setModalVisible(true);
+                  }}
+                  style={{ backgroundColor: colors.primary, flex: 1.5 }}
+                  disabled={!selectedGuestUid}
+                />
               </View>
-            )} */}
-
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-              <Button
-                title="Cancelar"
-                variant="cancel"
-                onPress={() => setSelectGuestModal(false)}
-                style={{ flex: 1 }}
-                textStyle={{ color: '#fff' }}
-              />
-              <Button
-                title="Continuar"
-                onPress={() => {
-                  if (selectableGuests.length === 0) return;
-
-                  if (!selectedGuestUid) {
-                    Alert.alert('Atenção', 'Selecione um convidado.');
-                    return;
-                  }
-
-                  setSelectGuestModal(false);
-                  setEditingUid(null);
-                  setPermissionLevel('Admin parcial');
-                  setModalVisible(true);
-                }}
-                style={{
-                  flex: 1,
-                  backgroundColor:
-                    selectableGuests.length === 0
-                      ? colors.border
-                      : colors.primary,
-                  opacity: selectableGuests.length === 0 ? 0.6 : 1,
-                }}
-                textStyle={{ color: '#fff' }}
-              />
             </View>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </LinearGradient>
@@ -917,21 +876,49 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: 'bold',
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: Fonts.bold,
+  },
+  qrHint: {
+    marginTop: 10,
+    fontSize: 10,
+    opacity: 0.65,
+    textAlign: 'center',
+    fontFamily: 'Inter_400Regular',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    gap: 8,
+  },
+  fabText: {
+    color: 'white',
+    fontSize: 16,
+    fontFamily: Fonts.bold,
   },
 
   location: {
     fontSize: 13,
     marginTop: 4,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: Fonts.regular,
   },
 
   sectionTitle: {
     fontSize: 18,
-    padding: 16,
-    fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontFamily: Fonts.bold,
+    marginTop: 10,
   },
 
   permissionsCard: {
@@ -941,7 +928,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  emptyText: { textAlign: 'center', marginTop: 20, fontSize: 14 },
+  emptyText: { textAlign: 'center', marginTop: 20, fontSize: 14, fontFamily: Fonts.regular },
 
   modalOverlay: {
     flex: 1,
@@ -951,43 +938,70 @@ const styles = StyleSheet.create({
     padding: 24,
   },
 
-  animatedContainer: { width: '100%', maxWidth: 420 },
+  modalContentWrapper: {
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
 
-  modalContent: { borderRadius: 18, padding: 20, borderWidth: 1 },
+  modalContent: {
+    width: '100%',
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+  },
+
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
 
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
+    fontFamily: Fonts.bold,
   },
 
   modalSubtitle: {
     fontSize: 16,
-    fontWeight: '600',
-    marginTop: 20,
-    marginBottom: 10,
+    fontFamily: Fonts.bold,
+    marginBottom: 12,
   },
 
-  modalText: { fontSize: 14, marginBottom: 12, lineHeight: 20 },
+  modalLabel: {
+    fontSize: 14,
+    fontFamily: Fonts.semiBold,
+    marginBottom: 8,
+  },
 
-  roleHighlight: { fontWeight: 'bold' },
+  roleInfoBox: {
+    marginBottom: 8,
+  },
 
-  modalLabel: { fontSize: 14, marginBottom: 8, fontWeight: '600' },
+  roleInfoText: {
+    fontSize: 14,
+    fontFamily: Fonts.regular,
+    lineHeight: 20,
+  },
 
   toggleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+    gap: 12,
+    marginBottom: 8,
   },
 
   toggleBtn: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 12,
+    borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
-    marginRight: 8,
+  },
+
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
   },
 
   buttonRow: { flexDirection: 'row', marginTop: 8 },
@@ -995,7 +1009,7 @@ const styles = StyleSheet.create({
   selectCard: {
     width: '100%',
     maxWidth: 460,
-    borderRadius: 18,
+    borderRadius: 24,
     padding: 16,
     borderWidth: 1,
   },
@@ -1007,7 +1021,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 10,
+    marginBottom: 8,
   },
 
   dot: {

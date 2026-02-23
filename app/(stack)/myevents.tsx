@@ -26,23 +26,45 @@ import { getAuth } from 'firebase/auth';
 import { useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Share2, KeyRound, Heart } from 'lucide-react-native';
+import { logger } from '@/lib/logger';
+import { Share2, KeyRound, Heart, LayoutDashboard, Settings, CalendarX2, CheckSquare, Shield } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import QRCode from 'react-native-qrcode-svg';
 import ViewShot from 'react-native-view-shot';
 import ShareEventButton from '@/components/ShareEventButton';
-
+import EmptyState from '@/components/EmptyState';
+import Fonts from '@/constants/Fonts';
 import Colors from '@/constants/Colors';
 import Button from '@/components/ui/Button';
 import RoleBadge from '@/components/ui/RoleBadge';
+import { Skeleton } from '@/components/ui/Skeleton';
 import type { Event, GuestMode, PermissionLevel } from '@/types/index';
 import { useFollowedEvents } from '@/hooks/useFollowedEvents';
 import { useEvents } from '@/context/EventsContext';
 import { createInviteForEvent } from '@/hooks/inviteService';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const MyEventsSkeleton = () => {
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
+
+  return (
+    <View style={{ paddingHorizontal: 4 }}>
+      {[1, 2, 3].map((i) => (
+        <View key={i} style={[styles.card, { backgroundColor: colors.backgroundCard, borderColor: colors.border, padding: 8 }]}>
+           <Skeleton width="100%" height={140} borderRadius={12} style={{ marginBottom: 12 }} />
+           <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Skeleton width="45%" height={36} borderRadius={20} />
+              <Skeleton width="45%" height={36} borderRadius={20} />
+           </View>
+        </View>
+      ))}
+    </View>
+  );
+};
 
 export default function MyEventsScreen() {
   const router = useRouter();
@@ -73,10 +95,14 @@ export default function MyEventsScreen() {
 
   const isFetchingRef = useRef(false);
   const [allUserEvents, setAllUserEvents] = useState<Event[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
+  // Inicia em true apenas se não houver eventos no state
+  const [loadingEvents, setLoadingEvents] = useState(state.events.length === 0);
 
   const [qrVisible, setQrVisible] = useState(false);
   const [qrPayload, setQrPayload] = useState('');
+  const [qrTitle, setQrTitle] = useState<string | undefined>();
+  const [qrLocation, setQrLocation] = useState<string | undefined>();
+  const [qrDates, setQrDates] = useState<string | undefined>();
   const qrRef = useRef<any>(null);
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -99,24 +125,6 @@ export default function MyEventsScreen() {
     [router],
   );
 
-  const goToGuests = useCallback(
-    async (eventId: string) => {
-      try {
-        await getGuestParticipationsByEventId(eventId);
-
-        const href = {
-          pathname: '/events/[id]/confirmed-guests',
-          params: { id: eventId },
-        } as const satisfies Href;
-
-        router.push(href);
-      } catch {
-        Alert.alert('Erro', 'Não foi possível carregar os convidados.');
-      }
-    },
-    [getGuestParticipationsByEventId, router],
-  );
-
   // ---------- QR Share ----------
   const handleShareQR = useCallback(async () => {
     if (!qrRef.current?.capture) return;
@@ -136,7 +144,7 @@ export default function MyEventsScreen() {
 
       await Sharing.shareAsync(fileUri);
     } catch (error) {
-      console.error('QR Share Error:', error);
+      logger.error('QR Share Error:', error);
       Alert.alert('Erro', 'Não foi possível compartilhar o QR Code.');
     }
   }, []);
@@ -157,70 +165,42 @@ export default function MyEventsScreen() {
 
   // ---------- Fetch & Filter ----------
   useEffect(() => {
-    if (isFetchingRef.current) return;
-    isFetchingRef.current = true;
     let active = true;
 
     const load = async () => {
-      setLoadingEvents(true);
-
-      try {
-        // garante eventos no state (se seu contexto já faz cache, ok)
-        if (!state.events.length) {
-          await fetchEvents();
-        }
-
-        // se não logado, mostra o que tiver no state
-        if (!userUid) {
-          if (!active) return;
-          setAllUserEvents(state.events);
-          return;
-        }
-
-        const participations = await getGuestParticipationsByUserId(userUid);
-
-        const modeMap: Record<string, GuestMode> = {};
-
-        for (const p of participations) {
-          if (
-            p?.eventId &&
-            (p.mode === 'confirmado' || p.mode === 'acompanhando')
-          ) {
-            modeMap[p.eventId] = p.mode;
-          }
-        }
-
-        setMyGuestModeByEventId(modeMap);
-
-        const guestEventIds = new Set(Object.keys(modeMap));
-
-        const result = state.events.filter((event) => {
-          const isCreator = event.userId === userUid;
-          const isSubAdmin = !!event.subAdminsByUid?.[userUid];
-          const isGuest = guestEventIds.has(event.id);
-
-          return isCreator || isSubAdmin || isGuest;
-        });
-
-        const finalList = (result.length ? result : state.events).filter(
-          Boolean,
-        );
-
-        // remove duplicados
-        const unique = Array.from(
-          new Map(finalList.map((e) => [e.id, e])).values(),
-        );
-
-        if (!active) return;
-        setAllUserEvents(unique);
-      } catch (err) {
-        console.error('Erro ao buscar eventos relacionados:', err);
-        if (!active) return;
-        // fallback: pelo menos mostra algo
+      // 1) Se já temos eventos, atualizamos a lista local imediatamente
+      if (state.events.length > 0) {
         setAllUserEvents(state.events);
-      } finally {
-        if (!active) return;
-        setLoadingEvents(false);
+        
+        const modeMap: Record<string, GuestMode> = {};
+        state.events.forEach(ev => {
+          if (ev.myGuestMode) {
+            modeMap[ev.id] = ev.myGuestMode;
+          }
+        });
+        setMyGuestModeByEventId(modeMap);
+        
+        if (active) setLoadingEvents(false);
+      }
+
+      // 2) Se não temos eventos, chamamos fetchEvents APENAS SE não estivermos buscando
+      // E usamos isFetchingRef para garantir que não entramos em loop
+      if (state.events.length === 0 && !isFetchingRef.current) {
+        isFetchingRef.current = true;
+        if (active) setLoadingEvents(true);
+
+        try {
+          await fetchEvents();
+        } catch (err) {
+          logger.error('Erro ao buscar eventos em MyEvents:', err);
+        } finally {
+          isFetchingRef.current = false;
+          // Mesmo se retornar 0 eventos, paramos o skeleton
+          if (active) setLoadingEvents(false);
+        }
+      } else if (state.events.length === 0 && !state.loading && !isFetchingRef.current) {
+        // Caso especial: já buscou e retornou vazio
+        if (active) setLoadingEvents(false);
       }
     };
 
@@ -228,16 +208,13 @@ export default function MyEventsScreen() {
 
     return () => {
       active = false;
-      isFetchingRef.current = false;
     };
-  }, [userUid, state.events.length]);
+  }, [userUid, state.events, state.loading, fetchEvents]);
 
   const ensureInviteForEvent = useCallback(
-    async (event: Event) => {
-      if (event.shareKey?.trim()) return event.shareKey.trim();
-
+    async (event: Event, ttlHours: number) => {
       // cria no Firestore: eventShareKeys + eventInviteSummaries
-      const newKey = await createInviteForEvent(event.id);
+      const newKey = await createInviteForEvent(event.id, ttlHours);
 
       // salva no próprio evento para não gerar outro depois
       await updateEvent({
@@ -255,8 +232,22 @@ export default function MyEventsScreen() {
       const isCreator = item.userId === userUid;
       const myLevel = userUid ? (item.subAdminsByUid?.[userUid] ?? null) : null;
       const isSuperAdmin = isCreator || myLevel === 'Super Admin';
+      const isPartialAdmin = myLevel === 'Admin parcial';
+      const isManagementAuthorized = isSuperAdmin || isPartialAdmin;
+
       const myGuestMode = myGuestModeByEventId[item.id] ?? null;
       const isGuest = !!myGuestMode;
+
+      // ✅ Lógica de Pendências
+      const pendingTasks = item.tasks?.filter((t) => !t.completed) || [];
+      const pendingCount = pendingTasks.length;
+      const hasUrgent = pendingTasks.some((t) => {
+        if (!t.deadline) return false;
+        const deadline = new Date(t.deadline);
+        const threeDaysFromNow = new Date();
+        threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+        return deadline <= threeDaysFromNow;
+      });
 
       return (
         <AnimatedPressable
@@ -264,7 +255,15 @@ export default function MyEventsScreen() {
           exiting={FadeOut.duration(180)}
           onPress={() => goToEvent(item.id)}
         >
-          <Animated.View style={styles.card}>
+          <Animated.View
+            style={[
+              styles.card,
+              {
+                backgroundColor: colors.backgroundCard,
+                borderColor: colors.border,
+              },
+            ]}
+          >
             <View style={styles.imageWrapper}>
               {!!item.coverImage ? (
                 <Image
@@ -277,116 +276,148 @@ export default function MyEventsScreen() {
               )}
 
               <View style={styles.overlay}>
-                {isCreator && <RoleBadge role="Criador" />}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  {isCreator && <RoleBadge role="Criador" />}
 
-                {!isCreator && myLevel && (
-                  <RoleBadge
-                    role={
-                      myLevel === 'Super Admin' ? 'Super Admin' : 'Adm parcial'
-                    }
-                  />
-                )}
+                  {!isCreator && myLevel && (
+                    <RoleBadge
+                      role={
+                        myLevel === 'Super Admin'
+                          ? 'Super Admin'
+                          : 'Adm parcial'
+                      }
+                    />
+                  )}
 
-                {!isCreator && !myLevel && isGuest && (
-                  <RoleBadge
-                    role="Convidado"
-                    label={
-                      myGuestMode === 'confirmado'
-                        ? 'Convidado ✅'
-                        : 'Convidado 👀'
-                    }
-                  />
-                )}
+                  {!isCreator && !myLevel && isGuest && (
+                    <RoleBadge
+                      role="Convidado"
+                      label={
+                        myGuestMode === 'confirmado'
+                          ? 'Convidado ✅'
+                          : 'Convidado 👀'
+                      }
+                    />
+                  )}
+                </View>
 
-                <Text style={styles.overlayTitle} numberOfLines={1}>
-                  {item.title}
-                </Text>
-
-                <Text style={styles.overlayLocation} numberOfLines={1}>
-                  {item.location}
-                </Text>
-
-                <View style={styles.eventCard}>
-                  <Text style={styles.overlayDesc} numberOfLines={2}>
-                    {`${new Date(item.startDate).toLocaleDateString(
-                      'pt-BR',
-                    )} - ${new Date(item.endDate).toLocaleDateString('pt-BR')}`}
+                <View style={{ marginTop: 'auto' }}>
+                  <Text style={styles.overlayTitle} numberOfLines={1}>
+                    {item.title}
                   </Text>
+
+                  <Text style={styles.overlayLocation} numberOfLines={1}>
+                    {item.location}
+                  </Text>
+
+                  <View style={styles.eventCard}>
+                    <Text style={styles.overlayDesc} numberOfLines={2}>
+                      {(() => {
+                        const start = new Date(
+                          item.startDate,
+                        ).toLocaleDateString('pt-BR');
+                        const end = new Date(item.endDate).toLocaleDateString(
+                          'pt-BR',
+                        );
+                        return start === end ? start : `${start} - ${end}`;
+                      })()}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
 
             <View style={styles.buttonsRow}>
-              <Pressable
-                onPress={() => goToGuests(item.id)}
-                style={[styles.mapBtn, { borderColor: colors.primary }]}
-              >
-                <Text style={[styles.mapBtnText, { color: colors.text }]}>
-                  Convidados
-                </Text>
-              </Pressable>
-
-              {isCreator || isSuperAdmin ? (
-                <>
-                  <View style={{ marginRight: 8 }}>
-                    <ShareEventButton
-                      shareKey={item.shareKey ?? ''}
-                      onEnsureInvite={() => ensureInviteForEvent(item)}
-                      onShowQRCode={(payload) => {
-                        setQrPayload(payload);
-                        setQrVisible(true);
-                      }}
-                    />
-                  </View>
-
-                  <Button
-                    title="Permissão"
-                    size="small"
-                    onPress={() => {
-                      router.push({
-                        pathname: '/(stack)/events/[id]/permissions',
-                        params: { id: item.id },
-                      });
+              {/* ✅ Botão Share (Minimal) */}
+              {isManagementAuthorized && (
+                <View style={styles.iconButtonWrapper}>
+                  <ShareEventButton
+                    event={item}
+                    minimal
+                    onEnsureInvite={(ttlHours) =>
+                      ensureInviteForEvent(item, ttlHours)
+                    }
+                    onShowQRCode={(payload) => {
+                      setQrPayload(payload);
+                      setQrTitle(item.title);
+                      setQrLocation(item.location);
+                      setQrDates(
+                        `${new Date(item.startDate).toLocaleDateString(
+                          'pt-BR',
+                        )} - ${new Date(item.endDate).toLocaleDateString(
+                          'pt-BR',
+                        )}`,
+                      );
+                      setQrVisible(true);
                     }}
-                    icon={<KeyRound size={14} color="white" />}
-                    style={styles.permissionBtn}
-                    textStyle={styles.permissionText}
                   />
-                </>
-              ) : (
-                <Pressable
-                  onPress={() => {
-                    const wasFollowing = isFollowing(item.id);
-                    toggleFollowEvent(item);
+                </View>
+              )}
 
-                    Alert.alert(
-                      wasFollowing ? 'Removido' : 'Sucesso',
-                      wasFollowing
-                        ? 'Você deixou de seguir o evento.'
-                        : 'Você está seguindo este evento.',
-                    );
-                  }}
-                  style={styles.permissionBtn}
+              {/* ✅ Indicador de Pendências (Clicável para ir direto para tarefas) */}
+              {isManagementAuthorized && (
+                <Pressable
+                  onPress={() => router.push({ pathname: '/(stack)/events/[id]/tasks', params: { id: item.id } })}
+                  style={({ pressed }) => [
+                    styles.pendingIndicator,
+                    { 
+                      borderColor: colors.border,
+                      backgroundColor: pressed ? colors.backgroundSecondary : 'rgba(255,255,255,0.03)'
+                    },
+                  ]}
                 >
-                  <View
-                    style={[styles.btnseguir, { borderColor: colors.primary }]}
+                  <CheckSquare
+                    size={16}
+                    color={
+                      pendingCount > 0
+                        ? hasUrgent
+                          ? colors.error
+                          : colors.warning
+                        : colors.success
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.pendingText,
+                      { color: colors.textSecondary },
+                    ]}
                   >
-                    <Heart
-                      size={16}
-                      color={colors.primary}
-                      fill={
-                        isFollowing(item.id) ? colors.primary : 'transparent'
-                      }
-                    />
-                    <Text
-                      style={[
-                        styles.mapBtnText,
-                        { color: colors.textSecondary },
-                      ]}
-                    >
-                      {isFollowing(item.id) ? 'Seguindo' : 'Seguir'}
-                    </Text>
-                  </View>
+                    {pendingCount}
+                  </Text>
+                </Pressable>
+              )}
+
+              {/* ✅ Botão Gestão (Principal - Flex 2) */}
+              {(isManagementAuthorized || isGuest) && (
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: isManagementAuthorized 
+                        ? '/(stack)/events/[id]/dashboard'
+                        : '/(stack)/events/[id]/edit-my-participation',
+                      params: { id: item.id },
+                    })
+                  }
+                  style={({ pressed }) => [
+                    styles.primaryActionBtn,
+                    {
+                      backgroundColor: pressed
+                        ? colors.backgroundSecondary
+                        : 'transparent',
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <LayoutDashboard size={18} color={colors.text} />
+                  <Text style={[styles.primaryActionBtnText, { color: colors.text }]}>
+                    {isManagementAuthorized ? 'Gerenciar' : 'Gestão'}
+                  </Text>
                 </Pressable>
               )}
             </View>
@@ -398,12 +429,13 @@ export default function MyEventsScreen() {
       colors.border,
       colors.primary,
       colors.text,
-      colors.textSecondary,
+      colors.backgroundCard,
+      colors.backgroundSecondary,
       goToEvent,
-      goToGuests,
-      isFollowing,
-      toggleFollowEvent,
+      myGuestModeByEventId,
       userUid,
+      ensureInviteForEvent,
+      router,
     ],
   );
 
@@ -420,7 +452,14 @@ export default function MyEventsScreen() {
       />
 
       <ScreenSafeArea style={styles.container}>
-        <Text style={[styles.title, { color: colors.text }]}>Meus Eventos</Text>
+        <View style={{ paddingHorizontal: 8, marginTop: 8, marginBottom: 8 }}>
+          <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
+            Aqui estão os eventos que você criou ou foi convidado para participar:
+          </Text>
+          <Text style={{ color: colors.text, fontSize: 18, fontFamily: Fonts.bold, marginTop: 10 }}>
+            Meus Eventos
+          </Text>
+        </View>
 
         <FlatList
           data={allUserEvents}
@@ -429,21 +468,15 @@ export default function MyEventsScreen() {
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             loadingEvents ? (
-              <View style={styles.centeredContent}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text
-                  style={[
-                    styles.emptyText,
-                    { color: colors.textSecondary, marginTop: 12 },
-                  ]}
-                >
-                  Carregando eventos...
-                </Text>
-              </View>
+              <MyEventsSkeleton />
             ) : (
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                Nenhum evento relacionado a você encontrado.
-              </Text>
+                <EmptyState
+                    icon={CalendarX2}
+                    title="Nenhum evento aqui"
+                    description="Você ainda não criou nem foi convidado para nenhum evento."
+                    actionLabel="Criar Evento"
+                    onAction={() => router.push('/events/new?mode=create')}
+                />
             )
           }
         />
@@ -454,6 +487,9 @@ export default function MyEventsScreen() {
           qrRef={qrRef}
           qrPayload={qrPayload}
           onShare={handleShareQR}
+          eventTitle={qrTitle}
+          eventLocation={qrLocation}
+          eventDates={qrDates}
         />
       </ScreenSafeArea>
     </LinearGradient>
@@ -488,38 +524,55 @@ const PermissionModal = ({
       <Animated.View
         entering={FadeIn}
         exiting={FadeOut}
-        style={styles.animatedContainer}
+        style={styles.modalContentWrapper}
       >
         <LinearGradient
           colors={gradientColors}
           locations={[0, 0.7, 1]}
           style={[styles.modalContent, { borderColor: colors.primary }]}
         >
-          <Text style={[styles.modalTitle, { color: colors.primary }]}>
-            🔐 Permissões
-          </Text>
+          <View style={styles.modalHeader}>
+            <Shield size={28} color={colors.primary} />
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Permissões
+            </Text>
+          </View>
 
-          <Text style={[styles.modalText, { color: colors.text }]}>
-            <Text style={[styles.roleHighlight, { color: colors.primary }]}>
-              Super admin:
-            </Text>{' '}
-            Controle total (inclusive gerenciar permissões).
-          </Text>
+          <View style={[styles.roleInfoBox, { backgroundColor: colors.backgroundSecondary, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border }]}>
+            <View style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <Shield size={16} color={colors.primary} />
+                <Text style={{ fontWeight: 'bold', color: colors.primary, fontSize: 14 }}>Super Admin</Text>
+              </View>
+              <Text style={[styles.roleInfoText, { color: colors.textSecondary, fontSize: 13 }]}>
+                • Controle total e gestão de equipe{"\n"}
+                • <Text style={{ fontWeight: '600', color: colors.text }}>Pode editar</Text> tudo: título, local, datas, desc. e capa{"\n"}
+                • <Text style={{ fontWeight: '600', color: colors.error }}>Não pode apagar</Text> o evento
+              </Text>
+            </View>
 
-          <Text style={[styles.modalText, { color: colors.text }]}>
-            <Text style={[styles.roleHighlight, { color: colors.primary }]}>
-              Admin parcial:
-            </Text>{' '}
-            Pode adicionar programas/atividades/fotos e deletar apenas o que
-            criou.
-          </Text>
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <Shield size={16} color={colors.primary} opacity={0.6} />
+                <Text style={{ fontWeight: 'bold', color: colors.primary, fontSize: 14, opacity: 0.8 }}>Admin Parcial</Text>
+              </View>
+              <Text style={[styles.roleInfoText, { color: colors.textSecondary, fontSize: 13 }]}>
+                • Gestão de programação e fotos{"\n"}
+                • <Text style={{ fontWeight: '600', color: colors.text }}>Pode editar</Text> info básica: título, local, datas e capa{"\n"}
+                • <Text style={{ fontWeight: '600', color: colors.error }}>Sem permissão</Text> para apagar o evento
+              </Text>
+            </View>
+          </View>
 
-          <Text style={[styles.modalSubtitle, { color: colors.text }]}>
-            👥 Adicionar permissão por UID
+          {/* Divider */}
+          <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 20, width: '100%' }} />
+
+          <Text style={{ fontSize: 16, fontFamily: Fonts.bold, color: colors.text, marginBottom: 12, textAlign: 'center' }}>
+            ✨ Atribuir Novo Acesso
           </Text>
 
           <TextInput
-            placeholder="Digite o UID do usuário (Firebase Auth UID)"
+            placeholder="Digite o UID do usuário"
             value={permissionUid}
             onChangeText={setPermissionUid}
             placeholderTextColor={colors.textSecondary}
@@ -535,8 +588,8 @@ const PermissionModal = ({
             ]}
           />
 
-          <Text style={[styles.modalLabel, { color: colors.text }]}>
-            Tipo de permissão
+          <Text style={[styles.modalLabel, { color: colors.text, marginTop: 12 }]}>
+            Tipo de acesso
           </Text>
 
           <View style={styles.toggleRow}>
@@ -548,9 +601,9 @@ const PermissionModal = ({
                   styles.toggleBtn,
                   {
                     backgroundColor:
-                      permissionLevel === level ? '#471C7A' : 'transparent',
+                      permissionLevel === level ? colors.primary : 'transparent',
                     borderColor:
-                      permissionLevel === level ? '#471C7A' : colors.border,
+                      permissionLevel === level ? colors.primary : colors.border,
                   },
                 ]}
               >
@@ -558,6 +611,7 @@ const PermissionModal = ({
                   style={{
                     color: permissionLevel === level ? '#fff' : colors.text,
                     fontWeight: '600',
+                    fontSize: 13,
                   }}
                 >
                   {level}
@@ -566,18 +620,18 @@ const PermissionModal = ({
             ))}
           </View>
 
-          <View style={styles.buttonRow}>
+          <View style={[styles.modalActions, { marginTop: 24 }]}>
             <Button
               title="Cancelar"
               variant="cancel"
               onPress={onClose}
-              style={{ flex: 1, marginRight: 8 }}
+              style={{ flex: 1 }}
               textStyle={{ color: 'white' }}
             />
             <Button
               title="Salvar"
               onPress={onSave}
-              style={{ backgroundColor: colors.primary, flex: 1 }}
+              style={{ backgroundColor: colors.primary, flex: 1.5 }}
               textStyle={{ color: '#fff' }}
             />
           </View>
@@ -593,12 +647,18 @@ const QRModal = ({
   qrRef,
   qrPayload,
   onShare,
+  eventTitle,
+  eventLocation,
+  eventDates,
 }: {
   visible: boolean;
   onClose: () => void;
   qrRef: React.RefObject<any>;
   qrPayload: string;
   onShare: () => void;
+  eventTitle?: string;
+  eventLocation?: string;
+  eventDates?: string;
 }) => {
   const isLinkPayload =
     typeof qrPayload === 'string' && /^https?:\/\//i.test(qrPayload);
@@ -612,7 +672,9 @@ const QRModal = ({
           style={styles.qrBox}
         >
           {/* ✅ Tudo isso é só UI do modal (não entra na imagem) */}
-          <Text style={styles.qrTitle}>Compartilhe seu evento!</Text>
+          <Text style={styles.qrTitle}>
+            {'Compartilhe seu evento!'}
+          </Text>
 
           {/* ✅ Tudo dentro do ViewShot entra no PNG compartilhado */}
           <ViewShot
@@ -620,13 +682,30 @@ const QRModal = ({
             options={{ format: 'png', quality: 1, result: 'tmpfile' }}
           >
             <View style={styles.qrShotCard}>
-              <Text style={styles.qrWelcomeTitle}>Bem-vindo(a) 👋</Text>
-              <Text style={styles.qrWelcomeSubtitle}>
-                Você é meu convidado!
+              <Text style={styles.qrWelcomeTitle}>
+                {eventTitle ? `Título: ${eventTitle}` : 'Bem-vindo(a) 👋'}
               </Text>
+              
+              {eventLocation && (
+                <Text style={styles.qrWelcomeSubtitle}>
+                  Localização: {eventLocation}
+                </Text>
+              )}
+
+              {eventDates && (
+                <Text style={styles.qrWelcomeSubtitle}>
+                  Data: {eventDates}
+                </Text>
+              )}
+
               <Text style={styles.qrWelcomeSubtitle}>
-                Aponte a câmera para entrar no evento
+                {eventTitle ? 'Você é meu convidado!' : 'Aponte a câmera para entrar no evento'}
               </Text>
+              {eventTitle && (
+                <Text style={styles.qrWelcomeSubtitle}>
+                  Aponte a câmera para entrar no evento
+                </Text>
+              )}
 
               <View style={styles.qrCodeWrap}>
                 <QRCode
@@ -640,10 +719,15 @@ const QRModal = ({
 
               {/* opcional: uma dica pequena no rodapé da imagem */}
               <Text style={styles.qrHint}>
-                Se preferir, peça o link pelo organizador.
+                Se preferir, peça o link para o organizador.
               </Text>
             </View>
           </ViewShot>
+
+          <Text style={styles.qrUsageTip}>
+            💡 Dica: Você pode imprimir este QR Code e disponibilizá-lo na entrada
+            do evento ou recepção para que todos acompanhem a programação.
+          </Text>
 
           {isLinkPayload && (
             <Button
@@ -703,32 +787,30 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     paddingLeft: 8,
     marginVertical: 16,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: Fonts.bold,
   },
 
   emptyText: {
     textAlign: 'center',
     marginTop: 24,
     fontSize: 16,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: Fonts.regular,
   },
 
-  listContent: { paddingBottom: 20 },
+  listContent: { paddingBottom: 10, padding:10 },
 
   card: {
-    backgroundColor: '#1f1f25',
-    marginBottom: 24,
+    marginBottom: 20,
     marginHorizontal: 4,
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
-    borderBottomWidth: 1,
-    borderColor: '#555',
-    padding: 4,
+    borderWidth: 1,
+    padding: 12,
     shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 5 },
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 4,
   },
 
   imageWrapper: {
@@ -758,19 +840,37 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: Fonts.semiBold,
+  },
+
+  pendingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 6,
+  },
+  pendingText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+  },
+  iconButtonWrapper: {
+    height: 40,
+    justifyContent: 'center',
   },
 
   overlayLocation: {
     fontSize: 14,
     color: '#ccc',
-    fontFamily: 'Inter_400Regular',
+    fontFamily: Fonts.regular,
   },
 
   overlayDesc: {
     fontSize: 12,
     color: '#ddd',
-    fontFamily: 'Inter_400Regular',
+    fontFamily: Fonts.regular,
   },
 
   eventCard: { flexDirection: 'column' },
@@ -812,6 +912,35 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
   },
 
+  minimalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  minimalBtnText: {
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+  },
+
+  primaryActionBtn: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  primaryActionBtnText: {
+    fontSize: 14,
+    fontFamily: Fonts.bold,
+  },
+
   btnseguir: {
     flex: 1,
     flexDirection: 'row',
@@ -846,43 +975,34 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalContentWrapper: {
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
   modalSubtitle: {
     fontSize: 16,
-    fontWeight: '600',
-    marginTop: 20,
-    marginBottom: 10,
-  },
-
-  modalText: { fontSize: 14, marginBottom: 12, lineHeight: 20 },
-
-  roleHighlight: { fontWeight: 'bold' },
-
-  input: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+    fontFamily: Fonts.bold,
     marginBottom: 12,
   },
-
-  modalLabel: { fontSize: 14, marginBottom: 8, fontWeight: '600' },
-
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+  roleInfoBox: {
+    marginBottom: 8,
   },
-
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    marginRight: 8,
+  roleInfoText: {
+    fontSize: 14,
+    fontFamily: Fonts.regular,
+    lineHeight: 20,
   },
-
   buttonRow: { flexDirection: 'row', marginTop: 8 },
 
   qrBox: {
@@ -903,6 +1023,15 @@ const styles = StyleSheet.create({
 
   qrShareBtn: { marginTop: 16, backgroundColor: '#25D366', width: '100%' },
   qrCloseBtn: { marginTop: 12, backgroundColor: '#333', width: '100%' },
+  qrUsageTip: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 18,
+  },
   qrShotCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -946,5 +1075,30 @@ const styles = StyleSheet.create({
     opacity: 0.65,
     textAlign: 'center',
     fontFamily: 'Inter_400Regular',
+  },
+  input: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    fontSize: 14,
+    fontFamily: Fonts.regular,
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontFamily: Fonts.semiBold,
+    marginBottom: 8,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
   },
 });

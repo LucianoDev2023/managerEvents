@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
@@ -12,16 +11,21 @@ import {
   Pressable,
   BackHandler,
   StatusBar as RNStatusBar,
+  Switch,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useAuthListener } from '@/hooks/useAuthListener';
+import { db } from '@/config/firebase';
+import { logger } from '@/lib/logger';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import Button from '@/components/ui/Button';
-import { Plus, Trash2, UserPlus } from 'lucide-react-native';
+import TextInput from '@/components/ui/TextInput';
+import { Plus, Trash2, UserPlus, Baby } from 'lucide-react-native';
 import { createManualGuest } from '@/hooks/guestService';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FamilyMember } from '@/types';
 
 export default function AddManualGuestScreen() {
   const { id: eventId } = useLocalSearchParams<{ id: string }>();
@@ -39,8 +43,13 @@ export default function AddManualGuestScreen() {
       : ['#ffffff', '#f0f0ff', '#e9e6ff'];
 
   const [userName, setUserName] = useState('');
-  const [family, setFamily] = useState<string[]>([]);
+  const [family, setFamily] = useState<FamilyMember[]>([]);
+  
+  // Input states
   const [newName, setNewName] = useState('');
+  const [isChild, setIsChild] = useState(false);
+  const [childAge, setChildAge] = useState('');
+
   const [saving, setSaving] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
@@ -58,13 +67,30 @@ export default function AddManualGuestScreen() {
     const trimmed = newName.trim();
     if (!trimmed) return;
 
-    if (family.some((n) => n.toLowerCase() === trimmed.toLowerCase())) {
+    if (family.some((m) => m.name.toLowerCase() === trimmed.toLowerCase())) {
       Alert.alert('Atenção', 'Esse nome já está na lista.');
       return;
     }
 
-    setFamily((prev) => [...prev, trimmed]);
+    // Age check for children
+    if (isChild) {
+      const age = parseInt(childAge);
+      if (isNaN(age) || age < 0 || age > 12) {
+        Alert.alert('Idade inválida', 'Para ser considerado criança, a idade deve ser entre 0 e 12 anos.');
+        return;
+      }
+    }
+
+    const newMember: FamilyMember = {
+        name: trimmed,
+        isChild,
+        age: isChild && childAge ? parseInt(childAge) : undefined
+    };
+
+    setFamily((prev) => [...prev, newMember]);
     setNewName('');
+    setIsChild(false);
+    setChildAge('');
 
     // (opcional) rolar para baixo depois de adicionar
     requestAnimationFrame(() =>
@@ -72,8 +98,8 @@ export default function AddManualGuestScreen() {
     );
   };
 
-  const handleRemoveCompanion = (name: string) => {
-    setFamily((prev) => prev.filter((n) => n !== name));
+  const handleRemoveCompanion = (nameToRemove: string) => {
+    setFamily((prev) => prev.filter((m) => m.name !== nameToRemove));
   };
 
   const handleSave = async () => {
@@ -89,13 +115,13 @@ export default function AddManualGuestScreen() {
       await createManualGuest({
         eventId,
         userName: userName.trim(),
-        family,
+        family, 
       });
 
       Alert.alert('✅ Sucesso', 'Convidado adicionado manualmente!');
       router.back();
     } catch (e: any) {
-      console.error(e);
+      logger.error(e);
       Alert.alert('Erro', 'Não foi possível adicionar o convidado.');
     } finally {
       setSaving(false);
@@ -140,7 +166,6 @@ export default function AddManualGuestScreen() {
           ref={scrollRef}
           style={styles.full}
           keyboardShouldPersistTaps="handled"
-          // ✅ O pulo do gato: flexGrow + paddingBottom com safe-area
           contentContainerStyle={[
             styles.content,
             {
@@ -177,25 +202,11 @@ export default function AddManualGuestScreen() {
             </Text>
           </View>
 
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            Nome do convidado principal *
-          </Text>
           <TextInput
+            label="Nome do convidado principal *"
             value={userName}
             onChangeText={setUserName}
             placeholder="Ex: Tio João"
-            placeholderTextColor={colors.textSecondary}
-            style={[
-              styles.input,
-              {
-                borderColor: colors.border,
-                color: colors.text,
-                backgroundColor:
-                  colorScheme === 'dark'
-                    ? 'rgba(0,0,0,0.25)'
-                    : 'rgba(255,255,255,0.7)',
-              },
-            ]}
           />
 
           <View style={styles.separator} />
@@ -204,27 +215,37 @@ export default function AddManualGuestScreen() {
             Acompanhantes (opcional)
           </Text>
 
-          <View style={styles.inputRow}>
+            {/* Area de adição de acompanhante */}
+          <View style={[styles.formCard, { borderColor: colors.border }]}>
             <TextInput
               value={newName}
               onChangeText={setNewName}
-              placeholder="Ex: Maria"
-              placeholderTextColor={colors.textSecondary}
-              style={[
-                styles.input,
-                {
-                  flex: 1,
-                  borderColor: colors.border,
-                  color: colors.text,
-                  backgroundColor:
-                    colorScheme === 'dark'
-                      ? 'rgba(0,0,0,0.25)'
-                      : 'rgba(255,255,255,0.7)',
-                },
-              ]}
-              onSubmitEditing={handleAddCompanion}
-              returnKeyType="done"
+              placeholder="Nome do acompanhante"
+              style={{ marginBottom: 12 }}
             />
+
+            <View style={[styles.rowBetween, { marginBottom: 12 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Baby size={20} color={colors.text} />
+                    <Text style={{ color: colors.text, fontSize: 16 }}>É criança?</Text>
+                </View>
+                <Switch 
+                    value={isChild} 
+                    onValueChange={setIsChild} 
+                    trackColor={{ false: '#767577', true: colors.primary }}
+                    thumbColor="#f4f3f4"
+                />
+            </View>
+
+            {isChild && (
+                <TextInput
+                    value={childAge}
+                    onChangeText={setChildAge}
+                    placeholder="Idade da criança"
+                    keyboardType="numeric"
+                    style={{ marginBottom: 12 }}
+                />
+            )}
 
             <Pressable
               style={({ pressed }) => [
@@ -232,20 +253,25 @@ export default function AddManualGuestScreen() {
                 {
                   backgroundColor: colors.primary,
                   opacity: !newName.trim() ? 0.5 : pressed ? 0.85 : 1,
+                  alignSelf: 'stretch', // Preencher largua
                 },
               ]}
               onPress={handleAddCompanion}
               disabled={!newName.trim()}
             >
-              <Plus size={18} color="#fff" />
+               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Plus size={18} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '600' }}>Adicionar</Text>
+               </View>
             </Pressable>
           </View>
 
+
           {family.length > 0 && (
             <View style={styles.listContainer}>
-              {family.map((item, idx) => (
+              {family.map((member, idx) => (
                 <View
-                  key={`${item}-${idx}`}
+                  key={`${member.name}-${idx}`}
                   style={[
                     styles.listItem,
                     {
@@ -257,8 +283,19 @@ export default function AddManualGuestScreen() {
                     },
                   ]}
                 >
-                  <Text style={{ color: colors.text, flex: 1 }}>{item}</Text>
-                  <Pressable onPress={() => handleRemoveCompanion(item)}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.text, fontSize: 16, fontWeight: '500' }}>{member.name}</Text>
+                    {member.isChild && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                            <Baby size={14} color={colors.textSecondary} style={{ marginRight: 4 }} />
+                            <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                                Criança • {member.age} anos
+                            </Text>
+                        </View>
+                    )}
+                  </View>
+
+                  <Pressable onPress={() => handleRemoveCompanion(member.name)}>
                     <Trash2 size={18} color={colors.error} />
                   </Pressable>
                 </View>
@@ -266,11 +303,10 @@ export default function AddManualGuestScreen() {
             </View>
           )}
 
-          {/* ✅ Espaço elástico: empurra o botão para o “fim” quando não rola */}
-          <View style={{ flex: 1 }} />
+          <View style={{ flex: 1, minHeight: 20 }} />
 
           <Button
-            title={saving ? 'Salvando...' : 'Adicionar Convidado'}
+            title={saving ? 'Salvando...' : 'Salvar Convidado'}
             onPress={handleSave}
             disabled={saving}
             style={{ backgroundColor: colors.primary }}
@@ -292,7 +328,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#3333',
   },
 
-  // base: paddingTop/paddingBottom serão setados dinamicamente
   content: {
     paddingHorizontal: 20,
     paddingTop: 110,
@@ -318,18 +353,22 @@ const styles = StyleSheet.create({
 
   label: { fontSize: 14, fontFamily: 'Inter_500Medium', marginBottom: 8 },
 
-  input: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 16,
-    fontFamily: 'Inter_400Regular',
-    marginBottom: 16,
-  },
+
 
   separator: { height: 16 },
 
-  inputRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  formCard: {
+      padding: 12,
+      borderWidth: 1,
+      borderRadius: 12,
+      marginBottom: 10,
+  },
+
+  rowBetween: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+  },
 
   miniBtn: {
     paddingVertical: 12,

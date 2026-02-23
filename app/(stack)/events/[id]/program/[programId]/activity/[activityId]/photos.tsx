@@ -7,13 +7,16 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Plus, Image as ImageIcon } from 'lucide-react-native';
 import { useColorScheme } from 'react-native';
+import { Skeleton } from '@/components/ui/Skeleton';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import PhotoGallery from '@/components/PhotoGallery';
 import LoadingOverlay from '@/components/LoadingOverlay';
@@ -21,7 +24,8 @@ import Colors from '@/constants/Colors';
 import { useEvents } from '@/context/EventsContext';
 import type { Event, Program, Activity, Photo, PermissionLevel } from '@/types';
 
-const MAX_PHOTOS_PER_USER_PER_ACTIVITY = 5;
+const MAX_PHOTOS_ADMIN = 5;
+const MAX_PHOTOS_GUEST = 3;
 
 function pickParam(value: string | string[] | undefined): string {
   if (!value) return '';
@@ -35,6 +39,25 @@ type RouteParams = {
 };
 
 type GuestParticipation = { eventId: string };
+
+const PhotoSkeleton = () => {
+    const colorScheme = useColorScheme() ?? 'dark';
+    const colors = Colors[colorScheme];
+
+    return (
+        <View style={{ flex: 1, padding: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
+                <Skeleton width={100} height={20} />
+                <Skeleton width={120} height={40} borderRadius={10} />
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                    <Skeleton key={i} width="31%" style={{ aspectRatio: 1 }} borderRadius={8} />
+                ))}
+            </View>
+        </View>
+    );
+};
 
 export default function ActivityPhotosScreen(): JSX.Element {
   const params = useLocalSearchParams<RouteParams>();
@@ -59,6 +82,17 @@ export default function ActivityPhotosScreen(): JSX.Element {
   const [initialLoading, setInitialLoading] = useState<boolean>(true);
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
   const [isParticipant, setIsParticipant] = useState<boolean>(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => setIsKeyboardVisible(false));
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   // =========================
   // Derived data (typed)
@@ -132,7 +166,8 @@ export default function ActivityPhotosScreen(): JSX.Element {
     return photos.filter((p) => p.createdByUid === uid).length;
   }, [photos, uid]);
 
-  const reachedMyLimit = myPhotosCount >= MAX_PHOTOS_PER_USER_PER_ACTIVITY;
+  const myLimit = canManage ? MAX_PHOTOS_ADMIN : MAX_PHOTOS_GUEST;
+  const reachedMyLimit = myPhotosCount >= myLimit;
 
   // =========================
   // Initial refetch
@@ -173,7 +208,7 @@ export default function ActivityPhotosScreen(): JSX.Element {
     if (reachedMyLimit) {
       Alert.alert(
         'Limite atingido',
-        `Você já adicionou ${myPhotosCount}/${MAX_PHOTOS_PER_USER_PER_ACTIVITY} fotos nesta atividade.`,
+        `Você já adicionou ${myPhotosCount}/${myLimit} fotos nesta atividade.`,
       );
       return;
     }
@@ -186,7 +221,7 @@ export default function ActivityPhotosScreen(): JSX.Element {
   }, [event, program, activity, canManage, reachedMyLimit, myPhotosCount]);
 
   const handleDeletePhoto = useCallback(
-    async (photoId: string): Promise<void> => {
+    async (photoId: string, publicId?: string): Promise<void> => {
       if (!event || !program || !activity) return;
 
       const photo = photos.find((p) => p.id === photoId);
@@ -200,10 +235,8 @@ export default function ActivityPhotosScreen(): JSX.Element {
       setDeletingPhotoId(photoId);
 
       try {
-        await deletePhoto(event.id, program.id, activity.id, photoId);
+        await deletePhoto(event.id, program.id, activity.id, photoId, publicId);
         await refetchEventById(event.id);
-        // opcional:
-        // Alert.alert('OK', 'Foto deletada com sucesso');
       } catch (e: unknown) {
         const message =
           e instanceof Error ? e.message : 'Erro ao excluir foto.';
@@ -228,13 +261,18 @@ export default function ActivityPhotosScreen(): JSX.Element {
   // UI states
   // =========================
   if (initialLoading && !event) {
+    const loadingGradientColors =
+      colorScheme === 'dark'
+        ? (['#0b0b0f', '#1b0033', '#3e1d73'] as const)
+        : (['#ffffff', '#f0f0ff', '#e9e6ff'] as const);
+
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ marginTop: 12, color: colors.textSecondary }}>
-          Carregando fotos...
-        </Text>
-      </View>
+        <LinearGradient colors={loadingGradientColors} style={{ flex: 1 }} locations={[0, 0.6, 1]}>
+             <SafeAreaView style={{ flex: 1 }}>
+                <Stack.Screen options={{ headerTitle: 'Fotos' }} />
+                <PhotoSkeleton />
+             </SafeAreaView>
+        </LinearGradient>
     );
   }
 
@@ -264,7 +302,8 @@ export default function ActivityPhotosScreen(): JSX.Element {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTitle: 'Fotos',
+          headerTitle: 'Galeria de Fotos',
+          headerTitleStyle: { fontFamily: 'Inter-Bold', fontSize: 17 },
           headerLeft: () => (
             <TouchableOpacity
               onPress={() => router.back()}
@@ -273,44 +312,21 @@ export default function ActivityPhotosScreen(): JSX.Element {
               <ArrowLeft size={24} color={colors.primary} />
             </TouchableOpacity>
           ),
+          headerRight: () => (
+            <View style={{ marginRight: 16 }}>
+                 <Text style={{ color: colors.textSecondary, fontSize: 11, fontFamily: 'Inter-Medium' }}>
+                    {myPhotosCount}/{myLimit} fotos
+                 </Text>
+            </View>
+          )
         }}
       />
+
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: 16 }}
         showsVerticalScrollIndicator={false}
       >
-        {canManage && (
-          <View style={styles.topBar}>
-            <Text style={{ color: colors.textSecondary }}>
-              Suas fotos: {myPhotosCount}/{MAX_PHOTOS_PER_USER_PER_ACTIVITY}
-            </Text>
-
-            <TouchableOpacity
-              style={[
-                styles.addButton,
-                {
-                  backgroundColor:
-                    deletingPhotoId || reachedMyLimit
-                      ? colors.border
-                      : colors.primary,
-                  opacity: deletingPhotoId || reachedMyLimit ? 0.6 : 1,
-                },
-              ]}
-              disabled={!!deletingPhotoId || reachedMyLimit}
-              onPress={handleAddPhoto}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.addButtonText}>
-                {reachedMyLimit
-                  ? 'Limite atingido'
-                  : deletingPhotoId
-                    ? 'Aguarde...'
-                    : 'Adicionar Foto'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
         {photos.length > 0 ? (
           <PhotoGallery
@@ -325,34 +341,39 @@ export default function ActivityPhotosScreen(): JSX.Element {
           />
         ) : (
           <View style={styles.emptyContainer}>
+            <ImageIcon size={64} color={colors.textSecondary} opacity={0.2} style={{ marginBottom: 16 }} />
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Nenhuma foto nesta atividade ainda.
+              Nenhuma foto nesta atividade ainda. Faça o primeiro registro!
             </Text>
-
-            {canManage && (
-              <TouchableOpacity
-                style={[
-                  styles.addButton,
-                  {
-                    backgroundColor: reachedMyLimit
-                      ? colors.border
-                      : colors.primary,
-                  },
-                ]}
-                disabled={reachedMyLimit}
-                onPress={handleAddPhoto}
-                activeOpacity={0.9}
-              >
-                <Text style={styles.addButtonText}>
-                  {reachedMyLimit
-                    ? 'Limite atingido'
-                    : 'Adicionar primeira foto'}
-                </Text>
-              </TouchableOpacity>
-            )}
           </View>
         )}
       </ScrollView>
+
+      {(canManage || isParticipant) && !isKeyboardVisible && (
+        <TouchableOpacity
+          style={[
+            styles.fab,
+            {
+              backgroundColor: reachedMyLimit ? colors.border : colors.primary,
+              shadowColor: colors.primary,
+            },
+          ]}
+          disabled={reachedMyLimit || !!deletingPhotoId}
+          onPress={handleAddPhoto}
+          activeOpacity={0.8}
+        >
+          {deletingPhotoId ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Plus size={24} color="#fff" />
+              <Text style={styles.fabText}>
+                {reachedMyLimit ? 'Limite' : 'Foto'}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+      )}
 
       {!!deletingPhotoId && <LoadingOverlay message="Excluindo..." />}
     </SafeAreaView>
@@ -387,14 +408,24 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
-  addButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    gap: 8,
   },
-  addButtonText: {
+  fabText: {
     color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
   },
 });

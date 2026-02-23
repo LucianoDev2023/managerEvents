@@ -129,8 +129,15 @@ export function usePhotoComments({
     photoCreatorId,
   ]);
 
+  const MAX_COMMENT_LENGTH = 50;
+
   const addComment = async () => {
     if (!newComment.trim() || isAddingComment) return;
+
+    if (newComment.trim().length > MAX_COMMENT_LENGTH) {
+      Alert.alert('Comentário muito longo', `Máximo de ${MAX_COMMENT_LENGTH} caracteres.`);
+      return;
+    }
 
     if (!currentUser.uid) {
       Alert.alert('Erro', 'Usuário não autenticado.');

@@ -181,15 +181,21 @@ export default function AddActivityScreen() {
           inputStyle={{ color: colors.textSecondary }}
         />
 
-        <TextInput
-          label="Descrição (Opcional)"
-          placeholder="Insira a descrição"
-          value={formValues.description}
-          onChangeText={(text) => updateFormValue('description', text)}
-          multiline
-          numberOfLines={4}
-          inputStyle={{ color: colors.textSecondary }}
-        />
+        <View>
+          <TextInput
+            label="Descrição (Opcional)"
+            placeholder="Insira a descrição"
+            value={formValues.description}
+            onChangeText={(text) => updateFormValue('description', text)}
+            multiline
+            numberOfLines={4}
+            maxLength={110}
+            inputStyle={{ color: colors.textSecondary, textAlign: 'justify' }}
+          />
+          <Text style={[styles.charCounter, { color: colors.textSecondary }]}>
+            {110 - (formValues.description?.length || 0)} caracteres restantes
+          </Text>
+        </View>
 
         <View style={styles.buttonsContainer}>
           <Button
@@ -257,6 +263,14 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontFamily: 'Inter-Regular',
     fontSize: 16,
+  },
+  charCounter: {
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: -8,
+    marginBottom: 8,
+    fontFamily: 'Inter-Regular',
+    opacity: 0.7,
   },
   errorText: {
     fontFamily: 'Inter-Regular',

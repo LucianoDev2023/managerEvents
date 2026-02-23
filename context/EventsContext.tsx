@@ -54,7 +54,8 @@ import { GuestParticipation } from '@/types/guestParticipation';
 import { EventVM } from '@/types/eventView';
 import { pickUniqueShareKey } from '@/lib/utils/shareKey';
 import { createInviteSummary } from '@/hooks/inviteService';
-import logger from '@/lib/logger';
+import { logger } from '@/lib/logger';
+import { destroyCloudinaryImage } from '@/lib/cloudinary';
 
 type GuestMode = GuestParticipation['mode'];
 
@@ -193,6 +194,7 @@ type EventsContextType = {
     programId: string,
     activityId: string,
     photoId: string,
+    publicId?: string,
   ) => Promise<void>;
 
   // ✅ guestParticipations
@@ -230,9 +232,18 @@ type EventsContextType = {
   ) => Promise<void>;
 
   getGuestsByEventId: (eventId: string) => Promise<Guest[]>;
+
+  // ✅ Métodos de Gestão (Arrays)
+  updateFinancials: (eventId: string, financials: any[]) => Promise<void>;
+  updateTasks: (eventId: string, tasks: any[]) => Promise<void>;
+  updateBuffet: (eventId: string, buffet: string[]) => Promise<void>;
+  updateTargetBudget: (eventId: string, newBudget: number) => Promise<void>;
+  // updatePixInfo: (eventId: string, pixInfo: { pixKey: string; pixKeyType: 'cpf' | 'cnpj' | 'email' | 'phone' | 'random'; pixMessage: string }) => Promise<void>;
 };
 
-const EventsContext = createContext<EventsContextType | undefined>(undefined);
+export const EventsContext = createContext<EventsContextType | undefined>(
+  undefined,
+);
 
 export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -261,6 +272,31 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         userId: data.userId ?? '',
         subAdminsByUid: (data.subAdminsByUid ?? {}) as Record<string, any>,
         programs: [],
+
+        // ✅ Novos campos administrativos
+        targetBudget: data.targetBudget ?? 0,
+        financials: (data.financials ?? []).map((f: any) => ({
+          ...f,
+          dueDate: f.dueDate?.toDate
+            ? f.dueDate.toDate()
+            : f.dueDate
+              ? new Date(f.dueDate)
+              : new Date(),
+        })),
+        tasks: (data.tasks ?? []).map((t: any) => ({
+          ...t,
+          deadline: t.deadline?.toDate
+            ? t.deadline.toDate()
+            : t.deadline
+              ? new Date(t.deadline)
+              : new Date(),
+        })),
+        buffet: data.buffet ?? [],
+
+        // Pix Info (Disabled)
+        // pixKey: data.pixKey,
+        // pixKeyType: data.pixKeyType,
+        // pixMessage: data.pixMessage,
       };
     },
     [],
@@ -325,7 +361,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       // 3) Eventos onde é convidado (guestParticipations)
       const participations = await getGuestParticipationsByUserId(uid);
 
-      const partsByEventId = new Map<string, 'confirmado' | 'acompanhando'>(
+      const partsByEventId = new Map<string, GuestMode>(
         participations
           .filter((p) => !!p.eventId)
           .map((p) => [p.eventId as string, p.mode]),
@@ -343,26 +379,24 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       const missingIds = eventIds.filter((id) => !eventsMap.has(id));
 
       if (missingIds.length) {
-        const batches = chunk(missingIds, 10);
-
+        // ✅ Para convidados, usamos getDoc individual (ou Promise.all) em vez de query IN.
+        // Motivo: as regras do Firestore permitem 'get' para participantes, mas 'list' (query)
+        // é mais restrito para evitar vazamento de dados via filtros.
         const snaps = await Promise.all(
-          batches.map(async (ids) => {
+          missingIds.map(async (eid) => {
             try {
-              const qs = await getDocs(
-                query(eventsRef, where(documentId(), 'in', ids)),
-              );
-              return qs;
+              return await getDoc(doc(db, 'events', eid));
             } catch (e: any) {
-              return { docs: [], size: 0 } as any;
+              return null;
             }
           }),
         );
 
-        snaps.forEach((qs) => {
-          qs.docs.forEach((d: QueryDocumentSnapshot<DocumentData>) => {
-            const ev = mapEvent(d as FireDoc);
+        snaps.forEach((snap) => {
+          if (snap && snap.exists()) {
+            const ev = mapEvent(snap as FireDoc);
             eventsMap.set(ev.id, ev);
-          });
+          }
         });
       }
 
@@ -518,15 +552,21 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const deleteEvent = async (eventId: string) => {
-    logger.debug(`[Diagnostic] 🛠️ Iniciando exclusão granular do evento: ${eventId}`);
+    logger.debug(
+      `[Diagnostic] 🛠️ Iniciando exclusão granular do evento: ${eventId}`,
+    );
 
-    const runStep = async (name: string, path: string, fn: () => Promise<void>) => {
+    const runStep = async (
+      name: string,
+      path: string,
+      fn: () => Promise<void>,
+    ) => {
       try {
         logger.debug(`[Diagnostic] ⏳ Tentando: ${name} (Path: ${path})`);
         await fn();
         logger.debug(`[Diagnostic] ✅ Sucesso: ${name}`);
       } catch (e: any) {
-        console.error(`[Diagnostic] ❌ FALHA: ${name} (Path: ${path})`, {
+        logger.error(`[Diagnostic] ❌ FALHA: ${name} (Path: ${path})`, {
           code: e?.code,
           message: e?.message,
         });
@@ -535,67 +575,149 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
 
     try {
       // --- 1) GUEST PARTICIPATIONS ---
-      await runStep('delete guestParticipations', `guestParticipations (eventId == ${eventId})`, async () => {
-        const parts = await getGuestParticipationsByEventIdService(eventId);
-        await Promise.all(parts.map((p) => deleteDoc(doc(db, 'guestParticipations', p.id))));
-      });
+      await runStep(
+        'delete guestParticipations',
+        `guestParticipations (eventId == ${eventId})`,
+        async () => {
+          const parts = await getGuestParticipationsByEventIdService(eventId);
+          await Promise.all(
+            parts.map((p) => deleteDoc(doc(db, 'guestParticipations', p.id))),
+          );
+        },
+      );
 
-      // --- 2) SHARE KEYS & SUMMARIES ---
+      // --- 1.5) CLOUDINARY COVER ---
       const evSnap = await getDoc(doc(db, 'events', eventId));
       const evData = evSnap.data();
+      if (evData?.coverImage && evData.coverImage.includes('cloudinary')) {
+        if (evData.coverPublicId) {
+          await runStep(
+            'destroy cover (Cloudinary)',
+            evData.coverPublicId,
+            () => destroyCloudinaryImage(evData.coverPublicId),
+          );
+        }
+      }
+
+      // --- 2) SHARE KEYS & SUMMARIES ---
       if (evData?.shareKey) {
         const sk = evData.shareKey;
-        await runStep('delete eventShareKeys', `eventShareKeys/${sk}`, () => deleteDoc(doc(db, 'eventShareKeys', sk)));
-        await runStep('delete inviteSummaries', `eventInviteSummaries/${sk}`, () => deleteDoc(doc(db, 'eventInviteSummaries', sk)));
+        await runStep('delete eventShareKeys', `eventShareKeys/${sk}`, () =>
+          deleteDoc(doc(db, 'eventShareKeys', sk)),
+        );
+        await runStep(
+          'delete inviteSummaries',
+          `eventInviteSummaries/${sk}`,
+          () => deleteDoc(doc(db, 'eventInviteSummaries', sk)),
+        );
       }
 
       // --- 3) TREE CLEANUP (Sub-coleções) ---
       // Pegamos todos os programas
-      const progSnap = await getDocs(collection(db, 'events', eventId, 'programs'));
+      const progSnap = await getDocs(
+        collection(db, 'events', eventId, 'programs'),
+      );
       for (const pDoc of progSnap.docs) {
         const pId = pDoc.id;
 
         // Pegamos todas as atividades do programa
-        const actSnap = await getDocs(collection(db, 'events', eventId, 'programs', pId, 'activities'));
+        const actSnap = await getDocs(
+          collection(db, 'events', eventId, 'programs', pId, 'activities'),
+        );
         for (const aDoc of actSnap.docs) {
           const aId = aDoc.id;
 
           // Pegamos todas as fotos da atividade
-          const photoSnap = await getDocs(collection(db, 'events', eventId, 'programs', pId, 'activities', aId, 'photos'));
+          const photoSnap = await getDocs(
+            collection(
+              db,
+              'events',
+              eventId,
+              'programs',
+              pId,
+              'activities',
+              aId,
+              'photos',
+            ),
+          );
           for (const phDoc of photoSnap.docs) {
             const phId = phDoc.id;
 
             // Deletar Comentários da Foto
-            await runStep('delete comments', `events/${eventId}/.../photos/${phId}/comments`, async () => {
-              const commSnap = await getDocs(collection(db, 'events', eventId, 'programs', pId, 'activities', aId, 'photos', phId, 'comments'));
-              await Promise.all(commSnap.docs.map(c => deleteDoc(c.ref)));
-            });
+            await runStep(
+              'delete comments',
+              `events/${eventId}/.../photos/${phId}/comments`,
+              async () => {
+                const commSnap = await getDocs(
+                  collection(
+                    db,
+                    'events',
+                    eventId,
+                    'programs',
+                    pId,
+                    'activities',
+                    aId,
+                    'photos',
+                    phId,
+                    'comments',
+                  ),
+                );
+                await Promise.all(commSnap.docs.map((c) => deleteDoc(c.ref)));
+              },
+            );
 
             // Deletar Foto
-            await runStep('delete photo', `events/${eventId}/.../photos/${phId}`, () => deleteDoc(phDoc.ref));
+            await runStep(
+              'delete photo',
+              `events/${eventId}/.../photos/${phId}`,
+              async () => {
+                const photoData = phDoc.data();
+                if (photoData.publicId) {
+                  await destroyCloudinaryImage(photoData.publicId);
+                }
+                await deleteDoc(phDoc.ref);
+              },
+            );
           }
 
           // Deletar Atividade
-          await runStep('delete activity', `events/${eventId}/programs/${pId}/activities/${aId}`, () => deleteDoc(aDoc.ref));
+          await runStep(
+            'delete activity',
+            `events/${eventId}/programs/${pId}/activities/${aId}`,
+            () => deleteDoc(aDoc.ref),
+          );
         }
 
         // Deletar Programa
-        await runStep('delete program', `events/${eventId}/programs/${pId}`, () => deleteDoc(pDoc.ref));
+        await runStep(
+          'delete program',
+          `events/${eventId}/programs/${pId}`,
+          () => deleteDoc(pDoc.ref),
+        );
       }
 
       // --- 4) NOTES ---
       await runStep('delete notes', `events/${eventId}/notes`, async () => {
-        const noteSnap = await getDocs(collection(db, 'events', eventId, 'notes'));
-        await Promise.all(noteSnap.docs.map(n => deleteDoc(n.ref)));
+        const noteSnap = await getDocs(
+          collection(db, 'events', eventId, 'notes'),
+        );
+        await Promise.all(noteSnap.docs.map((n) => deleteDoc(n.ref)));
       });
 
       // --- 5) EVENT DOC (O grand finale) ---
-      await runStep('delete event doc', `events/${eventId}`, () => deleteDoc(doc(db, 'events', eventId)));
+      await runStep('delete event doc', `events/${eventId}`, () =>
+        deleteDoc(doc(db, 'events', eventId)),
+      );
 
       dispatch({ type: 'DELETE_EVENT', payload: eventId });
-      logger.debug(`[Diagnostic] 🏁 Processo de exclusão finalizado para o evento ${eventId}`);
+      logger.debug(
+        `[Diagnostic] 🏁 Processo de exclusão finalizado para o evento ${eventId}`,
+      );
     } catch (e: any) {
-      console.error('[Diagnostic] 🆘 Erro catastrófico no flow de exclusão:', e);
+      logger.error(
+        '[Diagnostic] 🆘 Erro catastrófico no flow de exclusão:',
+        e,
+      );
       Alert.alert(
         'Erro ao Excluir',
         'Ocorreu um erro ao tentar processar a exclusão. Verifique os logs de diagnóstico.',
@@ -603,6 +725,79 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       throw e;
     }
   };
+
+  // ---------------------------
+  // Gestão (Arrays) - Atualização Direta
+  // ---------------------------
+  const updateFinancials = async (eventId: string, financials: any[]) => {
+    await updateDoc(doc(db, 'events', eventId), { financials });
+
+    // Atualiza estado local
+    const event = state.events.find((e) => e.id === eventId);
+    if (event) {
+      dispatch({
+        type: 'UPDATE_EVENT',
+        payload: { ...event, financials },
+      });
+    }
+  };
+
+  const updateTasks = async (eventId: string, tasks: any[]) => {
+    await updateDoc(doc(db, 'events', eventId), { tasks });
+
+    const event = state.events.find((e) => e.id === eventId);
+    if (event) {
+      dispatch({
+        type: 'UPDATE_EVENT',
+        payload: { ...event, tasks },
+      });
+    }
+  };
+
+  const updateBuffet = async (eventId: string, buffet: string[]) => {
+    await updateDoc(doc(db, 'events', eventId), { buffet });
+
+    const event = state.events.find((e) => e.id === eventId);
+    if (event) {
+      dispatch({
+        type: 'UPDATE_EVENT',
+        payload: { ...event, buffet },
+      });
+    }
+  };
+
+  const updateTargetBudget = async (eventId: string, targetBudget: number) => {
+    await updateDoc(doc(db, 'events', eventId), { targetBudget });
+
+    const event = state.events.find((e) => e.id === eventId);
+    if (event) {
+      dispatch({
+        type: 'UPDATE_EVENT',
+        payload: { ...event, targetBudget },
+      });
+    }
+  };
+
+  /* Disabled for now
+  const updatePixInfo = async (
+    eventId: string,
+    pixInfo: {
+      pixKey: string;
+      pixKeyType: 'cpf' | 'cnpj' | 'email' | 'phone' | 'random';
+      pixMessage: string;
+    },
+  ) => {
+    await updateDoc(doc(db, 'events', eventId), { ...pixInfo });
+
+    const event = state.events.find((e) => e.id === eventId);
+    if (event) {
+      dispatch({
+        type: 'UPDATE_EVENT',
+        payload: { ...event, ...pixInfo },
+      });
+    }
+  };
+  */
 
   // ---------------------------
   // Lazy loading: Programs/Activities/Photos
@@ -722,7 +917,9 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
           const uid = getAuth().currentUser?.uid;
           if (uid) {
             try {
-              const pSnap = await getDoc(doc(db, 'guestParticipations', `${uid}_${eventId}`));
+              const pSnap = await getDoc(
+                doc(db, 'guestParticipations', `${uid}_${eventId}`),
+              );
               if (pSnap.exists()) {
                 myGuestMode = pSnap.data()?.mode;
               }
@@ -821,6 +1018,31 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
             programs,
             shareKey: eventData.shareKey ?? '',
             myGuestMode,
+
+            // ✅ Novos campos administrativos (com conversão de datas)
+            targetBudget: eventData.targetBudget ?? 0,
+            financials: (eventData.financials ?? []).map((f: any) => ({
+              ...f,
+              dueDate: f.dueDate?.toDate
+                ? f.dueDate.toDate()
+                : f.dueDate
+                  ? new Date(f.dueDate)
+                  : new Date(),
+            })),
+            tasks: (eventData.tasks ?? []).map((t: any) => ({
+              ...t,
+              deadline: t.deadline?.toDate
+                ? t.deadline.toDate()
+                : t.deadline
+                  ? new Date(t.deadline)
+                  : new Date(),
+            })),
+            buffet: eventData.buffet ?? [],
+
+            // Pix Info (Disabled)
+            // pixKey: eventData.pixKey,
+            // pixKeyType: eventData.pixKeyType,
+            // pixMessage: eventData.pixMessage,
           };
 
           dispatch({ type: 'UPDATE_EVENT', payload: updatedEvent });
@@ -983,6 +1205,7 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
     programId: string,
     activityId: string,
     photoId: string,
+    suppliedPublicId?: string,
   ) => {
     const photoRef = doc(
       db,
@@ -995,6 +1218,26 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
       'photos',
       photoId,
     );
+
+    try {
+      if (suppliedPublicId) {
+        await destroyCloudinaryImage(suppliedPublicId);
+      } else {
+        const snap = await getDoc(photoRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.publicId) {
+            await destroyCloudinaryImage(data.publicId);
+          }
+        }
+      }
+    } catch (e) {
+      logger.error(
+        '[EventsContext] Error cleaning up photo from Cloudinary:',
+        e,
+      );
+    }
+
     await deleteDoc(photoRef);
     await refetchEventById(eventId);
   };
@@ -1048,12 +1291,15 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
   const getGuestsByEventId = async (eventId: string): Promise<Guest[]> => {
     const participations = await getGuestParticipationsByEventId(eventId);
 
-    return participations.map((p) => ({
-      userId: p.userId,
-      name: p.userName ?? '',
-      mode: p.mode,
-      family: p.family ?? [],
-    }));
+    return participations.map(
+      (p) =>
+        ({
+          userId: p.userId,
+          name: p.userName ?? '',
+          mode: p.mode,
+          family: p.family ?? [],
+        }) as unknown as Guest,
+    );
   };
 
   return (
@@ -1083,6 +1329,13 @@ export const EventsProvider: React.FC<{ children: React.ReactNode }> = ({
         updateGuestParticipation,
         confirmPresence,
         getGuestsByEventId,
+
+        // Gestão
+        updateFinancials,
+        updateTasks,
+        updateBuffet,
+        updateTargetBudget,
+        // updatePixInfo,
       }}
     >
       {children}

@@ -1,4 +1,4 @@
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '@/config/firebase';
 import { pickUniqueShareKey } from '@/lib/utils/shareKey';
@@ -14,11 +14,12 @@ type InviteSummaryDoc = {
   location: string;
   startDate: any;
   endDate: any;
+  expiresAt?: any;
 
   createdAt?: any;
 };
 
-export async function createInviteForEvent(eventId: string) {
+export async function createInviteForEvent(eventId: string, ttlHours: number = 72) {
   const u = getAuth().currentUser;
   if (!u) throw new Error('not-authenticated');
   if (u.isAnonymous) throw new Error('anonymous-blocked');
@@ -27,10 +28,16 @@ export async function createInviteForEvent(eventId: string) {
   // 1) gera shareKey único
   const shareKey = await pickUniqueShareKey();
 
+  // calcula expiresAt com base no TTL escolhido pelo organizador
+  const expiresAt = Timestamp.fromDate(
+    new Date(Date.now() + ttlHours * 60 * 60 * 1000),
+  );
+
   // 2) grava eventShareKeys/{shareKey}
   try {
     await setDoc(doc(db, 'eventShareKeys', shareKey), {
       eventId,
+      expiresAt,
       createdAt: serverTimestamp(),
     });
   } catch (e: any) {
@@ -54,6 +61,7 @@ export async function createInviteForEvent(eventId: string) {
     location: event.location ?? '',
     startDate: event.startDate ?? null,
     endDate: event.endDate ?? null,
+    expiresAt,
     createdAt: serverTimestamp(),
   };
 
@@ -70,6 +78,7 @@ export async function createInviteForEvent(eventId: string) {
   return shareKey;
 }
 
+
 export async function createInviteSummary(shareKey: string, eventId: string) {
   const u = getAuth().currentUser;
   if (!u) throw new Error('not-authenticated');
@@ -80,6 +89,9 @@ export async function createInviteSummary(shareKey: string, eventId: string) {
   if (!eventSnap.exists()) throw new Error('event-not-found');
   const event = eventSnap.data() as any;
 
+  const keySnap = await getDoc(doc(db, 'eventShareKeys', shareKey));
+  const expiresAt = keySnap.exists() ? keySnap.data()?.expiresAt : null;
+
   const summary: InviteSummaryDoc = {
     v: 1,
     shareKey,
@@ -89,6 +101,7 @@ export async function createInviteSummary(shareKey: string, eventId: string) {
     location: event.location ?? '',
     startDate: event.startDate ?? null,
     endDate: event.endDate ?? null,
+    expiresAt,
     createdAt: serverTimestamp(),
   };
 

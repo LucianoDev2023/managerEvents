@@ -1,5 +1,5 @@
 import { getAuth } from 'firebase/auth';
-import logger from '@/lib/logger';
+import { logger } from '@/lib/logger';
 
 const SIGN_BASE_URL = 'https://api.iafast.com.br';
 

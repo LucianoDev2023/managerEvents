@@ -28,7 +28,8 @@ import { useAuthListener } from '@/hooks/useAuthListener';
 import { createInviteSummary } from '@/hooks/inviteService';
 import { useEvents } from '@/context/EventsContext';
 import { getOptimizedUrl } from '@/lib/cloudinary';
-import logger from '@/lib/logger';
+import { logger } from '@/lib/logger';
+import Fonts from '@/constants/Fonts';
 
 type GuestMode = 'confirmado' | 'acompanhando';
 
@@ -42,13 +43,19 @@ type InviteSummary = {
   startDate?: any;
   endDate?: any;
   ownerName?: string;
+  expiresAt?: any;
 };
 
 function toDateLabel(v: any) {
   try {
     const d = typeof v?.toDate === 'function' ? v.toDate() : new Date(v);
     if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleDateString();
+    return d.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   } catch {
     return '';
   }
@@ -75,6 +82,9 @@ export default function InvitePreviewScreen() {
   const fetchedForKey = useRef<string | null>(null);
   // ✅ trava navegação pro evento (pós-check de participação)
   const navigatedToEvent = useRef<string | null>(null);
+
+  // ✅ Context (precisa estar antes do useEffect que usa)
+  const { refetchEventById } = useEvents();
 
   // 1) Key inválida => landing (só 1x)
   useEffect(() => {
@@ -144,29 +154,34 @@ export default function InvitePreviewScreen() {
       if (!uid) return;
 
       // trava: não refaz fetch sem necessidade
-      if (fetchedForKey.current === shareKey) return;
+      if (fetchedForKey.current === shareKey) {
+        if (summary) setLoading(false);
+        return;
+      }
       fetchedForKey.current = shareKey;
 
-      logger.debug(`[InviteDiag] 🛠️ Iniciando resolução: shareKey=${shareKey}, uid=${uid}`);
       setLoading(true);
       setSummary(null);
 
       try {
         // 🔥 Pequeno delay para garantir que o Firestore Auth propagou as regras
         // (especialmente após um redirect rápido de login/register)
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 200));
 
         let snap;
         try {
           snap = await getDoc(doc(db, 'eventInviteSummaries', shareKey));
         } catch (e: any) {
-          logger.debug('[InviteDiag] ⚠️ Erro na leitura primária (summary):', e.code);
-          // se for permissão negada, tenta mais uma vez em 1s
+          logger.debug(
+            '[InviteDiag] ⚠️ Erro na leitura primária (summary):',
+            e.code,
+          );
+          // se for permissão negada, tenta mais uma vez após um delay menor
           if (e.code === 'permission-denied') {
-             await new Promise((resolve) => setTimeout(resolve, 1000));
-             snap = await getDoc(doc(db, 'eventInviteSummaries', shareKey));
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            snap = await getDoc(doc(db, 'eventInviteSummaries', shareKey));
           } else {
-             throw e;
+            throw e;
           }
         }
 
@@ -175,66 +190,74 @@ export default function InvitePreviewScreen() {
         let usedFallback = false;
 
         if (snap?.exists()) {
-          logger.debug('[InviteDiag] ✅ eventInviteSummaries encontrado');
           const raw = snap.data() as InviteSummary;
           if (raw?.shareKey === shareKey && raw?.v === 1 && raw?.eventId) {
             data = raw;
+            if (!data.expiresAt) {
+              try {
+                const keySnap = await getDoc(
+                  doc(db, 'eventShareKeys', shareKey),
+                );
+                if (keySnap.exists()) {
+                  data.expiresAt = keySnap.data()?.expiresAt;
+                }
+              } catch (keyErr) {
+                // ignore
+              }
+            }
           }
-        } else {
-          logger.debug('[InviteDiag] ⚠️ eventInviteSummaries não existe');
         }
 
         // Fallback: se não há summary válido, resolve eventId via eventShareKeys
         if (!data) {
-          logger.debug('[InviteDiag] ⏳ Tentando fallback via eventShareKeys...');
           try {
             const keySnap = await getDoc(doc(db, 'eventShareKeys', shareKey));
             if (cancelled) return;
             if (keySnap.exists()) {
-              logger.debug('[InviteDiag] ✅ eventShareKeys (fallback) encontrado');
               const eventId = (keySnap.data() as any)?.eventId;
               if (typeof eventId === 'string' && eventId) {
                 data = { v: 1, shareKey, eventId, title: 'Convite' };
                 usedFallback = true;
               }
-            } else {
-              logger.debug('[InviteDiag] ❌ eventShareKeys (fallback) NÃO existe');
             }
           } catch (keyErr: any) {
-            logger.debug('[InviteDiag] ❌ Erro ao ler eventShareKeys (fallback):', keyErr.code);
+            logger.debug(
+              '[InviteDiag] ❌ Erro ao ler eventShareKeys (fallback):',
+              keyErr.code,
+            );
           }
         }
 
         if (!data) {
-          logger.debug('[InviteDiag] 🚫 Falha total: doc não encontrado ou sem permissão');
           setSummary(null);
           return;
         }
 
         try {
-          logger.debug(`[InviteDiag] ⏳ Verificando detalhes do evento: ${data?.eventId}`);
           const evSnap = await getDoc(doc(db, 'events', data!.eventId));
           if (evSnap.exists()) {
-            logger.debug('[InviteDiag] ✅ Evento principal acessível');
             const evData: any = evSnap.data();
             const isOwner = evData?.userId === uid;
             if (isOwner) {
-              logger.debug('[InviteDiag] 👑 Usuário é o dono, redirecionando direto');
               if (usedFallback) {
                 try {
                   await createInviteSummary(shareKey, data!.eventId);
                 } catch (healErr: any) {
-                  logger.debug('[InviteDiag] ⚠️ Erro ao curar summary:', healErr.message);
+                  logger.debug(
+                    '[InviteDiag] ⚠️ Erro ao curar summary:',
+                    healErr.message,
+                  );
                 }
               }
               goEvent(data!.eventId);
               return;
             }
-          } else {
-            logger.debug('[InviteDiag] ❌ Evento principal não encontrado ou ACESSO NEGADO');
           }
         } catch (checkErr: any) {
-          logger.debug('[InviteDiag] ❌ Erro ao ler evento (ignorável pro preview):', checkErr.code);
+          logger.debug(
+            '[InviteDiag] ❌ Erro ao ler evento (ignorável pro preview):',
+            checkErr.code,
+          );
         }
 
         setSummary(data);
@@ -242,7 +265,6 @@ export default function InvitePreviewScreen() {
         // Se já for logado, checa se já participa
         if (uid) {
           try {
-            logger.debug(`[InviteDiag] 🔍 Checando participação para uid=${uid}, eventId=${data.eventId}`);
             const existing = await getGuestParticipation(uid, data.eventId);
             if (cancelled) return;
 
@@ -250,21 +272,28 @@ export default function InvitePreviewScreen() {
               existing?.mode === 'confirmado' ||
               existing?.mode === 'acompanhando'
             ) {
-              logger.debug('[InviteDiag] ✅ Já participa, indo para Minha Participação');
               await refetchEventById(data.eventId);
               goMyParticipation(data.eventId);
               return;
             }
           } catch (partErr: any) {
-             const code = partErr.code || '';
-             const msg = partErr.message || '';
-             // 💡 Conforme solicitado: se der acesso negado, consideramos que o registro não existe
-             if (code.includes('permission-denied') || msg.includes('permission-denied')) {
-               logger.debug('[InviteDiag] ℹ️ Acesso negado na participação (tratado como inexistente).');
-             } else {
-               logger.debug('[InviteDiag] ⚠️ Erro ao checar participação:', code || msg);
-             }
-             // Não interrompe o fluxo de preview
+            const code = partErr.code || '';
+            const msg = partErr.message || '';
+            // 💡 Conforme solicitado: se der acesso negado, consideramos que o registro não existe
+            if (
+              code.includes('permission-denied') ||
+              msg.includes('permission-denied')
+            ) {
+              logger.debug(
+                '[InviteDiag] ℹ️ Acesso negado na participação (tratado como inexistente).',
+              );
+            } else {
+              logger.debug(
+                '[InviteDiag] ⚠️ Erro ao checar participação:',
+                code || msg,
+              );
+            }
+            // Não interrompe o fluxo de preview
           }
         }
       } catch (e: any) {
@@ -279,10 +308,7 @@ export default function InvitePreviewScreen() {
     return () => {
       cancelled = true;
     };
-  }, [shareKey, uid, authLoading, goEvent]);
-
-  // ✅ Context
-  const { refetchEventById } = useEvents();
+  }, [shareKey, uid, authLoading]);
 
   const handleChoose = async (mode: GuestMode) => {
     if (!uid || !summary?.eventId) return;
@@ -355,7 +381,7 @@ export default function InvitePreviewScreen() {
             marginTop: 16,
             paddingVertical: 10,
             paddingHorizontal: 16,
-            borderRadius: 12,
+            borderRadius: 16,
             borderWidth: 1,
             borderColor: colors.border,
           }}
@@ -405,9 +431,28 @@ export default function InvitePreviewScreen() {
       )}
 
       {(start || end) && (
-        <Text style={{ color: colors.textSecondary, marginBottom: 12 }}>
-          Data: {start}
-          {end ? ` — ${end}` : ''}
+        <Text
+          style={{
+            color: colors.textSecondary,
+            marginBottom: 12,
+            fontFamily: Fonts.medium,
+          }}
+        >
+          Data: {start === end ? start : `${start} — ${end}`}
+        </Text>
+      )}
+
+      {!!summary.expiresAt && (
+        <Text
+          style={{
+            color: colors.textSecondary,
+            marginBottom: 20,
+            opacity: 0.8,
+            fontFamily: Fonts.medium,
+            fontSize: 14,
+          }}
+        >
+          🕒 Link expirando em: {toDateLabel(summary.expiresAt)}
         </Text>
       )}
 
@@ -428,7 +473,7 @@ export default function InvitePreviewScreen() {
           style={{
             flex: 1,
             paddingVertical: 12,
-            borderRadius: 12,
+            borderRadius: 16,
             borderWidth: 1,
             borderColor: colors.primary,
             backgroundColor:
@@ -453,7 +498,7 @@ export default function InvitePreviewScreen() {
           style={{
             flex: 1,
             paddingVertical: 12,
-            borderRadius: 12,
+            borderRadius: 16,
             borderWidth: 1,
             borderColor: colors.border,
             backgroundColor:
@@ -483,7 +528,7 @@ export default function InvitePreviewScreen() {
         style={{
           marginTop: 16,
           paddingVertical: 10,
-          borderRadius: 12,
+          borderRadius: 16,
           borderWidth: 1,
           borderColor: colors.border,
           alignItems: 'center',

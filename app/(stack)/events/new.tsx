@@ -25,10 +25,14 @@ import {
   Info,
   MapPin,
   Camera,
-  Pencil,
+  Edit,
+  Plus,
+  X,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Href } from 'expo-router';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import Fonts from '@/constants/Fonts';
 
 import { useEvents } from '@/context/EventsContext';
 import Colors from '@/constants/Colors';
@@ -55,12 +59,22 @@ export default function EventFormScreen() {
     lat,
     lng,
     locationName,
+    pTitle,
+    pDesc,
+    pCover,
+    pStart,
+    pEnd,
   } = useLocalSearchParams<{
     id?: string;
     mode?: 'create' | 'edit';
     lat?: string;
     lng?: string;
     locationName?: string;
+    pTitle?: string;
+    pDesc?: string;
+    pCover?: string;
+    pStart?: string;
+    pEnd?: string;
   }>();
 
   const auth = getAuth();
@@ -143,6 +157,18 @@ export default function EventFormScreen() {
     }
   }, [lat, lng, locationName, setValue]);
 
+  // ✅ Restaura estado preservado ao voltar da seleção de local
+  useEffect(() => {
+    if (pTitle) setValue('title', pTitle);
+    if (pDesc) setValue('description', pDesc);
+    if (pCover) {
+      setLocalCoverUri(pCover);
+      setValue('coverImage', pCover);
+    }
+    if (pStart) setValue('startDate', new Date(pStart));
+    if (pEnd) setValue('endDate', new Date(pEnd));
+  }, [pTitle, pDesc, pCover, pStart, pEnd, setValue]);
+
   const onInvalid = useCallback(
     (err: any) => {
       const fieldNames = Object.keys(err);
@@ -154,6 +180,25 @@ export default function EventFormScreen() {
       }
     },
     [mode, id],
+  );
+
+  const onDateChange = useCallback(
+    (event: any, selectedDate?: Date) => {
+      // No Android, o picker fecha sozinho ao selecionar ou cancelar
+      if (Platform.OS === 'android') {
+        setShowStartDatePicker(false);
+        setShowEndDatePicker(false);
+      }
+
+      if (event.type === 'set' && selectedDate) {
+        if (showStartDatePicker) {
+          setValue('startDate', selectedDate, { shouldValidate: true });
+        } else if (showEndDatePicker) {
+          setValue('endDate', selectedDate, { shouldValidate: true });
+        }
+      }
+    },
+    [showStartDatePicker, showEndDatePicker, setValue],
   );
 
   const handleNavigate = useCallback((eventId: string) => {
@@ -188,7 +233,7 @@ export default function EventFormScreen() {
       mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.8,
-      aspect: [2, 1],
+      aspect: [16, 9],
     });
 
     if (result.canceled) return;
@@ -373,345 +418,403 @@ export default function EventFormScreen() {
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
-          padding: 24,
+          paddingBottom: 24,
           paddingTop:
             Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 40) : 0,
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={[styles.heading, { color: colors.text }]}>
-          {mode === 'edit' ? 'Editar Evento' : 'Criar Evento'}
-        </Text>
-
-        {/* ======== Localização ======== */}
-        <Controller
-          control={control}
-          name="location"
-          render={({ field }) => (
-            <TouchableOpacity
-              onPress={() =>
-                router.replace({
-                  pathname: '/selectLocationScreen',
-                  params: {
-                    redirectTo: '(newevents)/event-form',
-                    mode,
-                    id,
-                  },
-                })
-              }
-              activeOpacity={0.9}
-            >
-              <TextInput
-                label="Localização"
-                placeholder="Toque para selecionar no mapa"
-                value={field.value}
-                onChangeText={field.onChange}
-                editable={false}
-                error={errors.location?.message}
-                icon={<MapPin size={18} color={colors.primary} />}
-                inputStyle={{ color: colors.textSecondary }}
-              />
-            </TouchableOpacity>
-          )}
-        />
-
-        {/* ======== Título ======== */}
-        <Controller
-          control={control}
-          name="title"
-          render={({ field }) => (
-            <TextInput
-              label="Título"
-              value={field.value}
-              onChangeText={field.onChange}
-              error={errors.title?.message}
-              inputStyle={{ color: colors.textSecondary }}
-            />
-          )}
-        />
-
-        {/* ======== Datas ======== */}
-        <View style={styles.dateSection}>
-          <Text style={[styles.dateLabel, { color: colors.text }]}>
-            Datas do Evento
-          </Text>
-
-          <View style={styles.datePickersContainer}>
-            {/* Início */}
-            <View style={styles.datePickerWrapper}>
-              <Text
-                style={[
-                  styles.datePickerLabel,
-                  { color: colors.textSecondary },
-                ]}
-              >
-                Início
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => setShowStartDatePicker(true)}
-                style={[styles.dateButton, { borderColor: colors.border }]}
-              >
-                <Calendar size={18} color={colors.primary} />
-                <Text style={[styles.dateText, { color: colors.text }]}>
-                  {formatDate(startDate)}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Fim */}
-            <View style={styles.datePickerWrapper}>
-              <Text
-                style={[
-                  styles.datePickerLabel,
-                  { color: colors.textSecondary },
-                ]}
-              >
-                Fim
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => setShowEndDatePicker(true)}
-                style={[styles.dateButton, { borderColor: colors.border }]}
-              >
-                <CalendarRange size={18} color={colors.primary} />
-                <Text style={[styles.dateText, { color: colors.text }]}>
-                  {formatDate(endDate)}
-                </Text>
-              </TouchableOpacity>
-
-              {errors.endDate && (
-                <Text style={[styles.errorText, { color: colors.error }]}>
-                  {errors.endDate.message}
-                </Text>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {showStartDatePicker && (
-          <DateTimePicker
-            value={startDate}
-            mode="date"
-            display="default"
-            onChange={(_, date) => {
-              setShowStartDatePicker(false);
-              if (!date) return;
-
-              setValue('startDate', date, { shouldValidate: true });
-
-              // garante consistência: endDate >= startDate
-              if (endDate < date) {
-                const newEnd = new Date(date);
-                newEnd.setDate(newEnd.getDate() + 1);
-                setValue('endDate', newEnd, { shouldValidate: true });
-              }
-            }}
-          />
-        )}
-
-        {showEndDatePicker && (
-          <DateTimePicker
-            value={endDate}
-            mode="date"
-            display="default"
-            minimumDate={startDate}
-            onChange={(_, date) => {
-              setShowEndDatePicker(false);
-              if (!date) return;
-              setValue('endDate', date, { shouldValidate: true });
-            }}
-          />
-        )}
-
-        {/* ======== Descrição ======== */}
-        <Controller
-          control={control}
-          name="description"
-          render={({ field }) => (
-            <TextInput
-              label="Descrição"
-              value={field.value ?? ''}
-              onChangeText={field.onChange}
-              multiline
-              numberOfLines={4}
-              icon={<Info size={20} color={colors.primary} />}
-              inputStyle={{ color: colors.textSecondary }}
-            />
-          )}
-        />
-
-        {/* ======== Cover Image ======== */}
-        <View style={{ marginBottom: 20 }}>
-          {!previewCover ? (
-            <TouchableOpacity
-              style={[
-                styles.minimalSelector,
-                {
-                  backgroundColor: colors.backgroundSecondary,
-                  borderColor: colors.border,
-                },
-              ]}
-              activeOpacity={0.7}
-              disabled={isUploadingCover}
-              onPress={pickAndUploadCover}
-            >
-              {isUploadingCover ? (
-                <ActivityIndicator color={colors.primary} size="small" />
-              ) : (
-                <>
-                  <Camera size={20} color={colors.primary} />
-                  <Text
-                    style={[styles.minimalSelectorText, { color: colors.text }]}
-                  >
-                    Adicionar foto de capa
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View>
+        {/* ======== Cover Image Banner ======== */}
+        <View style={styles.bannerContainer}>
+          {previewCover ? (
+            <Animated.View entering={FadeIn} style={styles.previewCard}>
               <Image
-                source={{ 
-                  uri: previewCover.startsWith('http') 
-                    ? getOptimizedUrl(previewCover, { width: 800, quality: 'auto' }) 
-                    : previewCover 
+                source={{
+                  uri: previewCover.startsWith('http')
+                    ? getOptimizedUrl(previewCover, { width: 800, quality: 'auto' })
+                    : previewCover,
                 }}
-                style={styles.coverPreview}
+                style={styles.previewImage}
+                resizeMode="cover"
               />
-
               <TouchableOpacity
-                style={[styles.editBadge, { backgroundColor: colors.primary }]}
-                activeOpacity={0.8}
-                disabled={isUploadingCover}
+                style={[styles.clearButton, { backgroundColor: colors.error }]}
+                onPress={() => {
+                  setLocalCoverUri(null);
+                  setValue('coverImage', '', { shouldValidate: true });
+                }}
+              >
+                <X size={20} color="white" />
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.editOverlayButton, { backgroundColor: colors.primary }]}
                 onPress={pickAndUploadCover}
+                disabled={isUploadingCover}
               >
                 {isUploadingCover ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Pencil size={16} color="#fff" />
+                  <Edit size={16} color="#fff" />
                 )}
               </TouchableOpacity>
-            </View>
+            </Animated.View>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              disabled={isUploadingCover}
+              onPress={pickAndUploadCover}
+              style={[
+                styles.imagePickerCard,
+                { 
+                  borderColor: colors.primary, 
+                  backgroundColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
+                  borderStyle: 'dashed' 
+                },
+              ]}
+            >
+              <View style={[styles.pickerIconCircle, { backgroundColor: colors.primary + '20' }]}>
+                {isUploadingCover ? (
+                  <ActivityIndicator color={colors.primary} size="large" />
+                ) : (
+                  <Plus size={32} color={colors.primary} />
+                )}
+              </View>
+              <Text style={[styles.pickerTitle, { color: colors.text }]}>
+                Adicionar Capa
+              </Text>
+              <Text style={[styles.pickerSub, { color: colors.textSecondary }]}>
+                Toque aqui para escolher uma imagem
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
 
         {errors.coverImage && (
-          <Text style={{ color: colors.error }}>
+          <Text style={{ color: colors.error, textAlign: 'center', marginTop: -10, marginBottom: 10 }}>
             {errors.coverImage.message}
           </Text>
         )}
 
-        {/* ======== Ações ======== */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginTop: 24,
-          }}
-        >
-          <Button
-            title="Cancelar"
-            onPress={() => {
-              if (mode === 'edit' && id) {
-                router.replace(`/(stack)/events/${id}` as Href);
-              } else {
-                router.back();
-              }
-            }}
-            variant="cancel"
-            style={{ flex: 0.48 }}
+        <View style={styles.formContent}>
+          <Text style={[styles.heading, { color: colors.text }]}>
+            {mode === 'edit' ? 'Editar Evento' : 'Novo Evento'}
+          </Text>
+
+          {/* ======== Título ======== */}
+          <Controller
+            control={control}
+            name="title"
+            render={({ field }) => (
+              <TextInput
+                label="Título"
+                value={field.value}
+                onChangeText={field.onChange}
+                error={errors.title?.message}
+                inputStyle={{ color: colors.textSecondary }}
+                style={{ marginBottom: 12 }}
+              />
+            )}
           />
-          <Button
-            title={mode === 'edit' ? 'Salvar' : 'Criar evento'}
-            onPress={handleSubmit(onSubmit, onInvalid)}
-            style={{ flex: 0.48 }}
-            disabled={isSubmitting || isUploadingCover}
+
+           {/* ======== Localização ======== */}
+           <Controller
+            control={control}
+            name="location"
+            render={({ field }) => (
+              <TouchableOpacity
+                onPress={() =>
+                  router.replace({
+                    pathname: '/selectLocationScreen',
+                    params: {
+                      redirectTo: '(newevents)/event-form',
+                      mode,
+                      id,
+                      pTitle: watch('title'),
+                      pDesc: watch('description'),
+                      pCover: previewCover,
+                      pStart: watch('startDate')?.toISOString(),
+                      pEnd: watch('endDate')?.toISOString(),
+                    },
+                  })
+                }
+                activeOpacity={0.9}
+              >
+                <TextInput
+                  label="Localização"
+                  placeholder="Selecionar no mapa"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  editable={false}
+                  error={errors.location?.message}
+                  icon={<MapPin size={18} color={colors.primary} />}
+                  inputStyle={{ color: colors.textSecondary }}
+                  style={{ marginBottom: 12 }}
+                />
+              </TouchableOpacity>
+            )}
           />
+
+          {/* ======== Datas ======== */}
+          <View style={styles.dateSection}>
+            <View style={styles.datePickersContainer}>
+              {/* Início de: Fim em Row compacta */}
+              <View style={[styles.datePickerWrapper, { marginRight: 8 }]}>
+                <Text style={[styles.miniLabel, { color: colors.textSecondary }]}>Início</Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setShowStartDatePicker(true)}
+                  style={[
+                    styles.dateInput,
+                    { borderColor: colors.border, backgroundColor: colors.background }
+                  ]}
+                >
+                  <Text style={[styles.dateText, { color: colors.text }]}>
+                    {formatDate(startDate)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.datePickerWrapper}>
+                <Text style={[styles.miniLabel, { color: colors.textSecondary }]}>Fim</Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setShowEndDatePicker(true)}
+                  style={[
+                    styles.dateInput,
+                    { borderColor: colors.border, backgroundColor: colors.background }
+                  ]}
+                >
+                  <Text style={[styles.dateText, { color: colors.text }]}>
+                    {formatDate(endDate)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            {errors.endDate && (
+                <Text style={[styles.errorText, { color: colors.error }]}>
+                  {errors.endDate.message}
+                </Text>
+              )}
+          </View>
+
+          {/* ======== Descrição ======== */}
+          <View style={{ marginBottom: 16 }}>
+            <Controller
+              control={control}
+              name="description"
+              render={({ field }) => (
+                <TextInput
+                  label="Descrição"
+                  value={field.value ?? ''}
+                  onChangeText={field.onChange}
+                  multiline
+                  numberOfLines={2}
+                  maxLength={110}
+                  inputStyle={{ color: colors.textSecondary, textAlign: 'justify', minHeight: 60 }}
+                  style={{ marginBottom: 4 }}
+                />
+              )}
+            />
+            <Text style={[styles.charCounter, { color: colors.textSecondary }]}>
+              {110 - (watch('description')?.length || 0)}
+            </Text>
+          </View>
+
+          {/* ======== Ações ======== */}
+          <View style={styles.actionRow}>
+            <Button
+              title="Cancelar"
+              onPress={() => {
+                if (mode === 'edit' && id) {
+                  router.replace(`/(stack)/events/${id}` as Href);
+                } else {
+                  router.back();
+                }
+              }}
+              variant="ghost"
+              style={{ flex: 1, marginRight: 12 }}
+            />
+            <Button
+              title={mode === 'edit' ? 'Salvar' : 'Criar'}
+              onPress={handleSubmit(onSubmit, onInvalid)}
+              style={{ flex: 1 }}
+              disabled={isSubmitting || isUploadingCover}
+            />
+          </View>
         </View>
       </ScrollView>
 
       {isSubmitting && <LoadingOverlay message="Salvando evento..." />}
+
+      {showStartDatePicker && (
+        <DateTimePicker
+          value={startDate || new Date()}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={onDateChange}
+          minimumDate={new Date()}
+        />
+      )}
+
+      {showEndDatePicker && (
+        <DateTimePicker
+          value={endDate || new Date()}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={onDateChange}
+          minimumDate={startDate || new Date()}
+        />
+      )}
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  formContent: {
+    padding: 20,
+  },
   heading: {
-    fontSize: 24,
+    fontSize: 20,
     fontFamily: 'Inter-Bold',
-    marginBottom: 24,
+    marginBottom: 16,
     textAlign: 'center',
   },
 
-  datePickersContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  // Banner Styles
+  bannerContainer: {
+    padding: 20,
+    paddingBottom: 0,
   },
-  dateSection: {
+  imagePickerCard: {
+    width: '100%',
+    padding: 30,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  pickerIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
   },
-  dateLabel: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    marginTop: 10,
-    marginBottom: 8,
-  },
-  datePickerWrapper: {
-    flex: 0.48,
-  },
-  datePickerLabel: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
+  pickerTitle: {
+    fontSize: 18,
+    fontFamily: Fonts.bold,
     marginBottom: 4,
   },
-  dateButton: {
+  pickerSub: {
+    fontSize: 14,
+    fontFamily: Fonts.regular,
+  },
+
+  previewCard: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  previewImage: { width: '100%', height: '100%' },
+  clearButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  editOverlayButton: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+
+  bannerPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  bannerText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+  },
+
+  // Dates
+  dateSection: {
+    marginBottom: 12,
+  },
+  datePickersContainer: {
+    flexDirection: 'row',
+  },
+  datePickerWrapper: {
+    flex: 1,
+  },
+  miniLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+    marginBottom: 4,
+    marginLeft: 2,
+  },
+  dateInput: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderRadius: 8,
-    padding: 12,
+    paddingHorizontal: 10,
+    height: 40, 
+    justifyContent: 'center',
   },
   dateText: {
-    marginLeft: 8,
     fontFamily: 'Inter-Regular',
-    fontSize: 13,
+    fontSize: 14,
+  },
+
+  charCounter: {
+    fontSize: 11,
+    textAlign: 'right',
+    fontFamily: 'Inter-Regular',
+    opacity: 0.6,
   },
   errorText: {
     fontSize: 12,
-    fontFamily: 'Inter-Regular',
     marginTop: 4,
   },
 
-  coverPreview: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    backgroundColor: '#222',
-  },
-  minimalSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 12,
-    justifyContent: 'flex-start',
-  },
-  minimalSelectorText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 14,
-  },
   editBadge: {
-    position: 'absolute',
-    right: 12,
-    bottom: 12,
-    padding: 10,
-    borderRadius: 50,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    padding: 8,
+    borderRadius: 20,
+    elevation: 3,
+  },
+
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
   },
 });

@@ -235,14 +235,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   modalWrapper: {
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
   },
   modal: {
     minHeight: 120,
     padding: 16,
-    borderRadius: 20,
+    borderRadius: 16,
   },
 
   select: {

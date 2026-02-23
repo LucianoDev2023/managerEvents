@@ -1,5 +1,4 @@
-// app/(stack)/events/[id]/edit-participation.tsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,32 +11,38 @@ import {
   ActivityIndicator,
   Pressable,
   BackHandler,
+  Switch,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuthListener } from '@/hooks/useAuthListener';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import Button from '@/components/ui/Button';
-import { Trash2 } from 'lucide-react-native';
+import { Trash2, Baby } from 'lucide-react-native';
 import {
   getGuestParticipationByDocId,
   updateGuestParticipation,
 } from '@/hooks/guestService';
+import { FamilyMember } from '@/types';
 
 export default function EditParticipationScreen() {
   const { id: eventId, guestId } = useLocalSearchParams<{ id: string, guestId: string }>();
   const router = useRouter();
 
   const { user } = useAuthListener();
-  // const uid = user?.uid; // Removido: usaremos o targetUserId do guest
 
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
 
   const [targetUserId, setTargetUserId] = useState<string>('');
   const [userName, setUserName] = useState('');
-  const [family, setFamily] = useState<string[]>([]);
+  const [family, setFamily] = useState<FamilyMember[]>([]);
+  
+  // Input states
   const [newName, setNewName] = useState('');
+  const [isChild, setIsChild] = useState(false);
+  const [childAge, setChildAge] = useState('');
+
   const [saving, setSaving] = useState(false);
   const [initializing, setInitializing] = useState(true);
 
@@ -66,7 +71,19 @@ export default function EditParticipationScreen() {
 
         setTargetUserId(guest.userId);
         setUserName(guest.userName ?? '');
-        setFamily(Array.isArray(guest.family) ? guest.family : []);
+        
+        // 🔄 Migração: converte string[] para FamilyMember[]
+        const rawFamily = guest.family ?? [];
+        const formattedFamily: FamilyMember[] = Array.isArray(rawFamily) 
+            ? rawFamily.map((item: any) => {
+                if (typeof item === 'string') {
+                    return { name: item, isChild: false };
+                }
+                return item;
+            })
+            : [];
+
+        setFamily(formattedFamily);
       } catch (error: any) {
         Alert.alert('Erro', 'Não foi possível carregar a participação.');
       } finally {
@@ -99,13 +116,30 @@ export default function EditParticipationScreen() {
     const trimmed = newName.trim();
     if (!trimmed) return;
 
-    if (family.some((n) => n.toLowerCase() === trimmed.toLowerCase())) {
+    if (family.some((m) => m.name.toLowerCase() === trimmed.toLowerCase())) {
       Alert.alert('Atenção', 'Esse nome já está na lista.');
       return;
     }
 
-    setFamily((prev) => [...prev, trimmed]);
+    // Age check for children
+    if (isChild) {
+      const age = parseInt(childAge);
+      if (isNaN(age) || age < 0 || age > 12) {
+        Alert.alert('Idade inválida', 'Para ser considerado criança, a idade deve ser entre 0 e 12 anos.');
+        return;
+      }
+    }
+
+    const newMember: FamilyMember = {
+        name: trimmed,
+        isChild,
+        age: isChild && childAge ? parseInt(childAge) : undefined
+    };
+
+    setFamily((prev) => [...prev, newMember]);
     setNewName('');
+    setIsChild(false);
+    setChildAge('');
   };
 
   const handleRemove = (name: string) => {
@@ -114,7 +148,7 @@ export default function EditParticipationScreen() {
       {
         text: 'Remover',
         style: 'destructive',
-        onPress: () => setFamily((prev) => prev.filter((n) => n !== name)),
+        onPress: () => setFamily((prev) => prev.filter((m) => m.name !== name)),
       },
     ]);
   };
@@ -150,7 +184,7 @@ export default function EditParticipationScreen() {
       Alert.alert('✅ Sucesso', 'Participação atualizada!');
 
       router.replace({
-        pathname: '/events/[id]/confirmed-guests',
+        pathname: '/(stack)/events/[id]/confirmed-guests',
         params: { id: eventId },
       } as any);
     } catch (error: any) {
@@ -179,7 +213,7 @@ export default function EditParticipationScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.container, { backgroundColor: colors.background }]}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={[styles.label, { color: colors.textSecondary }]}>
           Nome do convidado
         </Text>
@@ -200,24 +234,54 @@ export default function EditParticipationScreen() {
           Adicionar acompanhante
         </Text>
 
-        <View style={styles.inputRow}>
+        <View style={[styles.formCard, { borderColor: colors.border }]}>
           <TextInput
             value={newName}
             onChangeText={setNewName}
-            placeholder="Ex: Maria"
+            placeholder="Nome do acompanhante"
             placeholderTextColor={colors.textSecondary}
             style={[
               styles.input,
-              { flex: 1, borderColor: colors.border, color: colors.text },
+              { flex: 1, borderColor: colors.border, color: colors.text, marginBottom: 12 },
             ]}
             returnKeyType="done"
-            onSubmitEditing={handleAdd}
           />
+
+          <View style={[styles.rowBetween, { marginBottom: 12 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Baby size={20} color={colors.text} />
+                  <Text style={{ color: colors.text, fontSize: 16 }}>É criança?</Text>
+              </View>
+              <Switch 
+                  value={isChild} 
+                  onValueChange={setIsChild} 
+                  trackColor={{ false: '#767577', true: colors.primary }}
+                  thumbColor="#f4f3f4"
+              />
+          </View>
+
+          {isChild && (
+              <TextInput
+                  value={childAge}
+                  onChangeText={setChildAge}
+                  placeholder="Idade da criança"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                  style={[
+                      styles.input,
+                      {
+                      borderColor: colors.border,
+                      color: colors.text,
+                      marginBottom: 12
+                      },
+                  ]}
+              />
+          )}
 
           <Pressable
             style={({ pressed }) => [
               styles.addButton,
-              { opacity: pressed ? 0.7 : 1, backgroundColor: colors.primary },
+              { opacity: pressed ? 0.7 : 1, backgroundColor: colors.primary, marginBottom: 0 },
             ]}
             onPress={handleAdd}
           >
@@ -239,9 +303,9 @@ export default function EditParticipationScreen() {
               </Pressable>
             </View>
 
-            {family.map((name, index) => (
+            {family.map((member, index) => (
               <View
-                key={`${name}-${index}`}
+                key={`${member.name}-${index}`}
                 style={[
                   styles.nameRow,
                   {
@@ -250,11 +314,21 @@ export default function EditParticipationScreen() {
                   },
                 ]}
               >
-                <Text style={[styles.nameText, { color: colors.text }]}>
-                  • {name}
-                </Text>
+                <View style={{ flex: 1 }}>
+                    <Text style={[styles.nameText, { color: colors.text }]}>
+                    {member.name}
+                    </Text>
+                    {member.isChild && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                            <Baby size={14} color={colors.textSecondary} style={{ marginRight: 4 }} />
+                            <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                                Criança • {member.age} anos
+                            </Text>
+                        </View>
+                    )}
+                </View>
 
-                <Pressable onPress={() => handleRemove(name)}>
+                <Pressable onPress={() => handleRemove(member.name)}>
                   <Trash2 size={18} color={colors.error} />
                 </Pressable>
               </View>
@@ -302,14 +376,14 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     fontFamily: 'Inter_400Regular',
-    marginBottom: 12,
   },
 
   addButton: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
-    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   listHeader: {
@@ -353,4 +427,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'Inter_400Regular',
   },
+
+  formCard: {
+      padding: 12,
+      borderWidth: 1,
+      borderRadius: 12,
+      marginBottom: 10,
+  },
+
+  rowBetween: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+  }
 });

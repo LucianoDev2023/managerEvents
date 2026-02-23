@@ -19,6 +19,12 @@ export default function StackLayout() {
     </TouchableOpacity>
   );
 
+  const SimpleBack = () => (
+    <TouchableOpacity onPress={() => router.back()} style={{ paddingHorizontal: 16 }}>
+      <ArrowLeft size={24} color={colors.primary} />
+    </TouchableOpacity>
+  );
+
   return (
     <Stack
       screenOptions={{
@@ -39,6 +45,7 @@ export default function StackLayout() {
       <Stack.Screen name="myevents" options={{ title: 'Lista de eventos' }} />
       <Stack.Screen name="donate" options={{ title: 'Doação' }} />
       <Stack.Screen name="qr-scanner" options={{ title: 'Ler convite' }} />
+      <Stack.Screen name="help" options={{ title: 'Centro de Ajuda' }} />
 
       {/* ✅ telas reais dentro de events */}
       <Stack.Screen name="events/new" options={{ title: 'Novo evento' }} />
@@ -47,46 +54,54 @@ export default function StackLayout() {
       {/* ✅ rotas existentes dentro de events/[id]/... */}
       <Stack.Screen
         name="events/[id]/permissions"
-        options={{ title: 'Administrar permissões' }}
+        options={{ title: 'Administrar permissões', headerLeft: SimpleBack }}
       />
 
       <Stack.Screen
         name="events/[id]/confirmed-guests"
         options={{
           title: 'Lista de convidados',
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={{ padding: 8 }}
-            >
-              <ArrowLeft size={24} color={colors.primary} />
-            </TouchableOpacity>
-          ),
+          headerLeft: SimpleBack,
         }}
       />
 
       <Stack.Screen
         name="events/[id]/edit-my-participation"
-        options={{ title: 'Editar minha participação' }}
+        options={{ title: 'Editar minha participação', headerLeft: SimpleBack }}
       />
 
       <Stack.Screen
         name="events/[id]/edit-participation/[guestId]"
-        options={{ title: 'Editar acompanhantes' }}
+        options={{ title: 'Editar acompanhantes', headerLeft: SimpleBack }}
       />
 
       <Stack.Screen
         name="events/[id]/eventOrganizerNoteViewScreen"
-        options={{ title: 'Anotações' }}
+        options={{ title: 'Anotações', headerLeft: SimpleBack }}
       />
       <Stack.Screen
         name="events/[id]/eventOrganizerNoteScreen"
-        options={{ title: 'Nova anotação' }}
+        options={{ title: 'Nova anotação', headerLeft: SimpleBack }}
       />
 
       <Stack.Screen
         name="events/[id]/add-guest"
-        options={{ title: 'Adicionar convidado' }}
+        options={{ title: 'Adicionar convidado', headerLeft: SimpleBack }}
+      />
+
+      <Stack.Screen
+        name="events/[id]/add-guest-manual"
+        options={{ title: 'Adicionar manualmente', headerLeft: SimpleBack }}
+      />
+
+      <Stack.Screen
+        name="events/[id]/financials"
+        options={{ title: 'Financeiro', headerLeft: SimpleBack }}
+      />
+
+      <Stack.Screen
+        name="events/[id]/tasks"
+        options={{ title: 'Tarefas', headerLeft: SimpleBack }}
       />
 
       <Stack.Screen
@@ -102,6 +117,11 @@ export default function StackLayout() {
             </TouchableOpacity>
           ),
         }}
+      />
+      
+      <Stack.Screen 
+        name="events/[id]/dashboard" 
+        options={{ title: 'Painel de Gestão', headerLeft: SimpleBack }} 
       />
     </Stack>
   );

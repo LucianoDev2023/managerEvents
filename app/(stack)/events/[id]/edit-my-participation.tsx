@@ -11,26 +11,41 @@ import {
   ActivityIndicator,
   Pressable,
   BackHandler,
+  Switch,
+  LayoutAnimation,
+  UIManager,
+  Modal,
 } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useAuthListener } from '@/hooks/useAuthListener';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from 'react-native';
 import Button from '@/components/ui/Button';
-import { Trash2, Users, Save } from 'lucide-react-native';
+import { Trash2, Users, Save, Baby, ChevronDown, ChevronUp, Plus, X, Edit, Shield, UserPlus } from 'lucide-react-native';
+import Fonts from '@/constants/Fonts';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useEvents } from '@/context/EventsContext';
+import { getMyAdminLevel } from '@/src/helpers/eventPermissions';
 
 import {
   getGuestParticipation,
   updateGuestParticipation,
   updateAllParticipationsUserName,
 } from '@/hooks/guestService';
-import { GuestMode } from '@/types';
+import { GuestMode, FamilyMember } from '@/types';
 import { updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { auth } from '@/config/firebase';
-import logger from '@/lib/logger';
+import { logger } from '@/lib/logger';
+
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export default function EditMyParticipationScreen() {
   const router = useRouter();
@@ -38,6 +53,9 @@ export default function EditMyParticipationScreen() {
 
   const { user, authLoading } = useAuthListener();
   const userId = user?.uid ?? null;
+
+  const { state } = useEvents();
+  const event = useMemo(() => state.events.find((e) => e.id === eventId), [state.events, eventId]);
 
   const scheme = (useColorScheme() ?? 'dark') as 'light' | 'dark';
   const colors = Colors[scheme];
@@ -48,9 +66,16 @@ export default function EditMyParticipationScreen() {
       : ['#ffffff', '#f0f0ff', '#e9e6ff'];
   }, [scheme]);
 
-  const [family, setFamily] = useState<string[]>([]);
+  // ✅ family is list of objects
+  const [family, setFamily] = useState<FamilyMember[]>([]);
   const [userName, setUserName] = useState('');
+  
+  // ✅ Form states
   const [newName, setNewName] = useState('');
+  const [isChild, setIsChild] = useState(false);
+  const [childAge, setChildAge] = useState('');
+  
+  const [isAddFormOpen, setIsAddFormOpen] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [initializing, setInitializing] = useState(true);
@@ -58,22 +83,18 @@ export default function EditMyParticipationScreen() {
   const canUseScreen = !!eventId && !!userId && !authLoading;
 
   const goBack = useCallback(() => {
-    // você pediu voltar pro profile no back físico
     router.push('/(tabs)/profile');
   }, [router]);
 
-  // Android hardware back
   useEffect(() => {
     const onBackPress = () => {
       goBack();
       return true;
     };
-
     const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => sub.remove();
   }, [goBack]);
 
-  // Header
   const headerOptions = useMemo(() => {
     return {
       headerShown: true,
@@ -82,17 +103,19 @@ export default function EditMyParticipationScreen() {
       headerTintColor: colors.text,
       headerBackTitleVisible: false,
       headerStyle: {
-        backgroundColor: scheme === 'dark' ? '#1e1630' : '#f8f8ff',
+        backgroundColor: 'transparent',
       },
-      headerBlurEffect: (scheme === 'dark' ? 'dark' : 'light') as any,
       headerShadowVisible: false,
     } as any;
-  }, [colors.text, scheme]);
+  }, [colors.text]);
 
-  // Carrega participação
+  const toggleAddForm = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsAddFormOpen(!isAddFormOpen);
+  };
+
   useEffect(() => {
     const fetchParticipation = async () => {
-      // enquanto auth carrega, não finaliza initializing (pra evitar flicker)
       if (authLoading) return;
 
       if (!eventId || !userId) {
@@ -102,10 +125,18 @@ export default function EditMyParticipationScreen() {
 
       try {
         const guest = await getGuestParticipation(userId, eventId);
-        setFamily(guest?.family ?? []);
-        setUserName(guest?.userName ?? user?.displayName ?? '');
         
-        // Se existir, usa o mode do banco. Se não, mantemos 'confirmado'.
+        const rawFamily = guest?.family ?? [];
+        const formattedFamily: FamilyMember[] = rawFamily.map((item: any) => {
+            if (typeof item === 'string') {
+                return { name: item, isChild: false };
+            }
+            return item;
+        });
+
+        setFamily(formattedFamily);
+        setUserName(guest?.userName ?? user?.displayName ?? '');
+
         if (guest?.mode) {
           setMode(guest.mode);
         }
@@ -121,40 +152,110 @@ export default function EditMyParticipationScreen() {
 
   const normalizedNewName = useMemo(() => newName.trim(), [newName]);
 
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
   const handleAdd = useCallback(() => {
     const trimmed = normalizedNewName;
     if (!trimmed) return;
 
-    // normaliza comparação (case-insensitive)
-    const exists = family.some(
-      (n) => n.toLowerCase() === trimmed.toLowerCase(),
-    );
-    if (exists) {
-      Alert.alert('Atenção', 'Esse nome já está na lista.');
-      return;
+    // Check for duplicates only if name changed or adding new
+    const isNameChanged = editingIndex !== null && family[editingIndex].name.toLowerCase() !== trimmed.toLowerCase();
+    
+    const exists = family.some(m => m.name.toLowerCase() === trimmed.toLowerCase());
+    
+    if (editingIndex === null || isNameChanged) {
+        if (exists) {
+          Alert.alert('Atenção', 'Esse nome já está na lista.');
+          return;
+        }
     }
 
-    setFamily((prev) => [...prev, trimmed]);
-    setNewName('');
-  }, [family, normalizedNewName]);
+    // Limit check
+    if (editingIndex === null) {
+        const myLevel = getMyAdminLevel(event, userId);
+        const isSuperAdmin = myLevel === 'Super Admin';
+        const isCreator = event?.userId === userId;
+        
+        if (!isSuperAdmin && !isCreator && family.length >= 10) {
+            Alert.alert('Limite atingido', 'Você só pode adicionar até 10 acompanhantes.');
+            return;
+        }
+    }
 
-  const handleRemove = useCallback((name: string) => {
+    // Age check for children
+    if (isChild) {
+      const age = parseInt(childAge);
+      if (isNaN(age) || age < 0 || age > 12) {
+        Alert.alert('Idade inválida', 'Para ser considerado criança, a idade deve ser entre 0 e 12 anos.');
+        return;
+      }
+    }
+
+    const newMember: FamilyMember = {
+        name: trimmed,
+        isChild,
+        age: isChild && childAge ? parseInt(childAge) : undefined
+    };
+
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    
+    if (editingIndex !== null) {
+        // Update existing
+        const newFamily = [...family];
+        newFamily[editingIndex] = newMember;
+        setFamily(newFamily);
+        setEditingIndex(null);
+        setIsAddFormOpen(false);
+    } else {
+        // Add new
+        setFamily((prev) => [...prev, newMember]);
+    }
+    
+    setNewName('');
+    setIsChild(false);
+    setChildAge('');
+    // Optionally keep form open or close it. Closing it for now as per previous logic.
+    if (editingIndex === null) setIsAddFormOpen(false); 
+  }, [family, normalizedNewName, isChild, childAge, editingIndex]);
+
+  const handleEdit = useCallback((index: number) => {
+      const member = family[index];
+      setNewName(member.name);
+      setIsChild(member.isChild ?? false);
+      setChildAge(member.age ? member.age.toString() : '');
+      setEditingIndex(index);
+      setIsAddFormOpen(true);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }, [family]);
+
+  const cancelEdit = useCallback(() => {
+    setNewName('');
+    setIsChild(false);
+    setChildAge('');
+    setEditingIndex(null);
+    setIsAddFormOpen(false);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }, []);
+
+  const handleRemove = useCallback((nameToRemove: string) => {
     Alert.alert(
       'Remover acompanhante',
-      `Tem certeza que deseja remover "${name}" da lista?`,
+      `Tem certeza que deseja remover "${nameToRemove}" da lista?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Remover',
           style: 'destructive',
-          onPress: () => setFamily((prev) => prev.filter((n) => n !== name)),
+          onPress: () => {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setFamily((prev) => prev.filter((m) => m.name !== nameToRemove));
+            if (editingIndex !== null) cancelEdit(); // Cancel edit if removing
+          },
         },
       ],
     );
-  }, []);
+  }, [editingIndex, cancelEdit]);
 
-  // ✅ Se o usuário ainda não existe, mode padrão = confirmado
-  // Se já existe, usa o que veio do banco.
   const [mode, setMode] = useState<GuestMode>('confirmado');
 
   const handleSave = useCallback(async () => {
@@ -167,48 +268,34 @@ export default function EditMyParticipationScreen() {
 
     setSaving(true);
     try {
-      // 1. Atualiza a participação específica do evento
       await updateGuestParticipation({
         userId,
         eventId,
-        updates: { 
-          family, 
+        updates: {
+          family,
           userName: userName.trim(),
-          mode // ✅ Garante que o mode seja enviado
+          mode, 
         },
       });
 
-      // 2. Sincroniza o novo nome com o Perfil (Auth + Users) e outras participações
       if (auth.currentUser) {
-        // Atualiza Firebase Auth
         await updateProfile(auth.currentUser, { displayName: userName.trim() });
-        
-        // Atualiza Firestore Users
         await setDoc(
           doc(db, 'users', userId),
           { name: userName.trim(), updatedAt: serverTimestamp() },
-          { merge: true }
+          { merge: true },
         );
-
-        // Sincroniza todas as outras participações deste usuário
         await updateAllParticipationsUserName(userId, userName.trim());
       }
 
-      Alert.alert('✅ Sucesso', 'Participação e perfil atualizados!');
+      Alert.alert('✅ Sucesso', 'Participação atualizada!');
       router.replace({
-        pathname: '/events/[id]/confirmed-guests',
+        pathname: '/(stack)/events/[id]',
         params: { id: eventId },
       } as any);
     } catch (error: any) {
       logger.error('❌ updateGuestParticipation error:', error);
-      logger.error('code:', error?.code);
-      logger.error('message:', error?.message);
-      logger.error('details:', error?.details);
-
-      Alert.alert(
-        'Erro',
-        `${error?.code ?? ''}\n${error?.message ?? 'Falha ao salvar.'}`,
-      );
+      Alert.alert('Erro', 'Falha ao salvar participação.');
     } finally {
       setSaving(false);
     }
@@ -216,16 +303,18 @@ export default function EditMyParticipationScreen() {
 
   const handleClearAll = useCallback(() => {
     if (family.length === 0) return;
-
     Alert.alert(
       'Limpar lista',
-      'Deseja remover todos os acompanhantes da lista?',
+      'Deseja remover todos os acompanhantes?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Remover todos',
           style: 'destructive',
-          onPress: () => setFamily([]),
+          onPress: () => {
+             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+             setFamily([]);
+          },
         },
       ],
     );
@@ -235,9 +324,6 @@ export default function EditMyParticipationScreen() {
     return (
       <View style={[styles.full, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        {/* <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-          Carregando...
-        </Text> */}
       </View>
     );
   }
@@ -248,22 +334,7 @@ export default function EditMyParticipationScreen() {
         <Text style={[styles.title, { color: colors.text }]}>
           Não foi possível abrir esta tela.
         </Text>
-        <Text style={[styles.sub, { color: colors.textSecondary }]}>
-          Faça login novamente e tente abrir o evento.
-        </Text>
-
-        <View style={{ height: 14 }} />
-
-        <Pressable
-          onPress={goBack}
-          style={({ pressed }) => [
-            styles.secondaryBtn,
-            {
-              borderColor: colors.primary,
-              opacity: pressed ? 0.8 : 1,
-            },
-          ]}
-        >
+        <Pressable onPress={goBack} style={[styles.secondaryBtn, { borderColor: colors.primary }]}>
           <Text style={{ color: colors.text }}>Voltar</Text>
         </Pressable>
       </View>
@@ -287,190 +358,217 @@ export default function EditMyParticipationScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.headerCard}>
-            <View style={styles.headerRow}>
-              <Users size={18} color={colors.primary} />
-              <Text style={[styles.headerTitle, { color: colors.text }]}>
-                Minha Participação
-              </Text>
-            </View>
-
-            <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
-              Atualize seus dados e acompanhantes para este evento.
-            </Text>
+          {/* Header Compacto */}
+          <View style={[styles.headerCard, { borderColor: 'rgba(255,255,255,0.1)' }]}>
+             <View style={styles.headerRow}>
+               <Users size={18} color={colors.primary} />
+               <Text style={[styles.headerTitle, { color: colors.text }]}>Minha Participação</Text>
+             </View>
+             
+             {/* Nome do Usuário Principal Compacto */}
+             <TextInput
+                value={userName}
+                onChangeText={setUserName}
+                placeholder="Seu nome"
+                placeholderTextColor={colors.textSecondary}
+                style={[
+                  styles.compactInput,
+                  {
+                    color: colors.text,
+                    backgroundColor: scheme === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.8)',
+                    borderColor: userName.length < 2 ? colors.error : colors.border,
+                  },
+                ]}
+              />
+              {userName.length < 2 && (
+                  <Text style={{ color: colors.error, fontSize: 10, marginTop: 2, marginLeft: 4 }}>Nome obrigatório</Text>
+              )}
           </View>
 
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            Seu nome (ou como deseja ser identificado)
-          </Text>
 
-          <TextInput
-            value={userName}
-            onChangeText={setUserName}
-            placeholder="Seu nome"
-            placeholderTextColor={colors.textSecondary}
-            style={[
-              styles.input,
-              {
-                borderColor: colors.border,
-                color: colors.text,
-                backgroundColor:
-                  scheme === 'dark'
-                    ? 'rgba(0,0,0,0.25)'
-                    : 'rgba(255,255,255,0.7)',
-                marginBottom: 20,
-              },
-            ]}
-          />
-
-          <View
-            style={{
-              height: 1,
-              backgroundColor: colors.border,
-              marginVertical: 10,
-              opacity: 0.3,
-            }}
-          />
-
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            Nome do acompanhante
-          </Text>
-
-          <View style={styles.inputRow}>
-            <TextInput
-              value={newName}
-              onChangeText={setNewName}
-              placeholder="Ex: Maria"
-              placeholderTextColor={colors.textSecondary}
-              style={[
-                styles.input,
-                {
-                  borderColor: colors.border,
-                  color: colors.text,
-                  backgroundColor:
-                    scheme === 'dark'
-                      ? 'rgba(0,0,0,0.25)'
-                      : 'rgba(255,255,255,0.7)',
-                },
-              ]}
-              returnKeyType="done"
-              onSubmitEditing={handleAdd}
-            />
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.addButton,
-                {
-                  opacity: !normalizedNewName ? 0.55 : pressed ? 0.85 : 1,
-                },
-              ]}
-              onPress={handleAdd}
-              disabled={!normalizedNewName}
-            >
-              <Text style={styles.addButtonText}>Adicionar</Text>
-            </Pressable>
-          </View>
-
-          {family.length > 0 ? (
-            <View style={{ marginTop: 16 }}>
-              <View style={styles.listHeader}>
-                <Text style={[styles.listTitle, { color: colors.text }]}>
-                  Lista atual ({family.length})
-                </Text>
-
-                <Pressable
-                  onPress={handleClearAll}
-                  style={({ pressed }) => [
-                    styles.clearAll,
-                    { opacity: pressed ? 0.75 : 1 },
-                  ]}
-                >
-                  <Text
-                    style={{
-                      color: colors.error,
-                      fontFamily: 'Inter_500Medium',
-                    }}
-                  >
-                    Limpar
-                  </Text>
+          {/* Seção Acompanhantes */}
+          <View style={styles.sectionHeader}>
+             <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                Acompanhantes ({family.length})
+             </Text>
+             {family.length > 0 && (
+                <Pressable onPress={handleClearAll}>
+                    <Text style={{ color: colors.error, fontSize: 12, fontWeight: '600' }}>Limpar</Text>
                 </Pressable>
-              </View>
+             )}
+          </View>
 
-              {family.map((name) => (
+          {/* Lista de Acompanhantes (Compacta) */}
+          <View style={{ gap: 8, marginBottom: 16 }}>
+            {family.map((member, index) => (
                 <View
-                  key={name}
+                  key={`${member.name}-${index}`}
                   style={[
-                    styles.nameRow,
+                    styles.memberCard,
                     {
-                      borderColor: colors.border,
-                      backgroundColor:
-                        scheme === 'dark'
-                          ? 'rgba(0,0,0,0.22)'
-                          : 'rgba(255,255,255,0.7)',
+                      backgroundColor: scheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.6)',
+                      borderColor: editingIndex === index ? colors.primary : 'rgba(255,255,255,0.05)',
                     },
                   ]}
                 >
-                  <Text style={[styles.nameText, { color: colors.text }]}>
-                    • {name}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.memberName, { color: colors.text }]}>{member.name}</Text>
+                    {member.isChild && (
+                        <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                            👶 {member.age ? `${member.age} anos` : 'Criança'}
+                        </Text>
+                    )}
+                  </View>
+                  
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Pressable
+                        onPress={() => handleEdit(index)}
+                        style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.5 : 1 }]}
+                    >
+                        <Edit size={16} color={colors.textSecondary} />
+                    </Pressable>
+                    <Pressable
+                        onPress={() => handleRemove(member.name)}
+                        style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.5 : 1 }]}
+                    >
+                        <X size={16} color={colors.error} />
+                    </Pressable>
+                  </View>
+                </View>
+            ))}
+          </View>
 
-                  <Pressable
-                    onPress={() => handleRemove(name)}
-                    style={({ pressed }) => [
-                      styles.removeButton,
-                      { opacity: pressed ? 0.7 : 1 },
+          {/* Botão para Abrir Modal */}
+          <Pressable
+            onPress={() => {
+              setEditingIndex(null);
+              setNewName('');
+              setIsChild(false);
+              setChildAge('');
+              setIsAddFormOpen(true);
+            }}
+            style={[styles.addTriggerBtn, { borderColor: colors.primary, borderStyle: 'dashed' }]}
+          >
+            <Plus size={18} color={colors.primary} />
+            <Text style={[styles.addTriggerText, { color: colors.primary }]}>Adicionar acompanhante</Text>
+          </Pressable>
+          {/* Modal para Adicionar/Editar Acompanhante */}
+          <Modal
+            visible={isAddFormOpen}
+            transparent
+            animationType="fade"
+            onRequestClose={cancelEdit}
+          >
+            <View style={styles.modalOverlay}>
+              <Animated.View
+                entering={FadeIn}
+                exiting={FadeOut}
+                style={styles.modalContentWrapper}
+              >
+                <LinearGradient
+                  colors={gradientColors}
+                  locations={[0, 0.7, 1]}
+                  style={[styles.modalContent, { borderColor: colors.primary }]}
+                >
+                  <View style={styles.modalHeader}>
+                    <UserPlus size={28} color={colors.primary} />
+                    <Text style={[styles.modalTitle, { color: colors.text }]}>
+                      {editingIndex !== null ? 'Editar Acompanhante' : 'Novo Acompanhante'}
+                    </Text>
+                  </View>
+
+                  <Text style={[styles.modalLabel, { color: colors.text }]}>Nome</Text>
+                  <TextInput
+                    value={newName}
+                    onChangeText={setNewName}
+                    placeholder="Ex: Maria Silva"
+                    placeholderTextColor={colors.textSecondary}
+                    autoFocus
+                    style={[
+                      styles.compactInput,
+                      {
+                        color: colors.text,
+                        backgroundColor: scheme === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.9)',
+                        borderColor: colors.border,
+                        marginBottom: 20
+                      },
                     ]}
-                  >
-                    <Trash2 size={18} color={colors.error} />
-                  </Pressable>
-                </View>
-              ))}
+                  />
+
+                  <View style={[styles.rowBetween, { marginBottom: 20 }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Baby size={20} color={colors.textSecondary} />
+                      <View>
+                         <Text style={{ color: colors.text, fontSize: 15, fontFamily: Fonts.semiBold }}>É criança?</Text>
+                         <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: Fonts.regular }}>Até 12 anos</Text>
+                      </View>
+                    </View>
+                    <Switch 
+                      value={isChild} 
+                      onValueChange={setIsChild} 
+                      trackColor={{ false: '#767577', true: colors.primary }}
+                      thumbColor="#f4f3f4"
+                    />
+                  </View>
+
+                  {isChild && (
+                    <Animated.View entering={FadeIn} exiting={FadeOut}>
+                        <Text style={[styles.modalLabel, { color: colors.text }]}>Idade</Text>
+                        <TextInput
+                          value={childAge}
+                          onChangeText={setChildAge}
+                          placeholder="0"
+                          placeholderTextColor={colors.textSecondary}
+                          keyboardType="numeric"
+                          style={[
+                            styles.compactInput,
+                            {
+                                color: colors.text,
+                                backgroundColor: scheme === 'dark' ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.9)',
+                                borderColor: colors.border,
+                                marginBottom: 24,
+                                width: 80,
+                                textAlign: 'center'
+                            },
+                          ]}
+                        />
+                    </Animated.View>
+                  )}
+
+                  <View style={styles.modalActions}>
+                    <Button 
+                      title="Cancelar"
+                      onPress={cancelEdit}
+                      variant="cancel"
+                      style={{ flex: 1 }}
+                    />
+                    <Button 
+                      title={editingIndex !== null ? "Salvar" : "Adicionar"}
+                      onPress={handleAdd}
+                      disabled={!normalizedNewName}
+                      style={{ flex: 1.5, backgroundColor: colors.primary }}
+                      textStyle={{ color: '#fff' }}
+                    />
+                  </View>
+                </LinearGradient>
+              </Animated.View>
             </View>
-          ) : (
-            <View style={styles.emptyBox}>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                Nenhum acompanhante adicionado ainda.
-              </Text>
-            </View>
-          )}
+          </Modal>
 
-          <View style={{ height: 18 }} />
-
-          <View style={styles.actions}>
-            <Pressable
-              onPress={handleSave}
-              disabled={saving}
-              style={({ pressed }) => [
-                styles.primaryBtn,
-                {
-                  backgroundColor: colors.primary,
-                  opacity: saving ? 0.6 : pressed ? 0.9 : 1,
-                },
-              ]}
-            >
-              {saving ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <View style={styles.btnRow}>
-                  <Save size={18} color="#fff" />
-                  <Text style={styles.primaryBtnText}>Salvar alterações</Text>
-                </View>
-              )}
-            </Pressable>
-
-            <View style={{ height: 10 }} />
-
-            {/* mantém seu Button custom também, se preferir:
-                <Button title="Salvar alterações" onPress={handleSave} disabled={saving} />
-             */}
+          <View style={{ height: 40 }} />
+          
+          {/* Actions Footer */}
+          <View style={styles.footerActions}>
             <Button
-              title="Voltar"
-              onPress={goBack}
-              variant="ghost"
-              fullWidth
-              style={{ borderColor: colors.border }}
+                title="Salvar tudo"
+                onPress={handleSave}
+                style={{ backgroundColor: colors.primary, flex: 1 }}
+                textStyle={{ color: '#fff' }}
+                loading={saving}
+                icon={<Save size={16} color="#fff" />}
             />
           </View>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
@@ -479,167 +577,100 @@ export default function EditMyParticipationScreen() {
 
 const styles = StyleSheet.create({
   full: { flex: 1 },
-
-  content: {
-    padding: 20,
-    paddingTop: 120, // por causa do header transparente (aumentado de 90)
-    paddingBottom: 30,
+  content: { padding: 16, paddingTop: 100, paddingBottom: 40 },
+  title: { fontSize: 18, fontFamily: Fonts.bold, textAlign: 'center' },
+  
+  headerCard: { 
+      borderRadius: 20, 
+      padding: 16, 
+      marginBottom: 24, 
+      backgroundColor: 'rgba(255,255,255,0.03)', 
+      borderWidth: 1, 
   },
-
-  loadingText: {
-    marginTop: 12,
-    fontFamily: 'Inter_400Regular',
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  headerTitle: { fontSize: 14, fontFamily: Fonts.bold, textTransform: 'uppercase', letterSpacing: 1 },
+  
+  compactInput: {
+      borderWidth: 1, 
+      borderRadius: 12, 
+      paddingHorizontal: 12, 
+      paddingVertical: 12, 
+      fontSize: 15, 
+      fontFamily: Fonts.regular
   },
-
-  title: {
-    fontSize: 18,
-    fontFamily: 'Inter_600SemiBold',
-    textAlign: 'center',
-    paddingHorizontal: 20,
+  
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingHorizontal: 4 },
+  sectionTitle: { fontSize: 13, fontFamily: Fonts.semiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  
+  memberCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 14,
+      borderRadius: 16,
+      borderWidth: 1,
+      marginBottom: 8,
   },
-  sub: {
-    marginTop: 8,
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-    textAlign: 'center',
-    paddingHorizontal: 26,
+  memberName: { fontSize: 15, fontFamily: Fonts.semiBold },
+  
+  addTriggerBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      gap: 8,
+      backgroundColor: 'rgba(0,0,0,0.05)',
+      marginTop: 8,
   },
-
-  headerCard: {
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+  addTriggerText: { fontSize: 14, fontFamily: Fonts.bold },
+  
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContentWrapper: {
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalContent: {
+    width: '100%',
+    borderRadius: 24,
+    padding: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
   },
-  headerRow: {
+  modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
+    marginBottom: 24,
+    gap: 12,
   },
-  headerTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter_600SemiBold',
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: Fonts.bold,
   },
-  headerSub: {
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-    lineHeight: 18,
-  },
-
-  label: {
+  modalLabel: {
     fontSize: 14,
+    fontFamily: Fonts.semiBold,
     marginBottom: 8,
-    fontFamily: 'Inter_500Medium',
   },
-
-  inputRow: {
+  modalActions: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
-
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    fontFamily: 'Inter_400Regular',
+  formTitle: { fontSize: 14, fontFamily: Fonts.bold },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  
+  iconBtn: { 
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-
-  addButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#6c47ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontFamily: 'Inter_600SemiBold',
-  },
-
-  listHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  listTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  clearAll: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderRadius: 12,
-    marginBottom: 10,
-  },
-  nameText: {
-    fontSize: 15,
-    fontFamily: 'Inter_500Medium',
-    flex: 1,
-  },
-  removeButton: {
-    marginLeft: 10,
-    padding: 6,
-    borderRadius: 10,
-  },
-
-  emptyBox: {
-    marginTop: 18,
-    padding: 14,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-  },
-  emptyText: {
-    textAlign: 'center',
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-  },
-
-  actions: {
-    marginTop: 8,
-  },
-
-  primaryBtn: {
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  primaryBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontFamily: 'Inter_600SemiBold',
-  },
-
-  secondaryBtn: {
-    borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-  },
+  
+  secondaryBtn: { borderWidth: 1, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, alignSelf: 'center', marginTop: 10 },
+  footerActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
 });

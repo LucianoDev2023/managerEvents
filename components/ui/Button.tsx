@@ -9,7 +9,9 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 import Colors from '@/constants/Colors';
+import Fonts from '@/constants/Fonts';
 import { useColorScheme } from 'react-native';
 
 type ButtonVariant =
@@ -34,7 +36,10 @@ interface ButtonProps {
   icon?: React.ReactNode;
   iconPosition?: 'left' | 'right';
   accessibilityLabel?: string;
+  scaleOnPress?: boolean; // Nova prop para desativar se necessário
 }
+
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function Button({
   title,
@@ -48,14 +53,33 @@ export default function Button({
   textStyle,
   icon,
   iconPosition = 'left',
-  accessibilityLabel, // ✅ removido o ponto e vírgula errado aqui
+  accessibilityLabel,
+  scaleOnPress = true,
 }: ButtonProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
-  const getButtonStyle = () => {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    if (scaleOnPress && !disabled && !loading) {
+      scale.value = withTiming(0.96, { duration: 100 });
+    }
+  };
+
+  const handlePressOut = () => {
+    if (scaleOnPress) {
+      scale.value = withTiming(1, { duration: 100 });
+    }
+  };
+
+  const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
-      borderRadius: 10,
+      borderRadius: 16, // Arredondamento padronizado (16px)
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
@@ -73,7 +97,7 @@ export default function Button({
         baseStyle.paddingHorizontal = 24;
         break;
       default: // medium
-        baseStyle.paddingVertical = 12;
+        baseStyle.paddingVertical = 14; // Pouco mais de altura
         baseStyle.paddingHorizontal = 20;
     }
 
@@ -82,7 +106,7 @@ export default function Button({
       case 'secondary':
         return {
           ...baseStyle,
-          backgroundColor: colors.backGroundSecondary,
+          backgroundColor: colors.backgroundSecondary,
         };
       case 'ghost':
         return {
@@ -93,7 +117,7 @@ export default function Button({
         return {
           ...baseStyle,
           backgroundColor: 'transparent',
-          borderWidth: 1,
+          borderWidth: 1.5, // Borda um pouco mais grossa
           borderColor: colors.primary,
         };
       case 'danger':
@@ -104,7 +128,7 @@ export default function Button({
       case 'cancel':
         return {
           ...baseStyle,
-          backgroundColor: '#aaa',
+          backgroundColor: isDark ? '#333' : '#e0e0e0', // Melhor contraste no cancel
         };
       default: // primary
         return {
@@ -114,9 +138,12 @@ export default function Button({
     }
   };
 
-  const getTextStyle = () => {
+  const isDark = colorScheme === 'dark';
+
+  const getTextStyle = (): TextStyle => {
     const baseStyle: TextStyle = {
-      fontFamily: 'Inter-Medium',
+      fontFamily: Fonts.bold, // Botões geralmente ficam melhores com Bold
+      fontSize: 16,
     };
 
     // Size styles
@@ -139,6 +166,11 @@ export default function Button({
           ...baseStyle,
           color: colors.primary,
         };
+      case 'cancel':
+         return {
+            ...baseStyle,
+            color: isDark ? '#fff' : '#333',
+         };
       default: // primary, secondary, danger
         return {
           ...baseStyle,
@@ -147,22 +179,21 @@ export default function Button({
     }
   };
 
-  const buttonStyles = [
-    styles.button,
-    getButtonStyle(),
-    fullWidth && styles.fullWidth,
-    style,
-  ];
-
-  const textStyles = [styles.text, getTextStyle(), textStyle];
-
   return (
-    <TouchableOpacity
-      style={buttonStyles}
+    <AnimatedTouchableOpacity
+      style={[
+        styles.button,
+        getButtonStyle(),
+        fullWidth && styles.fullWidth,
+        style,
+        animatedStyle
+      ]}
       onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       disabled={disabled || loading}
       accessibilityLabel={accessibilityLabel}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
       {loading ? (
         <ActivityIndicator
@@ -177,19 +208,19 @@ export default function Button({
           {icon && iconPosition === 'left' && (
             <View style={styles.iconLeft}>{icon}</View>
           )}
-          <Text style={textStyles}>{title}</Text>
+          <Text style={[styles.text, getTextStyle(), textStyle]}>{title}</Text>
           {icon && iconPosition === 'right' && (
             <View style={styles.iconRight}>{icon}</View>
           )}
         </>
       )}
-    </TouchableOpacity>
+    </AnimatedTouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 10,
+    // borderRadius movido para getButtonStyle para ser dinâmico se precisar
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -207,3 +238,4 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
+

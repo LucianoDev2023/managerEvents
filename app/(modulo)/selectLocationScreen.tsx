@@ -15,13 +15,14 @@ import MapView, {
 } from 'react-native-maps';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import Constants from 'expo-constants';
 
 import Colors from '@/constants/Colors';
 import 'react-native-get-random-values';
 
-// ✅ env lida fora do componente (mais estável)
+// ✅ env lida via Constants (mais seguro para diferentes ambientes Expo)
 const GOOGLE_PLACES_API_KEY =
-  process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY ?? '';
+  Constants.expoConfig?.extra?.googlePlacesApiKey ?? '';
 
 export default function SelectLocationScreen() {
   const router = useRouter();
@@ -51,12 +52,22 @@ export default function SelectLocationScreen() {
     lat,
     lng,
     locationName,
+    pTitle,
+    pDesc,
+    pCover,
+    pStart,
+    pEnd,
   } = useLocalSearchParams<{
     id?: string;
     mode?: 'create' | 'edit';
     lat?: string;
     lng?: string;
     locationName?: string;
+    pTitle?: string;
+    pDesc?: string;
+    pCover?: string;
+    pStart?: string;
+    pEnd?: string;
   }>();
 
   useEffect(() => {
@@ -119,6 +130,11 @@ export default function SelectLocationScreen() {
         lat: selected.latitude.toString(),
         lng: selected.longitude.toString(),
         locationName: selected.name ?? '',
+        pTitle,
+        pDesc,
+        pCover,
+        pStart,
+        pEnd,
       },
     });
   };

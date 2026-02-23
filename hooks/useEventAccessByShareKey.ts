@@ -123,7 +123,21 @@ export function useEventAccessByShareKey(shareKey?: string) {
           return;
         }
 
-        const eventId = keySnap.data()?.eventId as string | undefined;
+        const keyData = keySnap.data();
+        const eventId = keyData?.eventId as string | undefined;
+        const expiresAt = keyData?.expiresAt;
+
+        if (expiresAt) {
+          const expireDate = toDateSafe(expiresAt);
+          if (expireDate < new Date()) {
+            safe(() => {
+              setEventFound(null);
+              setGuestStatus('none');
+            });
+            return;
+          }
+        }
+
         if (!eventId) {
           safe(() => {
             setEventFound(null);

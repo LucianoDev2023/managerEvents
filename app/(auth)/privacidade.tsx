@@ -12,8 +12,8 @@ import { useRouter } from 'expo-router';
 export default function PrivacidadeScreen() {
   const router = useRouter();
 
-  const NOME_CONTROLADOR = 'Jociel Luciano';
-  const EMAIL_PRIVACIDADE = 'planejejasuporte@gmail.com';
+  const NOME_CONTROLE = 'Equipe Plannix';
+  const EMAIL_SUPORTE = 'planejejasuporte@gmail.com';
 
   return (
     <View style={styles.container}>
@@ -23,74 +23,78 @@ export default function PrivacidadeScreen() {
           Última atualização: {new Date().toLocaleDateString('pt-BR')}
         </Text>
 
-        <Text style={styles.h2}>1. Quem somos</Text>
+        <Text style={styles.h2}>1. Introdução e Controlador</Text>
         <Text style={styles.p}>
-          Este app é operado por{' '}
-          <Text style={styles.bold}>{NOME_CONTROLADOR}</Text>, pessoa física,
-          responsável pelo tratamento de dados pessoais conforme a LGPD (Lei nº
-          13.709/2018).
+          A Plannix está comprometida com a transparência e a segurança dos seus dados, em total conformidade com a <Text style={styles.bold}>LGPD (Lei Geral de Proteção de Dados)</Text>.
+          Este aplicativo é operado pela <Text style={styles.bold}>{NOME_CONTROLE}</Text>, com foco em fornecer uma ferramenta eficiente para gerenciamento de eventos.
+        </Text>
+
+        <Text style={styles.h2}>2. Coleta de Dados e Finalidade</Text>
+        <Text style={styles.p}>Coletamos os dados estritamente necessários para as funcionalidades do App:</Text>
+        <Text style={styles.p}>
+          • <Text style={styles.bold}>Identificação:</Text> E-mail, UID e Nome (Cadastro ou Google Login).
         </Text>
         <Text style={styles.p}>
-          Contato:{' '}
-          <Text
-            style={styles.link}
-            onPress={() => Linking.openURL(`mailto:${EMAIL_PRIVACIDADE}`)}
-          >
-            {EMAIL_PRIVACIDADE}
+          • <Text style={styles.bold}>Eventos:</Text> Fotos, comentários e informações de participação inseridas por você.
+        </Text>
+        <Text style={styles.p}>
+          • <Text style={styles.bold}>Google Sign-In:</Text> Recebemos nome e e-mail para criar seu perfil. Não acessamos sua senha ou outros dados privados da sua conta Google.
+        </Text>
+
+        <Text style={styles.h2}>3. Transparência na Resolução de Nomes</Text>
+        <Text style={styles.p}>
+          Para garantir a identificação no App, utilizamos um sistema de Resolução de Nomes:
+        </Text>
+        <Text style={styles.p}>
+          • Seu nome de perfil é visível para outros participantes apenas nos eventos em que você também participa.
+        </Text>
+        <Text style={styles.p}>
+          • Isso permite que outros convidados identifiquem autores de fotos e comentários.
+        </Text>
+
+        <Text style={styles.h2}>4. Compartilhamento com Terceiros</Text>
+        <Text style={styles.p}>
+          Seus dados não são vendidos. Usamos provedores essenciais:
+        </Text>
+        <Text style={styles.p}>
+          • <Text style={styles.bold}>Firebase (Google):</Text> Autenticação e banco de dados.
+        </Text>
+        <Text style={styles.p}>
+          • <Text style={styles.bold}>Cloudinary:</Text> Armazenamento seguro de fotos.
+        </Text>
+
+        <Text style={styles.h2}>5. Segurança e Moderação</Text>
+        <Text style={styles.p}>
+          Implementamos protocolos de segurança modernos e ferramentas de moderação (denúncias) para garantir um ambiente seguro.
+        </Text>
+
+        <Text style={styles.h2}>6. Direitos do Usuário (LGPD)</Text>
+        <Text style={styles.p}>
+          Você pode solicitar acesso, correção, portabilidade ou exclusão de dados.
+        </Text>
+        <Text style={styles.p}>
+          • <Text style={styles.bold}>Google:</Text> Você pode revogar o acesso do Plannix em sua conta Google a qualquer momento.
+        </Text>
+
+        <View style={styles.urgentBox}>
+          <Text style={styles.urgentTitle}>7. Exclusão Definitiva de Conta e Dados</Text>
+          <Text style={styles.urgentText}>
+            Em conformidade com a Google Play Store, oferecemos dois caminhos:
           </Text>
-        </Text>
-
-        <Text style={styles.h2}>2. Quais dados coletamos</Text>
-        <Text style={styles.p}>
-          • E-mail e UID (Firebase Auth) para autenticação.
-        </Text>
-        <Text style={styles.p}>
-          • Dados de uso e segurança (ex.: data/hora de acesso e IP aproximado
-          quando disponível).
-        </Text>
-        <Text style={styles.p}>
-          • Dados que você cadastrar no app (ex.: eventos, informações do
-          evento, etc.).
-        </Text>
-
-        <Text style={styles.h2}>3. Para que usamos seus dados</Text>
-        <Text style={styles.p}>• Criar e gerenciar sua conta.</Text>
-        <Text style={styles.p}>
-          • Permitir acesso e uso das funções do app.
-        </Text>
-        <Text style={styles.p}>• Suporte, segurança e prevenção de abuso.</Text>
-
-        <Text style={styles.h2}>4. Base legal</Text>
-        <Text style={styles.p}>
-          • Execução de contrato (para operar o serviço).
-        </Text>
-        <Text style={styles.p}>
-          • Consentimento (para itens opcionais, quando houver).
-        </Text>
-
-        <Text style={styles.h2}>5. Compartilhamento</Text>
-        <Text style={styles.p}>
-          Usamos provedores como o{' '}
-          <Text style={styles.bold}>Firebase/Google</Text> para autenticação e
-          infraestrutura.
-        </Text>
-
-        <Text style={styles.h2}>6. Retenção e exclusão</Text>
-        <Text style={styles.p}>
-          Mantemos os dados enquanto sua conta estiver ativa. Você pode
-          solicitar a exclusão da conta e dados a qualquer momento.
-        </Text>
-
-        <Text style={styles.h2}>7. Seus direitos</Text>
-        <Text style={styles.p}>
-          Você pode solicitar acesso, correção e exclusão de dados, além de
-          outras solicitações previstas na LGPD, pelo e-mail acima.
-        </Text>
+          <Text style={styles.urgentText}>
+            • <Text style={styles.bold}>Pelo App:</Text> Acesse Perfil {'>'} Excluir minha conta.
+          </Text>
+          <Text style={styles.urgentText}>
+            • <Text style={styles.bold}>Por E-mail:</Text> Solicite via {EMAIL_SUPORTE}.
+          </Text>
+          <Text style={[styles.urgentText, { fontStyle: 'italic', marginTop: 4 }]}>
+            A exclusão é irreversível e remove todos os seus dados pessoais.
+          </Text>
+        </View>
 
         <Text style={styles.h2}>8. Alterações</Text>
         <Text style={styles.p}>
-          Podemos atualizar esta Política e indicaremos a data no topo desta
-          página.
+          Podemos atualizar esta Política periodicamente. A data será sempre indicada no topo desta tela.
         </Text>
 
         <Pressable style={styles.button} onPress={() => router.back()}>
@@ -118,9 +122,29 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 24,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
   buttonText: { color: '#fff', fontWeight: '700' },
+  urgentBox: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: 'rgba(255, 77, 77, 0.1)',
+    borderWidth: 1,
+    borderColor: '#ff4d4d',
+    borderRadius: 16,
+  },
+  urgentTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#ff4d4d',
+    marginBottom: 8,
+  },
+  urgentText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 4,
+  },
 });

@@ -1,4 +1,5 @@
 // app/_layout.tsx
+import 'react-native-get-random-values';
 import React, { useEffect } from 'react';
 import { Slot, useRouter, useSegments, usePathname } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
@@ -10,8 +11,10 @@ import { useAuthListener } from '../hooks/useAuthListener';
 import { EventsProvider } from '../context/EventsContext';
 import { RegistrationFlowProvider } from '../context/RegistrationFlowContext';
 import { VersionChecker } from '../components/VersionChecker';
+import { useCachedFonts } from '../hooks/useFonts';
 
 export default function RootLayout() {
+  const { fontsLoaded, fontError } = useCachedFonts();
   const { user, authLoading } = useAuthListener();
   const segments = useSegments();
   const router = useRouter();
@@ -21,18 +24,22 @@ export default function RootLayout() {
   const colors = Colors[colorScheme];
 
   useEffect(() => {
+    if (!fontsLoaded || authLoading) return;
+
     const inAuthGroup = segments[0] === '(auth)';
     const publicPaths = new Set([
       '/(auth)/landing',
+      '/landing',
       '/invite',
       '/invite-gate',
       '/invite-preview',
       '/+not-found',
     ]);
-    if (!authLoading && !user && !inAuthGroup && !publicPaths.has(pathname)) {
+    
+    if (!user && !inAuthGroup && !publicPaths.has(pathname)) {
       router.replace('/(auth)/landing');
     }
-  }, [authLoading, user, segments, router, pathname]);
+  }, [authLoading, user, segments, router, pathname, fontsLoaded]);
 
   useEffect(() => {
     (async () => {
@@ -43,6 +50,10 @@ export default function RootLayout() {
     const sub = Linking.addEventListener('url', () => {});
     return () => sub.remove();
   }, []);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   if (authLoading) {
     return (

@@ -23,6 +23,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { useEvents } from '../../context/EventsContext';
 import Colors from '../../constants/Colors';
+import Fonts from '@/constants/Fonts';
 import { getGuestParticipationsByUserId } from '../../hooks/guestService';
 import type { GuestParticipation } from '../../types/guestParticipation';
 
@@ -204,10 +205,18 @@ export default function CalendarScreen() {
           styles.container,
           {
             paddingTop:
-              Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 40) : 0,
+              Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 40) + 8 : 44,
           },
         ]}
       >
+        <View style={{ paddingHorizontal: 4, marginBottom: 20, marginTop: 8 }}>
+          <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
+            Visualize e organize seus próximos eventos confirmados e gerenciados:
+          </Text>
+          <Text style={{ color: colors.text, fontSize: 18, fontFamily: Fonts.bold, marginTop: 10 }}>
+            Calendário de Eventos
+          </Text>
+        </View>
         {isLoading && (
           <View style={styles.center}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -376,14 +385,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   navButton: { padding: 1 },
-  monthTitle: { fontSize: 18, fontFamily: 'Inter-Bold' },
+  monthTitle: { fontSize: 18, fontFamily: Fonts.bold },
 
   weekdaysContainer: { flexDirection: 'row', marginTop: 2 },
   weekday: {
     flex: 1,
     textAlign: 'center',
     fontSize: 14,
-    fontFamily: 'Inter-Medium',
+    fontFamily: Fonts.medium,
     paddingVertical: 8,
   },
 
@@ -409,7 +418,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  eventsTitle1: { fontFamily: 'Inter-Bold', fontSize: 16, marginBottom: 16 },
+  eventsTitle1: { fontFamily: Fonts.bold, fontSize: 16, marginBottom: 16 },
   eventsContainer: { flex: 1 },
 
   noEventsContainer: {
@@ -418,15 +427,15 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
   },
   noEventsText: {
-    fontFamily: 'Inter-Medium',
+    fontFamily: Fonts.medium,
     fontSize: 16,
     marginTop: 16,
     textAlign: 'center',
   },
 
-  eventTitle: { fontFamily: 'Inter-Bold', fontSize: 16, marginBottom: 2 },
-  eventDates: { fontFamily: 'Inter-Medium', fontSize: 14, marginBottom: 4 },
-  eventLocation: { fontFamily: 'Inter-Regular', fontSize: 14 },
+  eventTitle: { fontFamily: Fonts.bold, fontSize: 16, marginBottom: 2 },
+  eventDates: { fontFamily: Fonts.medium, fontSize: 14, marginBottom: 4 },
+  eventLocation: { fontFamily: Fonts.regular, fontSize: 14 },
 
   cardShadow: {
     borderRadius: 12,

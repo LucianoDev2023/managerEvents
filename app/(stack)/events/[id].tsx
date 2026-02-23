@@ -27,6 +27,7 @@ import {
 } from 'expo-router';
 import { useEvents } from '@/context/EventsContext';
 import Colors from '@/constants/Colors';
+import Fonts from '@/constants/Fonts';
 import { useColorScheme } from 'react-native';
 import {
   ArrowLeft,
@@ -35,16 +36,42 @@ import {
   Plus,
   CalendarDays,
   CheckCircle,
+  ChevronRight,
+  Users,
 } from 'lucide-react-native';
 import ProgramItem from '@/components/ProgramItem';
+import Button from '@/components/ui/Button';
 import { getAuth } from 'firebase/auth';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import LottieView from 'lottie-react-native';
 import { useSmartNavigation } from '@/hooks/useSmartNavigation';
+import { getFriendlyErrorMessage } from '@/lib/utils/errors';
 
 import type { Guest, Event } from '@/types';
+import { Skeleton } from '@/components/ui/Skeleton';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+
+const EventDetailSkeleton = () => {
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
+
+  return (
+    <View style={{ flex: 1, padding: 16 }}>
+      <Skeleton width="100%" height={220} borderRadius={12} style={{ marginBottom: 20 }} />
+      <View style={{ padding: 16, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.03)', marginBottom: 20 }}>
+        <Skeleton width={120} height={20} style={{ marginBottom: 12 }} />
+        <Skeleton width="100%" height={60} />
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Skeleton width={150} height={24} />
+      </View>
+      {[1, 2].map(i => (
+        <Skeleton key={i} width="100%" height={80} borderRadius={12} style={{ marginBottom: 12 }} />
+      ))}
+    </View>
+  );
+};
 
 export default function EventDetailScreen() {
   const { refetchEventById, deleteEvent, addProgram, getGuestsByEventId } =
@@ -102,6 +129,14 @@ export default function EventDetailScreen() {
 
     return isCreator || isAdmin;
   }, [event, userUid]);
+
+  const isGuest = useMemo(() => {
+    if (!userUid) return false;
+    return (
+      confirmed.some((g) => g.userId === userUid) ||
+      interested.some((g) => g.userId === userUid)
+    );
+  }, [confirmed, interested, userUid]);
 
   const loadEvent = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -168,7 +203,7 @@ export default function EventDetailScreen() {
 
         // ❌ outros erros: aí sim derruba
         setEvent(null);
-        setErrorMsg('Não foi possível carregar os dados do evento.');
+        setErrorMsg(getFriendlyErrorMessage(e));
       } finally {
         setInitialLoading(false);
         setRefreshing(false);
@@ -378,23 +413,18 @@ export default function EventDetailScreen() {
       {/* ✅ Header sempre consistente */}
       <Stack.Screen options={headerOptions} />
 
+      {/* Header Descritivo */}
+      {!initialLoading && event && (
+        <View style={{ paddingHorizontal: 16, marginTop: 8, marginBottom: 8 }}>
+          <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
+            Veja as informações completas e acompanhe a programação do evento:
+          </Text>
+        </View>
+      )}
+
       {/* ✅ Primeira carga */}
       {initialLoading ? (
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(200)}
-          style={styles.centeredContent}
-        >
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text
-            style={[
-              styles.emptyText,
-              { color: colors.textSecondary, marginTop: 12 },
-            ]}
-          >
-            Carregando programação...
-          </Text>
-        </Animated.View>
+        <EventDetailSkeleton />
       ) : !event ? (
         // ✅ Erro sem evento
         <View style={styles.centeredContent}>
@@ -402,28 +432,20 @@ export default function EventDetailScreen() {
             {errorMsg ?? 'Evento indisponível.'}
           </Text>
 
-          <TouchableOpacity
+          <Button 
+            title="Tentar novamente" 
+            variant="outline"
             onPress={() => loadEvent({ silent: false })}
-            style={{
-              marginTop: 14,
-              paddingVertical: 10,
-              paddingHorizontal: 16,
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: colors.primary,
-            }}
-            activeOpacity={0.85}
-          >
-            <Text style={{ color: colors.text }}>Tentar novamente</Text>
-          </TouchableOpacity>
+            style={{ marginTop: 14 }}
+          />
 
-          <TouchableOpacity
+          <Button 
+            title="Voltar" 
+            variant="ghost"
             onPress={() => router.back()}
             style={{ marginTop: 10 }}
-            activeOpacity={0.85}
-          >
-            <Text style={{ color: colors.textSecondary }}>Voltar</Text>
-          </TouchableOpacity>
+            textStyle={{ color: colors.textSecondary }}
+          />
         </View>
       ) : (
         // ✅ Tela normal
@@ -439,14 +461,17 @@ export default function EventDetailScreen() {
                 <View style={styles.row}>
                   <CalendarDays size={16} color="#fff" />
                   <Text style={styles.meta}>
-                    {new Date(event.startDate).toLocaleDateString('pt-BR')} até{' '}
-                    {new Date(event.endDate).toLocaleDateString('pt-BR')}
+                    {(() => {
+                      const start = new Date(event.startDate).toLocaleDateString('pt-BR');
+                      const end = new Date(event.endDate).toLocaleDateString('pt-BR');
+                      return start === end ? start : `${start} até ${end}`;
+                    })()}
                   </Text>
                 </View>
 
                 <TouchableOpacity
                   onPress={() => handleOpenInMaps(event.location)}
-                  style={[styles.mapBtn, { borderColor: colors.border }]}
+                  style={[styles.mapBtn, { borderColor: 'rgba(255,255,255,0.3)' }]}
                   activeOpacity={0.85}
                 >
                   <View style={styles.animaps}>
@@ -459,7 +484,7 @@ export default function EventDetailScreen() {
                   </View>
 
                   <Text
-                    style={[styles.mapBtnText, { color: colors.textSecondary }]}
+                    style={[styles.mapBtnText, { color: '#f0f0f0' }]}
                     numberOfLines={2}
                     ellipsizeMode="tail"
                   >
@@ -468,6 +493,62 @@ export default function EventDetailScreen() {
                 </TouchableOpacity>
               </View>
             </ImageBackground>
+          )}
+
+          {!!event.description && (
+            <View style={styles.descriptionCard}>
+              <Text style={[styles.descriptionHeader, { color: colors.text }]}>
+                Sobre o evento
+              </Text>
+              <Text
+                style={[
+                  styles.eventDescription,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                {event.description}
+              </Text>
+            </View>
+          )}
+
+          {isGuest && !hasPermission && (
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: '/(stack)/events/[id]/edit-my-participation',
+                  params: { id: event.id },
+                })
+              }
+              activeOpacity={0.8}
+              style={[
+                styles.guestActionCard,
+                {
+                  backgroundColor: colors.backgroundSecondary,
+                  borderColor: colors.primary,
+                },
+              ]}
+            >
+              <View style={styles.guestActionIconWrap}>
+                <Users size={20} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.guestActionTitle, { color: colors.text }]}>
+                  Minha Participação
+                </Text>
+                <Text
+                  style={[
+                    styles.guestActionSub,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  Editar seus dados e acompanhantes
+                </Text>
+              </View>
+              <ChevronRight
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
           )}
 
           <View style={styles.sectionHeader}>
@@ -493,26 +574,6 @@ export default function EventDetailScreen() {
                       style={[styles.controlButtonText, { color: colors.text }]}
                     >
                       Dia
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() =>
-                      router.push(
-                        `/events/${event.id}/eventOrganizerNoteViewScreen`,
-                      )
-                    }
-                    style={[
-                      styles.controlButton,
-                      { borderColor: colors.primary },
-                    ]}
-                    activeOpacity={0.8}
-                  >
-                    <Edit size={18} color={colors.text} />
-                    <Text
-                      style={[styles.controlButtonText, { color: colors.text }]}
-                    >
-                      Notas
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -554,6 +615,7 @@ export default function EventDetailScreen() {
                 {isAddingProgram ? '' : 'Nenhuma programação ainda.'}
               </Text>
             )}
+
           </ScrollView>
 
           {Platform.OS === 'android' && showDatePicker && (
@@ -584,17 +646,17 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 15,
     fontSize: 16,
-    fontFamily: 'Inter-Medium',
+    fontFamily: Fonts.medium,
   },
   successTitle: {
     fontSize: 24,
-    fontFamily: 'Inter-Bold',
+    fontFamily: Fonts.bold,
     marginTop: 20,
     textAlign: 'center',
   },
   successSub: {
     fontSize: 15,
-    fontFamily: 'Inter-Regular',
+    fontFamily: Fonts.regular,
     marginTop: 8,
     marginBottom: 30,
     textAlign: 'center',
@@ -613,7 +675,7 @@ const styles = StyleSheet.create({
   finishBtnText: {
     color: '#fff',
     fontSize: 16,
-    fontFamily: 'Inter-Bold',
+    fontFamily: Fonts.bold,
   },
 
   coverImage: {
@@ -631,12 +693,31 @@ const styles = StyleSheet.create({
   },
   coverTitle: {
     fontSize: 20,
-    fontFamily: 'Inter-Bold',
+    fontFamily: Fonts.bold,
     color: '#fff',
     paddingBottom: 4,
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  meta: { color: 'white', fontSize: 13, fontFamily: 'Inter-Regular' },
+  meta: { color: 'white', fontSize: 13, fontFamily: Fonts.regular },
+
+  descriptionCard: {
+    marginHorizontal: 18,
+    marginBottom: 20,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(87, 6, 6, 0.05)',
+  },
+  descriptionHeader: {
+    fontSize: 16,
+    fontFamily: Fonts.bold,
+    marginBottom: 8,
+  },
+  eventDescription: {
+    fontSize: 14,
+    fontFamily: Fonts.regular,
+    lineHeight: 20,
+    textAlign: 'justify',
+  },
 
   sectionHeader: {
     alignContent: 'center',
@@ -645,7 +726,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 18,
   },
-  sectionTitle: { fontSize: 18, fontFamily: 'Inter-Bold' },
+  sectionTitle: { fontSize: 18, fontFamily: Fonts.bold },
 
   headerActions: { flexDirection: 'row', gap: 12 },
 
@@ -663,7 +744,7 @@ const styles = StyleSheet.create({
   },
   mapBtnText: {
     fontSize: 13,
-    fontFamily: 'Inter-Medium',
+    fontFamily: Fonts.medium,
     flexShrink: 1,
     textAlign: 'center',
     lineHeight: 16,
@@ -689,7 +770,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 24,
     fontSize: 16,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: Fonts.regular,
   },
 
   buttonRow: { flexDirection: 'row', gap: 16 },
@@ -707,7 +788,35 @@ const styles = StyleSheet.create({
   controlButtonText: {
     fontSize: 14,
     justifyContent: 'center',
-    fontFamily: 'Inter_500Medium',
+    fontFamily: Fonts.medium,
   },
   disabled: { opacity: 0.5 },
+  footerActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  guestActionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 24,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    gap: 12,
+  },
+  guestActionIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  guestActionTitle: {
+    fontSize: 15,
+    fontFamily: Fonts.bold,
+  },
+  guestActionSub: {
+    fontSize: 12,
+    fontFamily: Fonts.regular,
+    marginTop: 2,
+  },
 });

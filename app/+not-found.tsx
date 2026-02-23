@@ -1,10 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { Stack, router, usePathname, useSegments } from 'expo-router';
 import * as Linking from 'expo-linking';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, useColorScheme } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import LottieView from 'lottie-react-native';
+import Colors from '@/constants/Colors';
+import Fonts from '@/constants/Fonts';
 
 export default function NotFoundScreen() {
   const handledRef = useRef(false);
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
 
   useEffect(() => {
     const safeReplaceHome = () => {
@@ -39,7 +45,7 @@ export default function NotFoundScreen() {
     };
 
     // Timeout de segurança (não prende em loading)
-    const t = setTimeout(() => safeReplaceHome(), 1500);
+    const t = setTimeout(() => safeReplaceHome(), 1800);
 
     Linking.getInitialURL()
       .then((url) => {
@@ -51,26 +57,56 @@ export default function NotFoundScreen() {
 
     return () => clearTimeout(t);
   }, []);
-  const pathname = usePathname();
-  const segments = useSegments();
 
   return (
-    <>
-      <Stack.Screen options={{ title: 'Redirecionando...' }} />
-      <View style={styles.container}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.text}>Buscando evento...</Text>
+    <LinearGradient colors={colors.gradients} style={styles.container}>
+      <Stack.Screen options={{ 
+        title: 'Redirecionando...',
+        headerShown: false,
+      }} />
+      <View style={styles.content}>
+        <LottieView
+          source={require('@/assets/images/start.json')}
+          autoPlay
+          loop
+          style={styles.lottie}
+        />
+        <Text style={[styles.text, { color: colors.text }]}>
+          Buscando seu evento...
+        </Text>
+        <Text style={[styles.subText, { color: colors.textSecondary }]}>
+          Aguarde um momento enquanto preparamos tudo
+        </Text>
       </View>
-    </>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  content: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: 30,
   },
-  text: { fontSize: 18, marginTop: 10 },
+  lottie: {
+    width: 200,
+    height: 200,
+    marginBottom: 20,
+  },
+  text: { 
+    fontSize: 22, 
+    fontFamily: Fonts.bold,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subText: {
+    fontSize: 16,
+    fontFamily: Fonts.regular,
+    textAlign: 'center',
+    opacity: 0.8,
+  },
 });

@@ -11,15 +11,25 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Alert,
+  useColorScheme,
+  Image,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import Colors from '@/constants/Colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/config/firebase';
+import { useGoogleAuth } from '@/hooks/useGoogleAuth';
+import { GoogleLoginButton } from '@/components/GoogleLoginButton';
+import { useRegistrationFlow } from '@/context/RegistrationFlowContext';
+import Fonts from '@/constants/Fonts';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme() ?? 'dark';
+  const colors = Colors[colorScheme];
   const { k } = useLocalSearchParams<{ k?: string }>();
 
   const [email, setEmail] = useState('');
@@ -27,12 +37,28 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(true);
 
+  const { setCameFromRegister } = useRegistrationFlow();
+
+  const { signIn, loading: googleLoading } = useGoogleAuth({
+    onSuccess: (data) => goAfterLogin(data.isNew),
+  });
+
   function resolvedInviteKey() {
     return typeof k === 'string' && k.trim() ? k.trim() : '';
   }
 
-  function goAfterLogin() {
+  function goAfterLogin(isNew = false) {
     const key = resolvedInviteKey();
+
+    if (isNew) {
+      setCameFromRegister(true);
+      router.replace({
+        pathname: '/accountCreatedScreen',
+        params: key ? { k: key } : {},
+      } as any);
+      return;
+    }
+
     if (key) {
       router.replace({
         pathname: '/(auth)/invite-preview',
@@ -98,20 +124,29 @@ export default function LoginScreen() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <LinearGradient
-        colors={['#0b0b0f', '#1b0033', '#3e1d73']}
+        colors={colors.gradients}
         locations={[0, 0.7, 1]}
         style={{ flex: 1 }}
       >
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.container}
         >
-          <Text style={styles.title}>Login</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Login</Text>
 
           <TextInput
             placeholder="exemplo@gmail.com"
-            placeholderTextColor="#aaa"
-            style={styles.input}
+            placeholderTextColor={colors.textSecondary}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.backgroundCard,
+                color: colors.text,
+                borderColor: colors.border,
+                borderWidth: 1,
+              },
+            ]}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -121,8 +156,15 @@ export default function LoginScreen() {
           <View style={styles.passwordContainer}>
             <TextInput
               placeholder="Senha"
-              placeholderTextColor="#aaa"
-              style={styles.passwordInput}
+              placeholderTextColor={colors.textSecondary}
+              style={[
+                styles.passwordInput,
+                {
+                  backgroundColor: colors.backgroundCard,
+                  color: colors.text,
+                  borderColor: colors.border,
+                },
+              ]}
               value={password}
               onChangeText={setPassword}
               secureTextEntry={showPassword}
@@ -132,9 +174,9 @@ export default function LoginScreen() {
               style={styles.eyeButton}
             >
               {showPassword ? (
-                <EyeOff size={20} color="#aaa" />
+                <EyeOff size={20} color={colors.textSecondary} />
               ) : (
-                <Eye size={20} color="#aaa" />
+                <Eye size={20} color={colors.textSecondary} />
               )}
             </TouchableOpacity>
           </View>
@@ -143,25 +185,45 @@ export default function LoginScreen() {
             onPress={() => router.push('/(auth)/forgot-password')}
             style={styles.forgotLink}
           >
-            <Text style={styles.forgotText}>Esqueceu a senha?</Text>
+            <Text style={[styles.forgotText, { color: colors.primary }]}>
+              Esqueceu a senha?
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={handleLogin}
-            style={styles.signInButton}
+            style={[styles.signInButton, { backgroundColor: colors.primary }]}
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.textOnPrimary} />
             ) : (
-              <Text style={styles.signInText}>Login</Text>
+              <Text
+                style={[styles.signInText, { color: colors.textOnPrimary }]}
+              >
+                Login
+              </Text>
             )}
           </TouchableOpacity>
 
-          <Text style={styles.bottomText}>
+          <View style={styles.divider}>
+            <View style={[styles.line, { backgroundColor: colors.border }]} />
+            <Text style={[styles.dividerText, { color: colors.textSecondary }]}>
+              ou
+            </Text>
+            <View style={[styles.line, { backgroundColor: colors.border }]} />
+          </View>
+
+          <GoogleLoginButton
+            onPress={signIn}
+            loading={googleLoading}
+            disabled={loading}
+          />
+
+          <Text style={[styles.bottomText, { color: colors.textSecondary }]}>
             Não possui uma conta?{' '}
             <Text
-              style={styles.signUpText}
+              style={[styles.signUpText, { color: colors.primary }]}
               onPress={() => router.push('/(auth)/register')}
             >
               Cadastre-se
@@ -170,17 +232,17 @@ export default function LoginScreen() {
 
           {/* ✅ LGPD: links obrigatórios no login */}
           <View style={styles.legalBox}>
-            <Text style={styles.legalText}>
+            <Text style={[styles.legalText, { color: colors.textSecondary }]}>
               Ao usar o app, você concorda com nossa{' '}
               <Text
-                style={styles.legalLink}
+                style={[styles.legalLink, { color: colors.primary }]}
                 onPress={() => router.push('/(auth)/privacidade')}
               >
                 Política de Privacidade
               </Text>{' '}
               e{' '}
               <Text
-                style={styles.legalLink}
+                style={[styles.legalLink, { color: colors.primary }]}
                 onPress={() => router.push('/(auth)/termos')}
               >
                 Termos de Uso
@@ -204,19 +266,18 @@ const styles = StyleSheet.create({
     paddingRight: 40,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#fff',
+    fontSize: 32,
+    fontFamily: Fonts.bold,
     marginBottom: 40,
   },
   input: {
-    backgroundColor: '#1f1f25',
-    color: '#fff',
     width: '100%',
-    borderRadius: 12,
+    borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 16,
     marginBottom: 16,
+    borderWidth: 1,
+    fontFamily: Fonts.regular,
   },
   passwordContainer: {
     width: '100%',
@@ -224,12 +285,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   passwordInput: {
-    backgroundColor: '#1f1f25',
-    color: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 16,
     paddingRight: 45,
+    borderWidth: 1,
+    fontFamily: Fonts.regular,
   },
   eyeButton: {
     position: 'absolute',
@@ -241,28 +302,26 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   forgotText: {
-    color: '#b18aff',
     fontSize: 14,
+    fontFamily: Fonts.medium,
   },
   signInButton: {
-    backgroundColor: '#b18aff',
-    borderRadius: 25,
+    borderRadius: 16,
     width: '100%',
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 16,
   },
   signInText: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: Fonts.bold,
   },
   bottomText: {
-    color: '#aaa',
     fontSize: 14,
+    fontFamily: Fonts.medium,
   },
   signUpText: {
-    color: '#b18aff',
+    fontFamily: Fonts.bold,
   },
   legalBox: {
     marginTop: 18,
@@ -270,14 +329,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   legalText: {
-    color: 'rgba(255,255,255,0.65)',
     fontSize: 12,
-    lineHeight: 16,
+    lineHeight: 18,
     textAlign: 'center',
+    fontFamily: Fonts.regular,
   },
   legalLink: {
-    color: '#b18aff',
     textDecorationLine: 'underline',
-    fontWeight: '600',
+    fontFamily: Fonts.bold,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+    width: '100%',
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  dividerText: {
+    paddingHorizontal: 10,
+    fontSize: 14,
+    fontFamily: Fonts.medium,
   },
 });

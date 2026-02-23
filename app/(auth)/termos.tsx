@@ -6,9 +6,8 @@ import { useRouter } from 'expo-router';
 export default function TermosScreen() {
   const router = useRouter();
 
-  // ✅ Ajuste estes 2 campos
   const NOME_APP = 'Plannix';
-  const NOME_CONTROLADOR = 'Jociel Luciano';
+  const NOME_CONTROLE = 'Equipe Plannix';
   const EMAIL_SUPORTE = 'planejejasuporte@gmail.com';
 
   return (
@@ -21,90 +20,56 @@ export default function TermosScreen() {
 
         <Text style={styles.h2}>1. Aceite dos Termos</Text>
         <Text style={styles.p}>
-          Ao criar uma conta, acessar ou utilizar o {NOME_APP}, você declara que
-          leu e concorda com estes Termos de Uso. Se não concordar, não utilize
-          o app.
+          Ao acessar e utilizar o aplicativo {NOME_APP}, você concorda em cumprir e estar vinculado a estes Termos de Uso. Se não concordar com qualquer parte destes termos, você deve descontinuar o uso do App imediatamente.
         </Text>
 
-        <Text style={styles.h2}>2. Quem opera o app</Text>
+        <Text style={styles.h2}>2. Responsabilidade do Usuário</Text>
         <Text style={styles.p}>
-          O {NOME_APP} é operado por{' '}
-          <Text style={styles.bold}>{NOME_CONTROLADOR}</Text>, pessoa física,
-          responsável pela disponibilização do serviço.
+          Você é o único responsável pelo conteúdo (fotos, nomes, comentários) que envia ao App. Ao utilizar o serviço, você garante que possui os direitos necessários sobre tais conteúdos.
         </Text>
 
-        <Text style={styles.h2}>3. Conta e acesso</Text>
+        <Text style={styles.h2}>3. Diretrizes e Conteúdo Proibido</Text>
+        <Text style={styles.p}>É expressamente proibido enviar qualquer conteúdo que:</Text>
+        <Text style={styles.p}>• Seja ofensivo, abusivo, discriminatório ou obsceno;</Text>
+        <Text style={styles.p}>• Incite o ódio, violência ou atividades ilegais;</Text>
+        <Text style={styles.p}>• Constitua spam ou propaganda não autorizada;</Text>
+        <Text style={styles.p}>• Viole a privacidade ou direitos de terceiros.</Text>
+
+        <View style={styles.modBadge}>
+          <Text style={styles.modBadgeText}>📌 Requisito Play Store: Política de UGC</Text>
+        </View>
+        <Text style={styles.h2}>4. Moderação de Conteúdo (UGC)</Text>
         <Text style={styles.p}>
-          Para utilizar determinadas funcionalidades, você poderá precisar criar
-          uma conta e fornecer informações verdadeiras e atualizadas. Você é
-          responsável por manter a confidencialidade das credenciais de acesso e
-          por todas as atividades realizadas em sua conta.
+          O {NOME_APP} utiliza ferramentas para manter um ambiente seguro:
+        </Text>
+        <Text style={styles.p}>
+          • <Text style={styles.bold}>Denúncias:</Text> Todos os usuários podem denunciar fotos ou comentários impróprios.
+        </Text>
+        <Text style={styles.p}>
+          • <Text style={styles.bold}>Ação Administrativa:</Text> Administradores do evento podem remover imediatamente conteúdos que violem estes termos.
+        </Text>
+        <Text style={styles.p}>
+          • <Text style={styles.bold}>Bloqueio:</Text> Usuários que violarem repetidamente as diretrizes podem ser bloqueados ou banidos permanentemente.
         </Text>
 
-        <Text style={styles.h2}>4. Uso permitido</Text>
-        <Text style={styles.p}>Você concorda em:</Text>
+        <Text style={styles.h2}>5. Licença de Uso</Text>
         <Text style={styles.p}>
-          • Não utilizar o app para fins ilegais ou proibidos por estes Termos.
-        </Text>
-        <Text style={styles.p}>
-          • Não tentar acessar áreas restritas, burlar autenticação ou explorar
-          falhas.
-        </Text>
-        <Text style={styles.p}>
-          • Não interferir no funcionamento do serviço (ex.: spam, automações
-          abusivas).
+          Você concede ao {NOME_APP} uma licença gratuita e não exclusiva para hospedar e exibir o conteúdo que você carrega, estritamente para os fins de prestação do serviço (álbum do evento).
         </Text>
 
-        <Text style={styles.h2}>5. Conteúdo e dados inseridos por você</Text>
+        <Text style={styles.h2}>6. Limitação de Responsabilidade</Text>
         <Text style={styles.p}>
-          Você é responsável pelos dados e conteúdos que inserir no app. Você
-          declara possuir os direitos necessários para inserir essas informações
-          e autoriza o processamento delas para a execução do serviço.
+          O {NOME_APP} é fornecido "como está". Não nos responsabilizamos por perdas de dados decorrentes de mau uso ou falhas técnicas de provedores de infraestrutura.
         </Text>
 
-        <Text style={styles.h2}>6. Privacidade e proteção de dados</Text>
+        <Text style={styles.h2}>7. Encerramento de Conta</Text>
         <Text style={styles.p}>
-          O tratamento de dados pessoais é regido pela nossa Política de
-          Privacidade. Recomendamos a leitura conjunta destes Termos e da
-          Política.
+          Você pode encerrar sua conta a qualquer momento em Perfil {'>'} Excluir minha conta. Seus dados pessoais identificáveis serão removidos de nossa base ativa.
         </Text>
 
-        <Text style={styles.h2}>7. Disponibilidade e alterações</Text>
+        <Text style={styles.h2}>8. Jurisdição</Text>
         <Text style={styles.p}>
-          Buscamos manter o serviço disponível, mas pode haver interrupções por
-          manutenção, falhas técnicas ou fatores externos. O app pode ser
-          atualizado, modificado ou ter funcionalidades ajustadas a qualquer
-          momento.
-        </Text>
-
-        <Text style={styles.h2}>8. Limitação de responsabilidade</Text>
-        <Text style={styles.p}>
-          Na medida permitida pela legislação aplicável, o {NOME_APP} não se
-          responsabiliza por danos indiretos, lucros cessantes ou perdas
-          decorrentes do uso ou da impossibilidade de uso do serviço, incluindo
-          problemas causados por terceiros, internet, dispositivos ou serviços
-          integrados.
-        </Text>
-
-        <Text style={styles.h2}>9. Cancelamento e exclusão de conta</Text>
-        <Text style={styles.p}>
-          Você pode solicitar a exclusão da sua conta e/ou interromper o uso do
-          app a qualquer momento. Alguns dados podem ser mantidos quando
-          necessário para cumprir obrigações legais, resolver disputas ou
-          garantir segurança.
-        </Text>
-
-        <Text style={styles.h2}>10. Contato</Text>
-        <Text style={styles.p}>
-          Para dúvidas, suporte ou solicitações relacionadas ao app, entre em
-          contato pelo e-mail: <Text style={styles.bold}>{EMAIL_SUPORTE}</Text>.
-        </Text>
-
-        <Text style={styles.h2}>11. Lei aplicável e foro</Text>
-        <Text style={styles.p}>
-          Estes Termos são regidos pelas leis da República Federativa do Brasil.
-          Fica eleito o foro do domicílio do usuário, conforme o Código de
-          Defesa do Consumidor, quando aplicável.
+          Estes termos são regidos pelas leis da República Federativa do Brasil. Qualquer litígio será resolvido no foro da comarca da {NOME_CONTROLE}.
         </Text>
 
         <Pressable style={styles.button} onPress={() => router.back()}>
@@ -131,9 +96,22 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 24,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
   buttonText: { color: '#fff', fontWeight: '700' },
+  modBadge: {
+    marginTop: 18,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(154, 167, 255, 0.15)',
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+  },
+  modBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#9aa7ff',
+  },
 });

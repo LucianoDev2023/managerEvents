@@ -6,7 +6,7 @@ export const eventFormSchema = z
     location: z.string().min(3, 'Localização obrigatória.'),
     startDate: z.date(),
     endDate: z.date(),
-    description: z.string().min(1, 'Descrição obrigatória'),
+    description: z.string().min(1, 'Descrição obrigatória').max(110, 'A descrição deve ter no máximo 110 caracteres.'),
     coverImage: z.string().default(''),
   })
   .refine((data) => data.endDate >= data.startDate, {

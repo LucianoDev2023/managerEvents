@@ -17,7 +17,7 @@ import {
 import { db } from '@/config/firebase';
 import type { GuestParticipation } from '@/types/guestParticipation';
 import { GuestMode } from '@/types';
-import logger from '@/lib/logger';
+import { logger } from '@/lib/logger';
 
 const makeParticipationId = (userId: string, eventId: string) =>
   `${userId}_${eventId}`;
@@ -50,7 +50,7 @@ export const upsertGuestParticipation = async (params: {
   eventId: string;
   mode: GuestMode;
   userName?: string | null;
-  family?: string[];
+  family?: any[];
 }) => {
   const { userId, eventId, mode } = params;
 
@@ -175,7 +175,7 @@ export const getGuestParticipationsByEventId = async (
 export const updateGuestParticipation = async (params: {
   userId: string;
   eventId: string;
-  updates: Partial<Pick<GuestParticipation, 'mode' | 'family' | 'userName'>>;
+  updates: Partial<Pick<GuestParticipation, 'mode' | 'userName'>> & { family?: any[] };
 }) => {
   const { userId, eventId, updates } = params;
   if (!userId || !eventId) throw new Error('userId e eventId são obrigatórios');
@@ -253,7 +253,7 @@ export const removeGuestParticipation = async (
 export const createManualGuest = async (params: {
   eventId: string;
   userName: string;
-  family?: string[];
+  family?: any[];
 }) => {
   const { eventId, userName } = params;
   if (!eventId || !userName) throw new Error('Dados incompletos');

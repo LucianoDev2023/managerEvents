@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import Colors from '@/constants/Colors';
+import Fonts from '@/constants/Fonts';
 import { useColorScheme } from 'react-native';
 import { Eye, EyeOff } from 'lucide-react-native';
 
@@ -111,6 +112,7 @@ export default function TextInput({
               minHeight: multiline ? 120 : 48,
               textAlignVertical: multiline ? 'top' : 'center',
               paddingVertical: multiline ? 12 : 0,
+              color: colors.text, // ✅ Garante cor correta no dark/light mode
             },
             inputStyle,
           ]}
@@ -160,13 +162,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    fontFamily: 'Inter-Medium',
+    fontFamily: Fonts.medium,
     fontSize: 16,
     marginBottom: 8,
   },
   inputContainer: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -178,13 +180,13 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 12,
     fontSize: 16,
-    fontFamily: 'Inter-Regular',
+    fontFamily: Fonts.regular,
   },
   eyeIcon: {
     padding: 12,
   },
   errorText: {
-    fontFamily: 'Inter-Regular',
+    fontFamily: Fonts.regular,
     fontSize: 14,
     marginTop: 4,
   },

@@ -2,21 +2,24 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  ScrollView,
+  FlatList,
   StyleSheet,
   Alert,
   ActivityIndicator,
   useColorScheme,
   Modal,
   TextInput as RNTextInput,
-  Pressable,
+  TouchableOpacity,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useEvents } from '@/context/EventsContext';
 import { getAuth } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { Edit, Pencil, Plus, Trash2, X } from 'lucide-react-native';
+import { Edit, Plus, Trash2, X } from 'lucide-react-native';
 
 import Colors from '@/constants/Colors';
+import Fonts from '@/constants/Fonts';
+import { logger } from '@/lib/logger';
 import { auth, db } from '@/config/firebase';
 import Button from '@/components/ui/Button';
 
@@ -27,10 +30,12 @@ export default function EventOrganizerNoteViewScreen() {
   const colors = Colors[colorScheme];
 
   const { id: eventId } = useLocalSearchParams<{ id: string }>();
+  const { state } = useEvents();
   const user = auth.currentUser;
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
 
+  const event = state.events.find(e => e.id === eventId);
   const [fields, setFields] = useState<Field[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -50,7 +55,7 @@ export default function EventOrganizerNoteViewScreen() {
           }
         }
       } catch (error) {
-        console.error('Erro ao carregar anotações:', error);
+        logger.error('Erro ao carregar anotações:', error);
         Alert.alert('Erro', 'Não foi possível carregar as anotações.');
       } finally {
         setIsLoading(false);
@@ -88,10 +93,10 @@ export default function EventOrganizerNoteViewScreen() {
       await setDoc(
         ref,
         { fields: newFields, createdBy: user.uid },
-        { merge: true }
+        { merge: true },
       );
     } catch (error) {
-      console.error('Erro ao salvar:', error);
+      logger.error('Erro ao salvar:', error);
       Alert.alert('Erro', 'Não foi possível salvar as alterações.');
     }
   };
@@ -107,7 +112,7 @@ export default function EventOrganizerNoteViewScreen() {
       setIsModalVisible(false);
       setEditIndex(null);
     } catch (err) {
-      console.error('Erro ao salvar edição:', err);
+      logger.error('Erro ao salvar edição:', err);
       Alert.alert('Erro', 'Não foi possível salvar a edição.');
     } finally {
       setIsEditing(false);
@@ -126,25 +131,34 @@ export default function EventOrganizerNoteViewScreen() {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={[
-        styles.container,
-        { backgroundColor: colors.background },
-      ]}
-    >
-      <Text style={[styles.heading, { color: colors.text }]}>
-        Anotações da organização
-      </Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Stack.Screen options={{ title: 'Anotações' }} />
 
-      {fields.length > 0 ? (
-        fields.map((field, index) => (
+      <View style={{ paddingHorizontal: 16, marginTop: 16, marginBottom: 8 }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
+          Mantenha suas ideias e anotações importantes organizadas para o:
+        </Text>
+        <Text style={{ color: colors.text, fontSize: 14, fontWeight: 'bold', marginTop: 2 }}>
+          {event?.title || '...'}
+        </Text>
+      </View>
+
+      <FlatList
+        data={fields}
+        keyExtractor={(_, index) => index.toString()}
+        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        ListEmptyComponent={
+          <Text style={{ textAlign: 'center', color: colors.textSecondary, marginTop: 40 }}>
+            Nenhuma anotação encontrada. Toque em "Nova Anotação" para começar.
+          </Text>
+        }
+        renderItem={({ item: field, index }) => (
           <View
-            key={index}
             style={[
               styles.fieldCard,
               {
                 borderColor: colors.border,
-                backgroundColor: colors.background,
+                backgroundColor: colors.backgroundCard,
               },
             ]}
           >
@@ -152,40 +166,30 @@ export default function EventOrganizerNoteViewScreen() {
               <Text style={[styles.label, { color: colors.primary }]}>
                 {field.label}
               </Text>
-              <View style={{ flexDirection: 'row', gap: 16 }}>
-                <Pressable onPress={() => handleEdit(index)}>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity onPress={() => handleEdit(index)} style={{ padding: 4 }}>
                   <Edit size={18} color={colors.primary} />
-                </Pressable>
-                <Pressable onPress={() => handleDelete(index)}>
-                  <Trash2 size={18} color="red" />
-                </Pressable>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDelete(index)} style={{ padding: 4 }}>
+                  <Trash2 size={18} color={colors.error} />
+                </TouchableOpacity>
               </View>
             </View>
             <Text style={[styles.value, { color: colors.text }]}>
               {field.value || '—'}
             </Text>
           </View>
-        ))
-      ) : (
-        <Text style={{ color: colors.textSecondary }}>
-          Nenhuma anotação encontrada.
-        </Text>
-      )}
+        )}
+      />
 
-      <View style={{ height: 20, justifyContent: 'flex-start' }} />
-      <Pressable
-        style={[styles.addButton, { backgroundColor: colors.primary }]}
-        onPress={() =>
-          router.push(`/events/${eventId}/eventOrganizerNoteScreen`)
-        }
+      <TouchableOpacity
+        style={[styles.extendedFab, { backgroundColor: colors.primary }]}
+        onPress={() => router.push(`/events/${eventId}/eventOrganizerNoteScreen`)}
+        activeOpacity={0.8}
       >
-        <Plus size={16} color={colors.text} />
-        <Text
-          style={[styles.addButtonText, { color: colors.text, marginLeft: 8 }]}
-        >
-          Adicionar anotação
-        </Text>
-      </Pressable>
+        <Plus color="#fff" size={24} />
+        <Text style={styles.fabText}>Nova Anotação</Text>
+      </TouchableOpacity>
 
       {/* Modal de edição */}
       <Modal visible={isModalVisible} animationType="slide" transparent>
@@ -193,121 +197,113 @@ export default function EventOrganizerNoteViewScreen() {
           <View
             style={[
               styles.modalContainer,
-              { backgroundColor: colors.background },
+              { backgroundColor: colors.backgroundCard },
             ]}
           >
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               Editar anotação
             </Text>
+            
+            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Título</Text>
             <RNTextInput
               style={[
                 styles.modalInput,
                 { color: colors.text, borderColor: colors.border },
               ]}
-              placeholder="Título"
               value={editField.label}
               onChangeText={(text) =>
                 setEditField((prev) => ({ ...prev, label: text }))
               }
-              placeholderTextColor={colors.text2}
+              placeholderTextColor={colors.textSecondary}
             />
+            
+            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Conteúdo</Text>
             <RNTextInput
               style={[
                 styles.modalInput,
-                { color: colors.text, borderColor: colors.border, height: 100 },
+                { color: colors.text, borderColor: colors.border, height: 100, textAlignVertical: 'top' },
               ]}
-              placeholder="Anotação"
               value={editField.value}
               multiline
               onChangeText={(text) =>
                 setEditField((prev) => ({ ...prev, value: text }))
               }
-              placeholderTextColor={colors.text2}
+              placeholderTextColor={colors.textSecondary}
             />
-            <View style={styles.modalButtons}>
-              <Pressable
-                onPress={() => setIsModalVisible(false)}
-                style={({ pressed }) => [
-                  styles.cancelButton,
-                  {
-                    opacity: pressed ? 0.6 : 1,
-                    backgroundColor: colors.backgroundComents,
-                  },
-                ]}
-              >
-                <Text
-                  style={[styles.cancelButtonText, { color: colors.text2 }]}
-                >
-                  Cancelar
-                </Text>
-              </Pressable>
 
-              <Pressable
-                onPress={handleSaveEdit}
-                disabled={isEditing}
-                style={[
-                  styles.saveButton,
-                  {
-                    opacity: isEditing ? 0.6 : 1,
-                    backgroundColor: colors.primary,
-                  },
-                ]}
-              >
-                {isEditing ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.saveButtonText}>Salvar</Text>
-                )}
-              </Pressable>
+            <View style={styles.modalButtons}>
+              <Button 
+                title="Cancelar" 
+                variant="cancel" 
+                onPress={() => setIsModalVisible(false)} 
+                style={{ flex: 1 }}
+              />
+              <Button 
+                title="Salvar" 
+                onPress={handleSaveEdit} 
+                loading={isEditing} 
+                style={{ flex: 1 }}
+              />
             </View>
-            <Pressable
-              onPress={() => setIsModalVisible(false)}
-              style={styles.closeButton}
-            >
-              <X size={20} color={colors.textSecondary} />
-            </Pressable>
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
-    paddingBottom: 40,
+    flex: 1,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  heading: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
   fieldCard: {
-    marginBottom: 16,
+    marginBottom: 12,
     padding: 16,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
   },
   fieldHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   label: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
+    fontFamily: 'Inter_600SemiBold',
   },
   value: {
     fontSize: 15,
     lineHeight: 22,
+    fontFamily: 'Inter_400Regular',
+  },
+  extendedFab: { 
+    position: 'absolute', 
+    right: 20, 
+    bottom: 30, 
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 30, 
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+  },
+  fabText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
@@ -316,71 +312,31 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   modalContainer: {
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
-    position: 'relative',
   },
   modalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  inputLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+    fontWeight: '500',
   },
   modalInput: {
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 14,
-    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    marginBottom: 16,
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 10,
-    gap: 20,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-  },
-  saveButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-
-  cancelButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginTop: 10,
-  },
-  cancelButtonText: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignSelf: 'center',
-    marginTop: 20,
-  },
-  addButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    gap: 12,
+    marginTop: 8,
   },
 });
